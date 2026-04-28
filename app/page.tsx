@@ -1,9 +1,9 @@
 import Navbar from './components/Navbar'
-import Hero from './components/Hero'
-import Categories from './components/Categories'
-import FeaturedProducts from './components/FeaturedProducts'
-import WhyChooseUs from './components/WhyChooseUs'
-import Footer from './components/Footer'
+import Hero2 from './components/Hero2'
+import Categories2 from './components/Categories2'
+import FeaturedProducts2 from './components/FeaturedProducts2'
+import WhyChooseUs2 from './components/WhyChooseUs2'
+import Footer2 from './components/Footer2'
 
 export default function Home() {
   return (
@@ -18,13 +18,13 @@ export default function Home() {
       <Navbar />
 
       <main id="main-content">
-        <Hero />
-        <Categories />
-        <FeaturedProducts />
-        <WhyChooseUs />
+        <Hero2 />
+        <Categories2 />
+        <FeaturedProducts2 />
+        <WhyChooseUs2 />
       </main>
 
-      <Footer />
+      <Footer2 />
     </>
   )
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Outfit, Orbitron } from 'next/font/google'
+import { Outfit, Orbitron, Playfair_Display, DM_Sans } from 'next/font/google'
 import './globals.css'
 import { FontProvider } from './context/FontContext'
 
@@ -15,6 +15,18 @@ const orbitron = Orbitron({
   display: 'swap',
 })
 
+const playfair = Playfair_Display({
+  variable: '--font-playfair',
+  subsets: ['latin'],
+  display: 'swap',
+})
+
+const dmSans = DM_Sans({
+  variable: '--font-dm-sans',
+  subsets: ['latin'],
+  display: 'swap',
+})
+
 export const metadata: Metadata = {
   title: 'IC Variedades',
   description: 'Tu tienda de tecnología, belleza y hogar. Gadgets, cuidado personal y más.',
@@ -26,7 +38,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${outfit.variable} ${orbitron.variable} h-full antialiased`}
+      className={`${outfit.variable} ${orbitron.variable} ${playfair.variable} ${dmSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-[#050b18] text-slate-100">
         <FontProvider>{children}</FontProvider>
