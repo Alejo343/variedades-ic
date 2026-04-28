@@ -1,26 +1,115 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: #050b18;
+  --color-surface: #0a1628;
+  --color-primary: #0ea5e9;
+  --color-primary-light: #38bdf8;
+  --color-accent: #7dd3fc;
+  --color-metallic: #94a3b8;
+  --color-metallic-light: #cbd5e1;
+  --font-sans: var(--font-outfit);
+  --font-display: var(--font-orbitron);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Font toggle classes */
+.font-outfit {
+  font-family: var(--font-outfit), ui-sans-serif, sans-serif;
+}
+.font-orbitron {
+  font-family: var(--font-orbitron), ui-sans-serif, sans-serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #050b18;
+  color: #f1f5f9;
+  font-family: var(--font-outfit), ui-sans-serif, sans-serif;
+}
+
+/* Glassmorphism utilities */
+.glass {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.glass-nav {
+  background: rgba(5, 11, 24, 0.8);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.glass-card {
+  background: rgba(14, 165, 233, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(14, 165, 233, 0.2);
+}
+
+/* Glow effects */
+.glow-blue {
+  box-shadow: 0 0 24px rgba(14, 165, 233, 0.25);
+}
+
+.glow-blue-hover {
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+.glow-blue-hover:hover {
+  box-shadow: 0 0 36px rgba(14, 165, 233, 0.45);
+  transform: scale(1.02);
+}
+
+/* Gradient text */
+.text-gradient {
+  background: linear-gradient(135deg, #38bdf8 0%, #7dd3fc 50%, #94a3b8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* CTA button shimmer */
+.btn-primary {
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 0 0 20px rgba(14, 165, 233, 0.3);
+  transition: all 0.3s ease;
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, #38bdf8, #0ea5e9);
+  box-shadow: 0 0 32px rgba(14, 165, 233, 0.55);
+  transform: translateY(-1px);
+}
+
+/* Scroll fade-in */
+.fade-in {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.65s ease-out, transform 0.65s ease-out;
+}
+.fade-in.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Animated orbs (hero background) */
+@keyframes float-orb {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(30px, -40px) scale(1.05); }
+  66%       { transform: translate(-20px, 20px) scale(0.97); }
+}
+.orb {
+  animation: float-orb 14s ease-in-out infinite;
+  filter: blur(80px);
+  border-radius: 9999px;
+  position: absolute;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-in { opacity: 1; transform: none; transition: none; }
+  .orb { animation: none; }
+  .btn-primary:hover { transform: none; }
+  .glow-blue-hover:hover { transform: none; }
 }
