@@ -179,3 +179,46 @@ body {
   .hero-enter, .hero-enter-right { animation: none; opacity: 1; }
   .marquee-scroll { animation: none; }
 }
+
+/* =============================================
+   BLUEPRINT TECH — v3 page components
+   ============================================= */
+
+@keyframes v3-in-left {
+  from { opacity: 0; transform: translateX(-32px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes v3-in-right {
+  from { opacity: 0; transform: translateX(32px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes v3-pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.35; transform: scale(0.65); }
+}
+@keyframes v3-card-glow {
+  0%, 100% { box-shadow: 0 0 32px rgba(59,130,246,0.10); }
+  50%       { box-shadow: 0 0 64px rgba(59,130,246,0.20); }
+}
+
+.v3-in-left  { opacity: 0; animation: v3-in-left  0.95s cubic-bezier(0.16,1,0.3,1) 0.1s  forwards; }
+.v3-in-right { opacity: 0; animation: v3-in-right 0.95s cubic-bezier(0.16,1,0.3,1) 0.3s  forwards; }
+.v3-pulse-dot { animation: v3-pulse-dot 2.4s ease-in-out infinite; }
+.v3-hero-card { animation: v3-card-glow 4.5s ease-in-out infinite; }
+
+.v3-scroll-reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+}
+.v3-scroll-reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v3-in-left, .v3-in-right { animation: none; opacity: 1; }
+  .v3-pulse-dot { animation: none; }
+  .v3-hero-card { animation: none; box-shadow: none; }
+  .v3-scroll-reveal { opacity: 1; transform: none; transition: none; }
+}
