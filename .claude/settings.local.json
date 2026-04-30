@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx skills *)",
+      "Bash(PGPASSWORD=root psql -U postgres -h localhost -c \"\\\\conninfo\")",
+      "Bash(PGPASSWORD=root \"/c/Program Files/PostgreSQL/18/bin/psql\" -U postgres -h localhost -c \"\\\\conninfo\")",
+      "Bash(PGPASSWORD=root \"/c/Program Files/PostgreSQL/18/bin/psql\" -U postgres -h localhost -c \"CREATE DATABASE variedades_ic;\")",
+      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(32\\).toString\\('hex'\\)\\)\")",
+      "Bash(npm run *)"
+    ]
+  }
+}

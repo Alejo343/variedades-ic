@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 
-function useFadeIn(delay = 0) {
+function useScrollReveal(delay = 0) {
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const el = ref.current
@@ -10,7 +10,7 @@ function useFadeIn(delay = 0) {
     const timer = setTimeout(() => {
       const observer = new IntersectionObserver(
         ([entry]) => { if (entry.isIntersecting) { el.classList.add('visible'); observer.disconnect() } },
-        { threshold: 0.15 }
+        { threshold: 0.1 }
       )
       observer.observe(el)
       return () => observer.disconnect()
@@ -20,106 +20,168 @@ function useFadeIn(delay = 0) {
   return ref
 }
 
-function ShippingIcon() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="1" y="3" width="15" height="13" />
-      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
-      <circle cx="5.5" cy="18.5" r="2.5" />
-      <circle cx="18.5" cy="18.5" r="2.5" />
-    </svg>
-  )
-}
-
-function ShieldIcon() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-      <polyline points="9 12 11 14 15 10" />
-    </svg>
-  )
-}
-
-function StarIcon() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-    </svg>
-  )
-}
-
-function SupportIcon() {
-  return (
-    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
-  )
-}
-
-const reasons = [
+const REASONS = [
   {
-    icon: <ShippingIcon />,
+    num: '01',
+    color: '#3b82f6',
+    title: 'Calidad Garantizada',
+    description: 'Curados manualmente. Solo trabajamos con productos de alto estándar, verificados antes de llegar a tus manos.',
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <polyline points="9 12 11 14 15 10" />
+      </svg>
+    ),
+  },
+  {
+    num: '02',
+    color: '#06b6d4',
     title: 'Envío Rápido',
-    description: 'Recibe tus pedidos en tiempo récord. Envíos a todo el país.',
+    description: 'Despacho en 24h. Recibe tu pedido en 1–3 días hábiles con seguimiento en tiempo real a toda Colombia.',
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="1" y="3" width="15" height="13" rx="1" />
+        <path d="M16 8h4l3 5v3h-7V8z" />
+        <circle cx="5.5" cy="18.5" r="2.5" />
+        <circle cx="18.5" cy="18.5" r="2.5" />
+      </svg>
+    ),
+  },
+  {
+    num: '03',
+    color: '#a78bfa',
+    title: 'Precios Justos',
+    description: 'Directo al consumidor. Sin intermediarios innecesarios, ofrecemos los mejores precios del mercado colombiano.',
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <line x1="12" y1="1" x2="12" y2="23" />
+        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+      </svg>
+    ),
+  },
+  {
+    num: '04',
     color: '#38bdf8',
-  },
-  {
-    icon: <ShieldIcon />,
-    title: 'Garantía',
-    description: 'Todos nuestros productos cuentan con garantía y respaldo oficial.',
-    color: '#34d399',
-  },
-  {
-    icon: <StarIcon />,
-    title: 'Calidad',
-    description: 'Solo trabajamos con marcas y productos de alta calidad verificada.',
-    color: '#f59e0b',
-  },
-  {
-    icon: <SupportIcon />,
-    title: 'Soporte',
-    description: 'Nuestro equipo está disponible para ayudarte antes y después de tu compra.',
-    color: '#c084fc',
+    title: 'Soporte Real',
+    description: 'Personas reales, no bots. Nuestro equipo responde antes, durante y después de tu compra — siempre disponible.',
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </svg>
+    ),
   },
 ]
 
-function ReasonCard({ reason, delay }: { reason: typeof reasons[0]; delay: number }) {
-  const ref = useFadeIn(delay)
+function ReasonCard({ reason, delay }: { reason: typeof REASONS[0]; delay: number }) {
+  const ref = useScrollReveal(delay)
+
   return (
     <div
       ref={ref}
-      className="fade-in glass rounded-2xl p-7 flex flex-col items-center text-center gap-4 transition-all duration-300 hover:scale-[1.03]"
-      onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = `0 0 32px ${reason.color}33` }}
-      onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = '' }}
+      className="scroll-reveal"
+      style={{
+        padding: '32px 28px',
+        borderLeft: `3px solid ${reason.color}`,
+        background: '#060f1d',
+        borderRadius: '0 3px 3px 0',
+        transition: 'background 0.25s',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = `#060f1d` }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = '#060f1d' }}
     >
+      {/* Big faint number */}
       <div
-        className="w-16 h-16 rounded-2xl flex items-center justify-center"
-        style={{ background: `${reason.color}14`, color: reason.color }}
+        aria-hidden="true"
+        style={{
+          position: 'absolute', top: '-12px', right: '20px',
+          fontFamily: 'var(--font-orbitron)', fontSize: '6rem',
+          fontWeight: 800, color: `${reason.color}08`, lineHeight: 1, pointerEvents: 'none',
+          userSelect: 'none',
+        }}
       >
+        {reason.num}
+      </div>
+
+      {/* Icon */}
+      <div style={{ color: reason.color, marginBottom: '20px', opacity: 0.85 }}>
         {reason.icon}
       </div>
-      <h3 className="text-white font-bold text-lg">{reason.title}</h3>
-      <p className="text-slate-400 text-sm leading-relaxed">{reason.description}</p>
+
+      {/* Title */}
+      <h3 style={{
+        fontFamily: 'var(--font-orbitron)', fontSize: '0.9375rem',
+        fontWeight: 700, color: '#e2e8f0', marginBottom: '12px', lineHeight: 1.2,
+      }}>
+        {reason.title}
+      </h3>
+
+      {/* Description */}
+      <p style={{
+        fontFamily: 'var(--font-outfit)', fontSize: '0.875rem',
+        lineHeight: 1.7, color: '#475569',
+      }}>
+        {reason.description}
+      </p>
     </div>
   )
 }
 
 export default function WhyChooseUs() {
+  const headerRef = useScrollReveal()
+
   return (
-    <section id="porque-elegirnos" className="py-24 px-4 sm:px-6 lg:px-8" aria-labelledby="why-heading">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-14">
-          <h2 id="why-heading" className="text-3xl sm:text-4xl font-bold text-white mb-4">
-            ¿Por qué <span className="text-gradient">elegirnos?</span>
+    <section
+      id="porque-elegirnos"
+      style={{
+        background: '#020c1b', padding: '96px 0',
+        borderTop: '1px solid rgba(59,130,246,0.06)',
+      }}
+      aria-labelledby="why3-heading"
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+        {/* Header */}
+        <div ref={headerRef} className="scroll-reveal" style={{ marginBottom: '48px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+            <div style={{ width: '3px', height: '28px', background: 'linear-gradient(to bottom, #3b82f6, #06b6d4)', borderRadius: '999px', flexShrink: 0 }} aria-hidden="true" />
+            <span style={{
+              fontFamily: 'var(--font-outfit)', fontSize: '11px',
+              letterSpacing: '0.32em', textTransform: 'uppercase', color: '#475569',
+            }}>
+              Nuestro compromiso
+            </span>
+          </div>
+          <h2
+            id="why3-heading"
+            style={{
+              fontFamily: 'var(--font-orbitron)', fontWeight: 800,
+              fontSize: 'clamp(1.75rem, 3.5vw, 2.5rem)', color: '#f1f5f9', lineHeight: 1.1,
+            }}
+          >
+            ¿Por qué{' '}
+            <span style={{
+              background: 'linear-gradient(90deg, #3b82f6, #06b6d4)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+            }}>
+              elegirnos?
+            </span>
           </h2>
-          <p className="text-slate-400 max-w-xl mx-auto">
-            Nos comprometemos a ofrecerte la mejor experiencia de compra.
-          </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {reasons.map((r, i) => (
-            <ReasonCard key={r.title} reason={r} delay={i * 100} />
+        {/* 2×2 grid */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+          gap: '2px',
+          background: 'rgba(59,130,246,0.05)',
+          border: '1px solid rgba(59,130,246,0.08)',
+          borderRadius: '4px',
+          overflow: 'hidden',
+        }}>
+          {REASONS.map((r, i) => (
+            <ReasonCard key={r.num} reason={r} delay={i * 80} />
           ))}
         </div>
       </div>
