@@ -111,6 +111,7 @@ export function ProductForm({ categories, initial }: Props) {
 
         // Add new images
         const newImgs = imgs.filter((i): i is NewImg => i.kind === "new");
+        const keptPrimaryExists = initial!.images.some(img => img.isPrimary && keptIds.has(img.id));
         for (let i = 0; i < newImgs.length; i++) {
           await fetch(`/api/admin/products/${initial!.id}`, {
             method: "PUT",
@@ -120,7 +121,7 @@ export function ProductForm({ categories, initial }: Props) {
                 url: newImgs[i].url,
                 alt: newImgs[i].alt,
                 displayOrder: (initial!.images.length) + i,
-                isPrimary: initial!.images.length === 0 && i === 0,
+                isPrimary: !keptPrimaryExists && i === 0,
               },
             }),
           });
@@ -289,7 +290,7 @@ export function ProductForm({ categories, initial }: Props) {
                 key={i}
                 className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200 bg-gray-50"
               >
-                <Image src={img.url} alt={img.alt} fill className="object-cover" />
+                <Image src={img.url} alt={img.alt} fill sizes="96px" className="object-cover" />
                 {i === 0 && (
                   <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] text-center py-0.5">
                     Principal

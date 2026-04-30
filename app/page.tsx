@@ -4,8 +4,15 @@ import Categories from './components/Categories'
 import FeaturedProducts from './components/FeaturedProducts'
 import WhyChooseUs from './components/WhyChooseUs'
 import Footer from './components/Footer'
+import { getCategoriesWithCount } from '@/lib/db/queries/categories'
+import { getFeaturedProducts } from '@/lib/db/queries/products'
 
-export default function Home() {
+export default async function Home() {
+  const [cats, featuredProds] = await Promise.all([
+    getCategoriesWithCount(),
+    getFeaturedProducts(),
+  ])
+
   return (
     <>
       <a
@@ -19,8 +26,8 @@ export default function Home() {
 
       <main id="main-content">
         <Hero />
-        <Categories />
-        <FeaturedProducts />
+        <Categories categories={cats} />
+        <FeaturedProducts products={featuredProds} />
         <WhyChooseUs />
       </main>
 

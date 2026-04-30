@@ -1,6 +1,20 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
+import Link from 'next/link'
+import Image from 'next/image'
+
+type FeaturedProduct = {
+  id: number
+  name: string
+  slug: string
+  price: number
+  stock: number
+  featured: boolean
+  categoryName: string | null
+  categorySlug: string | null
+  primaryImage: string | null
+}
 
 function useScrollReveal(delay = 0) {
   const ref = useRef<HTMLDivElement>(null)
@@ -20,67 +34,56 @@ function useScrollReveal(delay = 0) {
   return ref
 }
 
-/* ── Icons ── */
+/* ── Fallback icons by category slug ── */
 function HeadphonesIcon() {
   return <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/><path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
-}
-function WatchIcon() {
-  return <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="2" width="14" height="20" rx="7"/><path d="M12 6v6l4 2"/></svg>
-}
-function CameraIcon() {
-  return <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
 }
 function BrushIcon() {
   return <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
 }
-function ZapIcon() {
-  return <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+function HomeAppIcon() {
+  return <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
 }
-function TabletIcon() {
-  return <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+function BoxIcon() {
+  return <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
 }
 
-const PRODUCTS = [
-  {
-    id: 1, name: 'Audífonos Bluetooth Pro X', price: '$89.900', category: 'Tecnología',
-    color: '#3b82f6', bg: 'linear-gradient(145deg, #0d1e3f, #041020)',
-    icon: <HeadphonesIcon />, badge: 'Más Vendido',
-  },
-  {
-    id: 2, name: 'Smartwatch Serie 5', price: '$129.900', category: 'Tecnología',
-    color: '#60a5fa', bg: 'linear-gradient(145deg, #0a1835, #030e20)',
-    icon: <WatchIcon />, badge: null,
-  },
-  {
-    id: 3, name: 'Cámara de Seguridad HD', price: '$75.900', category: 'Hogar',
-    color: '#06b6d4', bg: 'linear-gradient(145deg, #041c25, #021018)',
-    icon: <CameraIcon />, badge: 'Nuevo',
-  },
-  {
-    id: 4, name: 'Cepillo Secador 2 en 1', price: '$95.900', category: 'Belleza',
-    color: '#a78bfa', bg: 'linear-gradient(145deg, #1a0d35, #0c0520)',
-    icon: <BrushIcon />, badge: null,
-  },
-  {
-    id: 5, name: 'Plancha Iónica Pro', price: '$68.900', category: 'Belleza',
-    color: '#c084fc', bg: 'linear-gradient(145deg, #160a28, #090318)',
-    icon: <ZapIcon />, badge: null,
-  },
-  {
-    id: 6, name: 'Tablet Android 10"', price: '$199.900', category: 'Tecnología',
-    color: '#38bdf8', bg: 'linear-gradient(145deg, #0c1d3a, #041020)',
-    icon: <TabletIcon />, badge: 'Destacado',
-  },
-]
+function getCategoryIcon(slug: string | null) {
+  if (!slug) return <BoxIcon />
+  const s = slug.toLowerCase()
+  if (s.includes('tecnol') || s.includes('tech') || s.includes('electr')) return <HeadphonesIcon />
+  if (s.includes('belleza') || s.includes('beauty') || s.includes('cosmet')) return <BrushIcon />
+  if (s.includes('hogar') || s.includes('home') || s.includes('casa')) return <HomeAppIcon />
+  return <BoxIcon />
+}
 
-function ProductCard({ product, delay }: { product: typeof PRODUCTS[0]; delay: number }) {
+function getCategoryColor(slug: string | null): string {
+  if (!slug) return '#3b82f6'
+  const s = slug.toLowerCase()
+  if (s.includes('tecnol') || s.includes('tech') || s.includes('electr')) return '#3b82f6'
+  if (s.includes('belleza') || s.includes('beauty') || s.includes('cosmet')) return '#a78bfa'
+  if (s.includes('hogar') || s.includes('home') || s.includes('casa')) return '#06b6d4'
+  return '#3b82f6'
+}
+
+function getCategoryBg(slug: string | null): string {
+  if (!slug) return 'linear-gradient(145deg, #0d1e3f, #041020)'
+  const s = slug.toLowerCase()
+  if (s.includes('tecnol') || s.includes('tech') || s.includes('electr')) return 'linear-gradient(145deg, #0d1e3f, #041020)'
+  if (s.includes('belleza') || s.includes('beauty') || s.includes('cosmet')) return 'linear-gradient(145deg, #1a0d35, #0c0520)'
+  if (s.includes('hogar') || s.includes('home') || s.includes('casa')) return 'linear-gradient(145deg, #041c25, #021018)'
+  return 'linear-gradient(145deg, #0d1e3f, #041020)'
+}
+
+function formatPrice(cents: number): string {
+  return '$' + cents.toLocaleString('es-CO')
+}
+
+function ProductCard({ product, delay }: { product: FeaturedProduct; delay: number }) {
   const ref = useScrollReveal(delay)
-  const [added, setAdded] = useState(false)
-
-  const handleAdd = () => {
-    setAdded(true)
-    setTimeout(() => setAdded(false), 1800)
-  }
+  const color = getCategoryColor(product.categorySlug)
+  const bg = getCategoryBg(product.categorySlug)
+  const icon = getCategoryIcon(product.categorySlug)
 
   return (
     <article
@@ -95,8 +98,8 @@ function ProductCard({ product, delay }: { product: typeof PRODUCTS[0]; delay: n
       }}
       onMouseEnter={e => {
         const el = e.currentTarget as HTMLElement
-        el.style.borderColor = `${product.color}35`
-        el.style.boxShadow = `0 0 40px ${product.color}10`
+        el.style.borderColor = `${color}35`
+        el.style.boxShadow = `0 0 40px ${color}10`
       }}
       onMouseLeave={e => {
         const el = e.currentTarget as HTMLElement
@@ -106,53 +109,65 @@ function ProductCard({ product, delay }: { product: typeof PRODUCTS[0]; delay: n
     >
       {/* Image area */}
       <div style={{
-        height: '190px', background: product.bg,
+        height: '190px', background: bg,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        position: 'relative',
+        position: 'relative', overflow: 'hidden',
       }}>
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'absolute', inset: 0, pointerEvents: 'none',
-            backgroundImage: `radial-gradient(${product.color}12 1px, transparent 1px)`,
-            backgroundSize: '18px 18px',
-          }}
-        />
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            width: '100px', height: '100px', borderRadius: '50%',
-            background: `radial-gradient(circle, ${product.color}14 0%, transparent 70%)`,
-          }}
-        />
-        <span style={{ color: product.color, opacity: 0.8, position: 'relative', zIndex: 1 }}>
-          {product.icon}
-        </span>
+        {product.primaryImage ? (
+          <Image
+            src={product.primaryImage}
+            alt={product.name}
+            fill
+            style={{ objectFit: 'cover' }}
+            sizes="(max-width: 768px) 100vw, 260px"
+          />
+        ) : (
+          <>
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'absolute', inset: 0, pointerEvents: 'none',
+                backgroundImage: `radial-gradient(${color}12 1px, transparent 1px)`,
+                backgroundSize: '18px 18px',
+              }}
+            />
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                width: '100px', height: '100px', borderRadius: '50%',
+                background: `radial-gradient(circle, ${color}14 0%, transparent 70%)`,
+              }}
+            />
+            <span style={{ color, opacity: 0.8, position: 'relative', zIndex: 1 }}>
+              {icon}
+            </span>
+          </>
+        )}
 
         {/* Category badge */}
-        <div style={{
-          position: 'absolute', top: '12px', left: '12px',
-          padding: '3px 10px', borderRadius: '2px',
-          background: `${product.color}12`, border: `1px solid ${product.color}28`,
-          fontFamily: 'var(--font-outfit)', fontSize: '10px',
-          letterSpacing: '0.12em', textTransform: 'uppercase', color: product.color,
-        }}>
-          {product.category}
-        </div>
-
-        {/* Special badge */}
-        {product.badge && (
+        {product.categoryName && (
           <div style={{
-            position: 'absolute', top: '12px', right: '12px',
+            position: 'absolute', top: '12px', left: '12px',
             padding: '3px 10px', borderRadius: '2px',
-            background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)',
-            fontFamily: 'var(--font-orbitron)', fontSize: '9px',
-            fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#60a5fa',
+            background: `${color}12`, border: `1px solid ${color}28`,
+            fontFamily: 'var(--font-outfit)', fontSize: '10px',
+            letterSpacing: '0.12em', textTransform: 'uppercase', color,
           }}>
-            {product.badge}
+            {product.categoryName}
           </div>
         )}
+
+        {/* Featured badge */}
+        <div style={{
+          position: 'absolute', top: '12px', right: '12px',
+          padding: '3px 10px', borderRadius: '2px',
+          background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.3)',
+          fontFamily: 'var(--font-orbitron)', fontSize: '9px',
+          fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#60a5fa',
+        }}>
+          Destacado
+        </div>
       </div>
 
       {/* Info */}
@@ -167,46 +182,43 @@ function ProductCard({ product, delay }: { product: typeof PRODUCTS[0]; delay: n
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto' }}>
           <span style={{
             fontFamily: 'var(--font-orbitron)', fontSize: '1.25rem',
-            fontWeight: 800, color: product.color,
+            fontWeight: 800, color,
           }}>
-            {product.price}
+            {formatPrice(product.price)}
           </span>
-          <button
-            onClick={handleAdd}
+          <Link
+            href={`/productos/${product.slug}`}
             style={{
               padding: '9px 18px', borderRadius: '2px',
-              background: added ? 'rgba(5,150,105,0.1)' : 'transparent',
-              border: added ? '1px solid rgba(5,150,105,0.4)' : `1px solid ${product.color}30`,
-              color: added ? '#34d399' : product.color,
+              background: 'transparent',
+              border: `1px solid ${color}30`,
+              color,
               fontFamily: 'var(--font-orbitron)', fontSize: '11px',
               fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
-              cursor: 'pointer', transition: 'all 0.2s',
+              textDecoration: 'none', transition: 'all 0.2s',
+              display: 'inline-block',
             }}
             onMouseEnter={e => {
-              if (!added) {
-                const el = e.currentTarget as HTMLElement
-                el.style.background = `${product.color}12`
-                el.style.borderColor = `${product.color}50`
-              }
+              const el = e.currentTarget as HTMLElement
+              el.style.background = `${color}12`
+              el.style.borderColor = `${color}50`
             }}
             onMouseLeave={e => {
-              if (!added) {
-                const el = e.currentTarget as HTMLElement
-                el.style.background = 'transparent'
-                el.style.borderColor = `${product.color}30`
-              }
+              const el = e.currentTarget as HTMLElement
+              el.style.background = 'transparent'
+              el.style.borderColor = `${color}30`
             }}
-            aria-label={`${added ? 'Agregado' : 'Agregar'} ${product.name} al carrito`}
+            aria-label={`Ver ${product.name}`}
           >
-            {added ? '✓' : '+'}
-          </button>
+            Ver →
+          </Link>
         </div>
       </div>
     </article>
   )
 }
 
-export default function FeaturedProducts() {
+export default function FeaturedProducts({ products }: { products: FeaturedProduct[] }) {
   const headerRef = useScrollReveal()
 
   return (
@@ -245,8 +257,8 @@ export default function FeaturedProducts() {
               </span>
             </h2>
           </div>
-          <a
-            href="#categorias"
+          <Link
+            href="/productos"
             style={{
               fontFamily: 'var(--font-orbitron)', fontSize: '11px',
               fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase',
@@ -257,19 +269,25 @@ export default function FeaturedProducts() {
             onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#3b82f6' }}
           >
             Ver todo →
-          </a>
+          </Link>
         </div>
 
         {/* Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-          gap: '14px',
-        }}>
-          {PRODUCTS.map((p, i) => (
-            <ProductCard key={p.id} product={p} delay={i * 60} />
-          ))}
-        </div>
+        {products.length > 0 ? (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+            gap: '14px',
+          }}>
+            {products.map((p, i) => (
+              <ProductCard key={p.id} product={p} delay={i * 60} />
+            ))}
+          </div>
+        ) : (
+          <p style={{ fontFamily: 'var(--font-outfit)', color: '#475569', fontSize: '14px' }}>
+            Próximamente productos destacados.
+          </p>
+        )}
       </div>
     </section>
   )

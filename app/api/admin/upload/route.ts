@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { writeFile } from "fs/promises";
+import { mkdir } from "fs/promises";
 import { join } from "path";
 import sharp from "sharp";
 
@@ -20,8 +20,10 @@ export async function POST(req: Request) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const filename = `${crypto.randomUUID()}.webp`;
-  const savePath = join(process.cwd(), "public", "uploads", "products", filename);
+  const uploadDir = join(process.cwd(), "public", "uploads", "products");
+  const savePath = join(uploadDir, filename);
 
+  await mkdir(uploadDir, { recursive: true });
   await sharp(buffer)
     .resize({ width: 1200, withoutEnlargement: true })
     .webp({ quality: 85 })

@@ -1,6 +1,6 @@
 import { db } from "../index";
-import { categories } from "../schema";
-import { eq } from "drizzle-orm";
+import { categories, products } from "../schema";
+import { eq, and, count } from "drizzle-orm";
 import type { CategoryInput } from "@/lib/validations";
 
 export function getAllCategories() {
@@ -9,6 +9,24 @@ export function getAllCategories() {
 
 export function getActiveCategories() {
   return db.select().from(categories).where(eq(categories.active, true)).orderBy(categories.name);
+}
+
+export function getCategoriesWithCount() {
+  return db
+    .select({
+      id: categories.id,
+      name: categories.name,
+      slug: categories.slug,
+      description: categories.description,
+      color: categories.color,
+      imageUrl: categories.imageUrl,
+      productCount: count(products.id),
+    })
+    .from(categories)
+    .leftJoin(products, and(eq(products.categoryId, categories.id), eq(products.active, true)))
+    .where(eq(categories.active, true))
+    .groupBy(categories.id)
+    .orderBy(categories.name);
 }
 
 export function getCategoryById(id: number) {

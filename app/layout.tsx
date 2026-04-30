@@ -28,7 +28,7 @@ export default function RootLayout({
       lang="es"
       className={`${outfit.variable} ${orbitron.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background text-slate-100">
+      <body suppressHydrationWarning className="min-h-full flex flex-col bg-background text-slate-100">
         <FontProvider>{children}</FontProvider>
       </body>
     </html>

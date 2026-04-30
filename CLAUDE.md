@@ -29,6 +29,7 @@ Single-page marketing site for **IC Variedades** (a Colombian store selling tech
 ### Styling
 
 `app/globals.css` uses Tailwind v4's `@import "tailwindcss"` and `@theme inline` for design tokens. Custom CSS animation classes:
+
 - `.slide-in-left`, `.slide-in-right` — entrance animations
 - `.pulse-dot`, `.hero-card` — ambient animations
 - `.scroll-reveal` — scroll-triggered fade-in (add `.visible` to activate)
@@ -43,7 +44,8 @@ This project uses Next.js **16** (see `package.json`). APIs and conventions may 
 
 **Objetivo:** convertir la landing estática en una tienda con catálogo público y panel de administración de inventario.
 
-**Decisiones clave:**
+**Decisiones clave:**P
+
 - PostgreSQL 18 + Drizzle ORM — DB local `variedades_ic`, psql en `C:/Program Files/PostgreSQL/18/bin/psql`
 - NextAuth v5 beta.31 (Credentials) protege `/admin` vía `middleware.ts`
 - Un solo admin: `admin@icvariedades.com` / contraseña en `.env.local` (hash bcrypt)
@@ -53,20 +55,21 @@ This project uses Next.js **16** (see `package.json`). APIs and conventions may 
 
 **Estado actual:**
 
-| # | Tarea | Estado |
-|---|-------|--------|
-| 1 | Dependencias instaladas (drizzle-orm, next-auth, sharp, zod…) | ✅ listo |
-| 2 | `.env.local` + DB `variedades_ic` creada en PostgreSQL | ✅ listo |
-| 3 | Schema Drizzle (`lib/db/schema.ts`) + migración aplicada | ✅ listo |
-| 4 | Auth: `lib/auth.ts`, API route NextAuth, `middleware.ts`, `/admin/login` | ✅ listo |
-| 5 | API routes CRUD: `/api/admin/categories`, `/api/admin/products`, `/api/admin/upload` | ✅ listo |
-| 6 | Panel admin: layout sidebar, dashboard, formularios de categorías y productos | ✅ listo |
-| 7 | Conectar página principal (`app/page.tsx`) a la BD | ⬜ pendiente |
-| 8 | Páginas públicas: catálogo `/productos`, detalle `/productos/[slug]`, filtro por categoría | ⬜ pendiente |
-| 9 | Botón WhatsApp en detalle de producto | ⬜ pendiente |
-| 10 | Poblar BD con productos reales | ⬜ pendiente |
+| #   | Tarea                                                                                      | Estado       |
+| --- | ------------------------------------------------------------------------------------------ | ------------ |
+| 1   | Dependencias instaladas (drizzle-orm, next-auth, sharp, zod…)                              | ✅ listo     |
+| 2   | `.env.local` + DB `variedades_ic` creada en PostgreSQL                                     | ✅ listo     |
+| 3   | Schema Drizzle (`lib/db/schema.ts`) + migración aplicada                                   | ✅ listo     |
+| 4   | Auth: `lib/auth.ts`, API route NextAuth, `middleware.ts`, `/admin/login`                   | ✅ listo     |
+| 5   | API routes CRUD: `/api/admin/categories`, `/api/admin/products`, `/api/admin/upload`       | ✅ listo     |
+| 6   | Panel admin: layout sidebar, dashboard, formularios de categorías y productos              | ✅ listo     |
+| 7   | Conectar página principal (`app/page.tsx`) a la BD                                         | ✅ listo     |
+| 8   | Páginas públicas: catálogo `/productos`, detalle `/productos/[slug]`, filtro por categoría | ✅ listo     |
+| 9   | Botón WhatsApp en detalle de producto                                                      | ✅ listo     |
+| 10  | Poblar BD con productos reales                                                             | ⬜ pendiente |
 
 **Archivos clave del backend:**
+
 - `lib/db/schema.ts` — tablas: `categories`, `products`, `product_images`
 - `lib/db/queries/categories.ts` / `products.ts` — queries Drizzle
 - `lib/validations.ts` — schemas Zod + función `toSlug()`
