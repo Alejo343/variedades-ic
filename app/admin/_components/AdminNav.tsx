@@ -7,6 +7,9 @@ const links = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/categories", label: "Categorías" },
   { href: "/admin/products", label: "Productos" },
+  { href: "/admin/distributors", label: "Distribuidores" },
+  { href: "/admin/purchase-orders", label: "Compras" },
+  { href: "/admin/sales-orders", label: "Ventas" },
 ];
 
 export function AdminNav() {

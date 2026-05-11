@@ -42,36 +42,56 @@ This project uses Next.js **16** (see `package.json`). APIs and conventions may 
 
 ## Roadmap: ecommerce + admin panel
 
-**Objetivo:** convertir la landing estática en una tienda con catálogo público y panel de administración de inventario.
+**Objetivo:** convertir la landing estática en una tienda con catálogo público y panel de administración de inventario, compras a distribuidores y ventas a clientes.
 
-**Decisiones clave:**P
+**Decisiones clave:**
 
 - PostgreSQL 18 + Drizzle ORM — DB local `variedades_ic`, psql en `C:/Program Files/PostgreSQL/18/bin/psql`
+- Migración con `DATABASE_URL=... npx drizzle-kit generate` + `npx drizzle-kit migrate` (el shell no carga `.env.local` automáticamente)
 - NextAuth v5 beta.31 (Credentials) protege `/admin` vía `middleware.ts`
 - Un solo admin: `admin@icvariedades.com` / contraseña en `.env.local` (hash bcrypt)
 - Imágenes subidas al servidor en `public/uploads/products/` (convertidas a WebP con sharp, max 10 MB)
 - Sin pagos, sin cuentas de clientes, sin variantes de producto
-- Pedidos vía WhatsApp — número: 573176642382
+- Pedidos de clientes vía WhatsApp — número: 573176642382
+- El dueño viaja a otra ciudad a recoger pedidos de distribuidores (flujo: pendiente → en_viaje → recibido)
+- Al marcar compra como "recibido", el stock se actualiza automáticamente en transacción
 
 **Estado actual:**
 
-| #   | Tarea                                                                                      | Estado       |
-| --- | ------------------------------------------------------------------------------------------ | ------------ |
-| 1   | Dependencias instaladas (drizzle-orm, next-auth, sharp, zod…)                              | ✅ listo     |
-| 2   | `.env.local` + DB `variedades_ic` creada en PostgreSQL                                     | ✅ listo     |
-| 3   | Schema Drizzle (`lib/db/schema.ts`) + migración aplicada                                   | ✅ listo     |
-| 4   | Auth: `lib/auth.ts`, API route NextAuth, `middleware.ts`, `/admin/login`                   | ✅ listo     |
-| 5   | API routes CRUD: `/api/admin/categories`, `/api/admin/products`, `/api/admin/upload`       | ✅ listo     |
-| 6   | Panel admin: layout sidebar, dashboard, formularios de categorías y productos              | ✅ listo     |
-| 7   | Conectar página principal (`app/page.tsx`) a la BD                                         | ✅ listo     |
-| 8   | Páginas públicas: catálogo `/productos`, detalle `/productos/[slug]`, filtro por categoría | ✅ listo     |
-| 9   | Botón WhatsApp en detalle de producto                                                      | ✅ listo     |
-| 10  | Poblar BD con productos reales                                                             | ⬜ pendiente |
+| # | Tarea | Estado |
+|---|-------|--------|
+| 1 | Dependencias instaladas (drizzle-orm, next-auth, sharp, zod…) | ✅ listo |
+| 2 | `.env.local` + DB `variedades_ic` creada en PostgreSQL | ✅ listo |
+| 3 | Schema Drizzle (`lib/db/schema.ts`) + migración aplicada | ✅ listo |
+| 4 | Auth: `lib/auth.ts`, API route NextAuth, `middleware.ts`, `/admin/login` | ✅ listo |
+| 5 | API routes CRUD: categorías, productos, upload, distribuidores, compras, ventas | ✅ listo |
+| 6 | Panel admin: categorías, productos, distribuidores, pedidos de compra, pedidos de venta | ✅ listo |
+| 7 | Conectar página principal (`app/page.tsx`) a la BD | ✅ listo |
+| 8 | Páginas públicas: catálogo `/productos`, detalle `/productos/[slug]`, filtro por categoría | ✅ listo |
+| 9 | Botón WhatsApp en detalle de producto | ✅ listo |
+| 10 | Poblar BD con productos reales | ⬜ pendiente |
 
 **Archivos clave del backend:**
-
-- `lib/db/schema.ts` — tablas: `categories`, `products`, `product_images`
-- `lib/db/queries/categories.ts` / `products.ts` — queries Drizzle
+- `lib/db/schema.ts` — tablas: `categories`, `products`, `product_images`, `distributors`, `purchase_orders`, `purchase_order_items`, `sales_orders`, `sales_order_items`
+- `lib/db/queries/categories.ts` / `products.ts` / `distributors.ts` / `purchase-orders.ts` / `sales-orders.ts` — queries Drizzle
 - `lib/validations.ts` — schemas Zod + función `toSlug()`
 - `lib/auth.ts` — configuración NextAuth
-- `app/admin/` — panel admin completo (layout, dashboard, categorías, productos)
+- `app/admin/` — panel admin completo
+
+**Módulo de pedidos:**
+
+Flujo compras a distribuidores (`purchase_orders`):
+- Estados: `pendiente` → `en_viaje` → `recibido` | `cancelado`
+- Al recibir: transacción que suma `quantity` al `stock` de cada producto (bandera `stockUpdated` evita duplicados)
+- API: `POST /api/admin/purchase-orders/{id}/receive`
+
+Flujo ventas a clientes (`sales_orders`):
+- Estados: `pendiente` → `confirmado` → `entregado` | `cancelado`
+- Precio de cada item queda guardado al momento del pedido (`unitPrice`)
+
+**Patrón de API routes (seguir siempre):**
+1. `auth()` al inicio — devolver 401 si no hay sesión
+2. `schema.safeParse(body)` — devolver 400 con `error.flatten()` si falla
+3. Parámetros dinámicos: `const { id } = await ctx.params` (son `Promise` en Next.js 16)
+4. Soft delete para catálogos (categorías, distribuidores): `active = false`
+5. Delete real para pedidos y sus items

@@ -21,8 +21,52 @@ export const productSchema = z.object({
   whatsappText: z.string().optional(),
 });
 
+export const distributorSchema = z.object({
+  name: z.string().min(1, "El nombre es requerido"),
+  city: z.string().optional(),
+  phone: z.string().optional(),
+  notes: z.string().optional(),
+  active: z.boolean().optional().default(true),
+});
+
+export const purchaseOrderSchema = z.object({
+  distributorId: z.number().int().nullable().optional(),
+  status: z.enum(["pendiente", "en_viaje", "recibido", "cancelado"]).optional().default("pendiente"),
+  expectedDate: z.string().nullable().optional(),
+  totalCost: z.number().int().min(0).nullable().optional(),
+  notes: z.string().optional(),
+});
+
+export const purchaseOrderItemSchema = z.object({
+  orderId: z.number().int(),
+  productId: z.number().int(),
+  quantity: z.number().int().min(1),
+  unitCost: z.number().int().min(0).nullable().optional(),
+});
+
+export const salesOrderSchema = z.object({
+  customerName: z.string().min(1, "El nombre es requerido"),
+  customerPhone: z.string().min(1, "El teléfono es requerido"),
+  status: z.enum(["pendiente", "confirmado", "entregado", "cancelado"]).optional().default("pendiente"),
+  deliveryNote: z.string().optional(),
+  totalPrice: z.number().int().min(0).nullable().optional(),
+  notes: z.string().optional(),
+});
+
+export const salesOrderItemSchema = z.object({
+  orderId: z.number().int(),
+  productId: z.number().int(),
+  quantity: z.number().int().min(1),
+  unitPrice: z.number().int().min(0).nullable().optional(),
+});
+
 export type CategoryInput = z.infer<typeof categorySchema>;
 export type ProductInput = z.infer<typeof productSchema>;
+export type DistributorInput = z.infer<typeof distributorSchema>;
+export type PurchaseOrderInput = z.infer<typeof purchaseOrderSchema>;
+export type PurchaseOrderItemInput = z.infer<typeof purchaseOrderItemSchema>;
+export type SalesOrderInput = z.infer<typeof salesOrderSchema>;
+export type SalesOrderItemInput = z.infer<typeof salesOrderItemSchema>;
 
 export function toSlug(name: string): string {
   return name
