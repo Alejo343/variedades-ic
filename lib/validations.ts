@@ -146,6 +146,11 @@ export const sellerLossSchema = z.object({
   notes: z.string().optional(),
 });
 
+export const settlementSchema = z.object({
+  sellerId: z.number().int(),
+  periodDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida (formato AAAA-MM-DD)"),
+});
+
 export type CategoryInput = z.infer<typeof categorySchema>;
 export type ProductInput = z.infer<typeof productSchema>;
 export type DistributorInput = z.infer<typeof distributorSchema>;
@@ -166,6 +171,7 @@ export type SellerReturnItemInput = z.infer<typeof sellerReturnItemSchema>;
 export type SellerReturnInput = z.infer<typeof sellerReturnSchema>;
 export type SellerLossItemInput = z.infer<typeof sellerLossItemSchema>;
 export type SellerLossInput = z.infer<typeof sellerLossSchema>;
+export type SettlementInput = z.infer<typeof settlementSchema>;
 
 export function toSlug(name: string): string {
   return name

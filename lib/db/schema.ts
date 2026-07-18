@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, text, integer, boolean, timestamp, date, check, pgSequence } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, text, integer, boolean, timestamp, date, check, pgSequence, unique } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const productSkuSeq = pgSequence("product_sku_seq", { startWith: 1, increment: 1 });
@@ -193,7 +193,7 @@ export const sellerSales = pgTable("seller_sales", {
   saleDate: timestamp("sale_date").defaultNow().notNull(),
   totalAmount: integer("total_amount").default(0).notNull(),
   commissionAmount: integer("commission_amount").default(0).notNull(),
-  settlementId: integer("settlement_id"),
+  settlementId: integer("settlement_id").references(() => settlements.id),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -257,6 +257,23 @@ export const sellerLossItems = pgTable(
   (table) => [check("loss_quantity_positive", sql`${table.quantity} > 0`)],
 );
 
+export const settlements = pgTable(
+  "settlements",
+  {
+    id: serial("id").primaryKey(),
+    sellerId: integer("seller_id").notNull().references(() => sellers.id),
+    periodDate: date("period_date").notNull(),
+    totalSales: integer("total_sales").notNull(),
+    totalCommission: integer("total_commission").notNull(),
+    totalLosses: integer("total_losses").notNull(),
+    amountDue: integer("amount_due").notNull(),
+    status: varchar("status", { length: 15 }).default("pendiente").notNull(),
+    settledAt: timestamp("settled_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [unique("settlements_seller_period_unique").on(table.sellerId, table.periodDate)],
+);
+
 export type Category = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
 export type Product = typeof products.$inferSelect;
@@ -299,3 +316,5 @@ export type SellerLoss = typeof sellerLosses.$inferSelect;
 export type NewSellerLoss = typeof sellerLosses.$inferInsert;
 export type SellerLossItem = typeof sellerLossItems.$inferSelect;
 export type NewSellerLossItem = typeof sellerLossItems.$inferInsert;
+export type Settlement = typeof settlements.$inferSelect;
+export type NewSettlement = typeof settlements.$inferInsert;

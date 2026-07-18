@@ -79,13 +79,15 @@ This project uses Next.js **16** (see `package.json`). APIs and conventions may 
 
 **Archivos clave del backend:**
 
-- `lib/db/schema.ts` — tablas: `categories`, `products`, `product_images`, `distributors`, `purchase_orders`, `purchase_order_items`, `sales_orders`, `sales_order_items`, `inventory_movements`, `sellers`, `cash_movements`, `direct_sales`, `direct_sale_items`, `seller_deliveries`, `seller_delivery_items`, `seller_sales`, `seller_sale_items`, `seller_returns`, `seller_return_items`, `seller_losses`, `seller_loss_items`; secuencia `product_sku_seq`
-- `lib/db/queries/categories.ts` / `products.ts` / `distributors.ts` / `purchase-orders.ts` / `sales-orders.ts` / `inventory.ts` / `sellers.ts` / `cash.ts` / `direct-sales.ts` / `seller-deliveries.ts` / `seller-inventory.ts` / `seller-sales.ts` / `seller-returns.ts` / `seller-losses.ts` — queries Drizzle
+- `lib/db/schema.ts` — tablas: `categories`, `products`, `product_images`, `distributors`, `purchase_orders`, `purchase_order_items`, `sales_orders`, `sales_order_items`, `inventory_movements`, `sellers`, `cash_movements`, `direct_sales`, `direct_sale_items`, `seller_deliveries`, `seller_delivery_items`, `seller_sales`, `seller_sale_items`, `seller_returns`, `seller_return_items`, `seller_losses`, `seller_loss_items`, `settlements`; secuencia `product_sku_seq`
+- `lib/db/queries/categories.ts` / `products.ts` / `distributors.ts` / `purchase-orders.ts` / `sales-orders.ts` / `inventory.ts` / `sellers.ts` / `cash.ts` / `direct-sales.ts` / `seller-deliveries.ts` / `seller-inventory.ts` / `seller-sales.ts` / `seller-returns.ts` / `seller-losses.ts` / `settlements.ts` — queries Drizzle
 - `lib/domain/order-status.ts` — máquina de estados pura (transiciones válidas de compras/ventas), con tests
 - `lib/domain/stock.ts` — aritmética de stock pura (`receiveStock`, `deductStock`), con tests
 - `lib/domain/inventory-movement.ts` — `applyMovement`/`validateAdjustmentReason`, con tests
 - `lib/domain/sku.ts` — `getSkuPrefix`/`formatSku`, con tests
 - `lib/domain/commission.ts` — `calculateCommission`, con tests
+- `lib/domain/settlement.ts` — `calculateSettlement`, con tests
+- `lib/domain/settlement-status.ts` — `canTransitionSettlement`, con tests
 - `lib/validations.ts` — schemas Zod + función `toSlug()`, con tests
 - `lib/auth.ts` — configuración NextAuth
 - `app/admin/` — panel admin completo
@@ -169,7 +171,7 @@ mínima → `npm run test` + `npm run lint` + `npm run build` en verde):
 | 4 | Inventario por vendedor (lectura, agregación sobre el ledger) | ✅ listo |
 | 5 | Ventas de vendedor (`seller_sales`, distinto de `salesOrders`) | ✅ listo |
 | 6 | Devoluciones y pérdidas/daños/robos de vendedor | ✅ listo |
-| 7 | Liquidaciones (`settlements`) | ⬜ pendiente |
+| 7 | Liquidaciones (`settlements`) | ✅ listo |
 | 8 | Compras a crédito / cuentas por pagar (`purchase_payments`) | ⬜ pendiente |
 | 9 | Reportes consolidados | ⬜ pendiente |
 | 10 | Variantes de producto (`product_variants`) | ⬜ pendiente |
@@ -450,6 +452,66 @@ inventario) cubren bien una venta de mostrador instantánea.
   operación (`seller -1` + `principal +1` para la devolución; solo
   `seller -1` con `unit_cost=30000` para el daño).
 
+**Fase 7 — completada:**
+
+- Schema: tabla `settlements` (`sellerId`, `periodDate` con
+  `UNIQUE(sellerId, periodDate)`, `totalSales`, `totalCommission`,
+  `totalLosses`, `amountDue`, `status` `pendiente`|`liquidada`, `settledAt`);
+  se agrega la FK `sellerSales.settlementId → settlements.id` que existía
+  como columna nullable sin FK desde la Fase 5.
+- Dominio: `lib/domain/settlement.ts#calculateSettlement` (`amountDue =
+  totalSales - totalCommission + totalLosses`) y
+  `lib/domain/settlement-status.ts#canTransitionSettlement` (lookup-table
+  `pendiente → liquidada`, mismo patrón que `order-status.ts`), ambos con
+  tests.
+- Query `lib/db/queries/settlements.ts`: `previewSettlement(sellerId,
+  periodDate)` (solo lectura, agrega `seller_sales` + `seller_loss_items`
+  filtrando por fecha exacta); `createSettlement` (transaccional: revisa
+  duplicado por `(sellerId, periodDate)` antes de insertar — da un mensaje
+  de error claro en vez de dejar que el usuario vea la violación cruda del
+  `UNIQUE` de Postgres —, calcula totales, inserta la cabecera, y estampa
+  `settlementId` en las filas de `seller_sales` de ese vendedor+día que aún
+  no lo tenían); `markSettlementLiquidada` (transaccional: valida la
+  transición con `canTransitionSettlement`, y si `amountDue > 0` inserta un
+  `cash_movements` ingreso vía `recordCashMovement` reutilizado tal cual).
+- Doble guardia contra doble conteo de una venta entre liquidaciones: el
+  `UNIQUE(sellerId, periodDate)` hace estructuralmente imposible crear dos
+  liquidaciones para el mismo vendedor el mismo día, y `previewSettlement`/
+  `createSettlement` además filtran `seller_sales.settlementId IS NULL` (no
+  solo por fecha) — así una venta jamás se agrega dos veces aunque hubiera
+  edge cases de fecha. Las pérdidas (`seller_loss_items`) no llevan
+  `settlementId`: como ya es imposible crear una segunda liquidación para
+  ese vendedor+día, una pérdida de ese día solo puede caer en la única
+  liquidación posible para esa fecha — se decidió no añadir la columna por
+  redundante. Simplificación no revisada aún con el usuario: si `amountDue`
+  llega a ser negativo (comisión supera las ventas cobradas), no se inserta
+  ningún movimiento de caja — caso sin resolver, no documentado como
+  limitación hasta ahora.
+- API: `POST /api/admin/settlements` (crear) y
+  `POST /api/admin/settlements/{id}/liquidate` (único camino a `liquidada`,
+  mismo patrón que `purchase-orders/{id}/receive`).
+- UI: `/admin/settlements/new` — selector de vendedor (`SellerPicker`
+  compartido) → selector de fecha (`<input type="date">`, default hoy) con
+  preview en vivo (ventas/comisión/pérdidas/a entregar) vía
+  `previewSettlement`, botón "Crear liquidación"; `/admin/settlements` —
+  listado con estado y botón "Liquidar" (solo visible si `pendiente`). Nav:
+  "Liquidaciones".
+- Verificado con `npm run test` (51/51) + `npm run lint` + `npm run build`
+  en verde, más flujo manual en navegador: entrega de 4 unidades al
+  vendedor de prueba, venta de 2 ($100.000, comisión $10.000) y pérdida de 1
+  ($30.000) adicionales a datos ya existentes del día → preview mostró
+  correctamente ventas $150.000, comisión $15.000, pérdidas $60.000, a
+  entregar $195.000; "Crear liquidación" → aparece "Pendiente" en el
+  listado; "Liquidar" → estado pasa a "Liquidada" y el botón desaparece;
+  saldo de caja pasó de $100.000 a $295.000 con un ingreso "Liquidación
+  vendedor #1 — 2026-07-18" por $195.000; una venta nueva registrada
+  después de liquidar mostró correctamente solo su propio total en un
+  preview posterior (confirma que las ventas ya liquidadas quedaron
+  estampadas con `settlementId` y no se recuentan); intento de crear una
+  segunda liquidación para el mismo vendedor+fecha fue rechazado tanto por
+  `fetch` directo a la API como por la UI real con "Ya existe una
+  liquidación para este vendedor en esta fecha".
+
 Guía para Claude Code al trabajar en este repositorio. Léela antes de tocar código.
 
 ## Cómo trabajamos aquí (spec-driven + tests)
@@ -559,14 +621,20 @@ La idea clave: cada capa tiene una responsabilidad y no invade a las demás.
   RN-022 — el costo lo asume el vendedor, nunca toca el principal) de
   vendedor. `SellerPicker` ahora es un componente compartido
   (`app/admin/_components/SellerPicker.tsx`) usado por ventas, devoluciones
-  y pérdidas. Ver "Roadmap: pivote a gestión integral de la empresa" arriba
-  para el detalle y las fases 7-10 pendientes.
+  y pérdidas.
+- Fase 7 del pivote: liquidaciones (`settlements`), cierra el día por
+  vendedor (`UNIQUE(sellerId, periodDate)`), calcula `amountDue = totalSales
+  - totalCommission + totalLosses` (`lib/domain/settlement.ts`), transición
+  `pendiente → liquidada` validada (`lib/domain/settlement-status.ts`), y al
+  liquidar genera el ingreso correspondiente en caja. Ver "Roadmap: pivote a
+  gestión integral de la empresa" arriba para el detalle y las fases 8-10
+  pendientes.
 
 **Próximo:**
 
-- Fase 7 del pivote: liquidaciones (`settlements`) — cierra el día por
-  vendedor, calcula `amountDue = totalSales - totalCommission + totalLosses`,
-  y al marcarse "liquidada" genera el ingreso correspondiente en caja.
+- Fase 8 del pivote: compras a crédito / cuentas por pagar
+  (`purchase_payments`) — `purchaseType` (`contado`|`credito`) en
+  `purchase_orders`, pagos parciales con tope en el saldo pendiente.
 - Poblar la BD con productos reales (tarea del roadmap original, aún pendiente).
 
 **Decisiones tomadas:**
@@ -588,6 +656,10 @@ La idea clave: cada capa tiene una responsabilidad y no invade a las demás.
   manualmente (`npm run dev` + flujo real, `npm run lint`, `npm run build`).
 - Variantes de producto (RN-007) siguen sin definirse del todo (qué atributos
   varían, si tienen SKU/precio propio) — se resuelve al llegar a la fase 10.
+- `markSettlementLiquidada` no maneja `amountDue` negativo (comisión supera
+  las ventas cobradas del día): simplemente omite el movimiento de caja sin
+  avisar. No se ha discutido con el usuario qué debería pasar en ese caso
+  (¿la empresa le debe al vendedor? ¿se registra como gasto?).
 
 ## Comandos
 
