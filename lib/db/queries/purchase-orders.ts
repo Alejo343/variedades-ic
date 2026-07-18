@@ -1,8 +1,9 @@
 import { db } from "../index";
 import { purchaseOrders, purchaseOrderItems, distributors, products } from "../schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import type { PurchaseOrderInput, PurchaseOrderItemInput } from "@/lib/validations";
 import { canTransitionPurchaseOrder, type PurchaseOrderStatus } from "@/lib/domain/order-status";
+import { recordPrincipalMovement } from "./inventory";
 
 export function getAllPurchaseOrders() {
   return db
@@ -101,10 +102,15 @@ export async function markPurchaseOrderReceived(id: number) {
       .where(eq(purchaseOrderItems.orderId, id));
 
     for (const item of items) {
-      await tx
-        .update(products)
-        .set({ stock: sql`${products.stock} + ${item.quantity}`, updatedAt: new Date() })
-        .where(eq(products.id, item.productId));
+      const result = await recordPrincipalMovement(tx, {
+        productId: item.productId,
+        type: "compra",
+        quantityDelta: item.quantity,
+        unitCost: item.unitCost,
+        sourceType: "purchase_order",
+        sourceId: id,
+      });
+      if (!result.ok) throw new Error(result.error);
     }
 
     const [updated] = await tx

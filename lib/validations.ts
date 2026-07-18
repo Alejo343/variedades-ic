@@ -14,8 +14,12 @@ export const productSchema = z.object({
   slug: z.string().min(1, "El slug es requerido").regex(/^[a-z0-9-]+$/, "Solo letras minúsculas, números y guiones"),
   description: z.string().optional(),
   price: z.number().int().min(0, "El precio debe ser mayor a 0"),
+  purchasePrice: z.number().int().min(0, "El precio de compra debe ser mayor a 0").optional().default(0),
   categoryId: z.number().int().nullable().optional(),
   stock: z.number().int().min(0).optional().default(0),
+  minStock: z.number().int().min(0).optional().default(0),
+  warrantyMonths: z.number().int().min(0).nullable().optional(),
+  hasVariants: z.boolean().optional().default(false),
   featured: z.boolean().optional().default(false),
   active: z.boolean().optional().default(true),
   whatsappText: z.string().optional(),
@@ -60,6 +64,52 @@ export const salesOrderItemSchema = z.object({
   unitPrice: z.number().int().min(0).nullable().optional(),
 });
 
+export const inventoryAdjustmentSchema = z.object({
+  productId: z.number().int(),
+  quantityDelta: z.number().int().refine((v) => v !== 0, "La cantidad no puede ser cero"),
+  reason: z.string().min(1, "El motivo es requerido"),
+});
+
+export const sellerSchema = z.object({
+  name: z.string().min(1, "El nombre es requerido"),
+  phone: z.string().optional(),
+  city: z.string().optional(),
+  commissionType: z.enum(["percentage", "fixed_per_unit"]),
+  commissionValue: z.number().int().min(0, "La comisión no puede ser negativa"),
+  active: z.boolean().optional().default(true),
+  notes: z.string().optional(),
+});
+
+export const cashMovementSchema = z.object({
+  type: z.enum(["ingreso", "gasto"]),
+  amount: z.number().int().min(1, "El monto debe ser mayor a 0"),
+  concept: z.string().min(1, "El concepto es requerido"),
+  notes: z.string().optional(),
+});
+
+export const directSaleItemSchema = z.object({
+  productId: z.number().int(),
+  quantity: z.number().int().min(1),
+  unitPrice: z.number().int().min(0),
+});
+
+export const directSaleSchema = z.object({
+  items: z.array(directSaleItemSchema).min(1, "Debe incluir al menos un producto"),
+  notes: z.string().optional(),
+});
+
+export const sellerDeliveryItemSchema = z.object({
+  productId: z.number().int(),
+  quantity: z.number().int().min(1),
+  unitCost: z.number().int().min(0).nullable().optional(),
+});
+
+export const sellerDeliverySchema = z.object({
+  sellerId: z.number().int(),
+  items: z.array(sellerDeliveryItemSchema).min(1, "Debe incluir al menos un producto"),
+  notes: z.string().optional(),
+});
+
 export type CategoryInput = z.infer<typeof categorySchema>;
 export type ProductInput = z.infer<typeof productSchema>;
 export type DistributorInput = z.infer<typeof distributorSchema>;
@@ -67,6 +117,13 @@ export type PurchaseOrderInput = z.infer<typeof purchaseOrderSchema>;
 export type PurchaseOrderItemInput = z.infer<typeof purchaseOrderItemSchema>;
 export type SalesOrderInput = z.infer<typeof salesOrderSchema>;
 export type SalesOrderItemInput = z.infer<typeof salesOrderItemSchema>;
+export type InventoryAdjustmentInput = z.infer<typeof inventoryAdjustmentSchema>;
+export type SellerInput = z.infer<typeof sellerSchema>;
+export type CashMovementInput = z.infer<typeof cashMovementSchema>;
+export type DirectSaleItemInput = z.infer<typeof directSaleItemSchema>;
+export type DirectSaleInput = z.infer<typeof directSaleSchema>;
+export type SellerDeliveryItemInput = z.infer<typeof sellerDeliveryItemSchema>;
+export type SellerDeliveryInput = z.infer<typeof sellerDeliverySchema>;
 
 export function toSlug(name: string): string {
   return name

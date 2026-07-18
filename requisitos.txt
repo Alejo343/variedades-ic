@@ -1,0 +1,278 @@
+Documento de Requisitos Funcionales
+Sistema de Gestión de Inventario, Ventas y Consignación
+
+Versión: 1.0
+
+Cliente: Pendiente
+
+Desarrollador: David Galeano
+
+1. Objetivo
+
+Desarrollar un sistema web que permita administrar el inventario, las compras, los proveedores, la consignación de productos a vendedores externos, las ventas, la caja y los reportes del negocio.
+
+El sistema será utilizado únicamente por el propietario del negocio.
+
+2. Alcance
+
+El sistema permitirá administrar:
+
+Productos
+Categorías
+Proveedores
+Compras
+Inventario
+Vendedores externos
+Entregas de mercancía
+Ventas
+Liquidaciones
+Caja
+Reportes
+
+No se contempla en esta primera versión:
+
+Facturación electrónica.
+Múltiples sucursales.
+Múltiples usuarios.
+Acceso para vendedores.
+CRM de clientes.
+3. Requisitos Funcionales
+RF-01 Gestión de Productos
+
+El sistema deberá permitir:
+
+Crear productos.
+Editar productos.
+Eliminar productos.
+Activar/Inactivar productos.
+Generar automáticamente un SKU único.
+Asignar una categoría.
+Registrar precio de compra.
+Registrar precio de venta.
+Registrar garantía.
+Registrar variantes del producto.
+Registrar stock mínimo.
+Consultar inventario disponible.
+RF-02 Gestión de Categorías
+
+El sistema deberá permitir:
+
+Crear categorías.
+Editar categorías.
+Eliminar categorías.
+Consultar categorías.
+RF-03 Gestión de Proveedores
+
+El sistema deberá permitir:
+
+Registrar proveedores.
+Editar proveedores.
+Eliminar proveedores.
+Consultar historial de compras por proveedor.
+RF-04 Compras
+
+El sistema deberá permitir:
+
+Registrar compras.
+Asociar la compra a un proveedor.
+Registrar costo de compra.
+Actualizar automáticamente el inventario.
+Registrar compras de contado o crédito.
+Registrar cuentas por pagar.
+Consultar saldos pendientes con proveedores.
+RF-05 Inventario
+
+El sistema deberá permitir:
+
+Consultar existencias.
+Ajustar inventario.
+Registrar pérdidas.
+Registrar robos.
+Registrar productos dañados.
+Registrar movimientos de inventario.
+Mostrar historial de movimientos.
+RF-06 Alertas
+
+El sistema deberá:
+
+Alertar cuando un producto llegue al stock mínimo.
+Mostrar productos agotados.
+RF-07 Gestión de Vendedores
+
+El sistema deberá permitir:
+
+Registrar vendedores.
+Editar vendedores.
+Eliminar vendedores.
+Consultar información de cada vendedor.
+RF-08 Entrega de Mercancía
+
+El sistema deberá permitir:
+
+Entregar productos a un vendedor.
+Realizar múltiples entregas al mismo vendedor.
+Actualizar automáticamente el inventario del vendedor.
+Descontar automáticamente el inventario principal.
+RF-09 Inventario por Vendedor
+
+El sistema deberá permitir conocer:
+
+Qué productos posee cada vendedor.
+Cantidad disponible.
+Productos vendidos.
+Productos pendientes.
+Productos devueltos.
+RF-10 Registro de Ventas
+
+El propietario registrará las ventas reportadas por los vendedores.
+
+Cada venta deberá registrar:
+
+Fecha.
+Vendedor.
+Producto.
+Cantidad.
+Precio de venta.
+
+El sistema deberá:
+
+Descontar automáticamente el inventario del vendedor.
+Calcular el total vendido.
+RF-11 Devoluciones
+
+El sistema deberá permitir:
+
+Registrar devolución de productos.
+Actualizar automáticamente el inventario principal.
+Actualizar automáticamente el inventario del vendedor.
+RF-12 Liquidaciones
+
+El sistema deberá permitir:
+
+Registrar la liquidación diaria de cada vendedor.
+Calcular automáticamente el dinero que debe entregar.
+Calcular la comisión correspondiente.
+Marcar la liquidación como completada.
+
+No se permitirán pagos parciales.
+
+RF-13 Comisión
+
+El sistema deberá:
+
+Calcular automáticamente la comisión del vendedor.
+Mostrar el valor de la comisión en la liquidación.
+RF-14 Productos Perdidos o Dañados
+
+El sistema deberá permitir registrar:
+
+Producto perdido.
+Producto dañado.
+
+El sistema deberá reflejar el costo correspondiente al vendedor.
+
+RF-15 Caja
+
+El sistema deberá permitir registrar:
+
+Ingresos.
+Gastos.
+Saldo disponible.
+RF-16 Reportes
+
+El sistema deberá generar reportes de:
+
+Inventario actual.
+Productos con stock mínimo.
+Productos agotados.
+Compras.
+Ventas.
+Utilidad.
+Caja.
+Inventario por vendedor.
+Ventas por vendedor.
+Productos pendientes por vendedor.
+Productos devueltos.
+Cuentas por pagar.
+4. Reglas de Negocio
+
+RN-01
+
+El sistema será utilizado únicamente por el propietario.
+
+RN-02
+
+Cada producto deberá tener un SKU único generado automáticamente.
+
+RN-03
+
+Todo producto comprado incrementará automáticamente el inventario.
+
+RN-04
+
+Toda entrega a un vendedor disminuirá el inventario principal.
+
+RN-05
+
+Toda devolución incrementará nuevamente el inventario principal.
+
+RN-06
+
+Un vendedor no podrá vender más productos de los que tenga asignados.
+
+RN-07
+
+Toda venta disminuirá el inventario del vendedor.
+
+RN-08
+
+Las liquidaciones serán diarias.
+
+RN-09
+
+No se permitirán pagos parciales en las liquidaciones.
+
+RN-10
+
+Si un vendedor pierde o daña un producto, deberá asumir su costo.
+
+RN-11
+
+Todo movimiento de inventario deberá quedar registrado en un historial.
+
+5. Actores
+Administrador
+
+Corresponde al propietario del negocio.
+
+Puede realizar todas las operaciones del sistema.
+
+No existirán otros roles en esta versión.
+
+6. Módulos del Sistema
+Dashboard
+Productos
+Categorías
+Proveedores
+Compras
+Inventario
+Vendedores
+Entregas
+Ventas
+Liquidaciones
+Caja
+Reportes
+Configuración
+7. Requisitos No Funcionales
+Respaldo de la información.
+Alto rendimiento para consultas de inventario y ventas.
+Observaciones
+
+Este documento corresponde a la primera versión del levantamiento de requisitos y servirá como base para las siguientes etapas del proyecto:
+
+Casos de uso.
+Modelo Entidad-Relación (ERD).
+Diseño de la base de datos.
+Arquitectura del sistema.
+Wireframes de las pantallas.
+Plan de desarrollo por módulos.

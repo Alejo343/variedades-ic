@@ -2,6 +2,7 @@ import { db } from "../index";
 import { products, categories, productImages } from "../schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import type { ProductInput } from "@/lib/validations";
+import { generateProductSku } from "./inventory";
 
 export function getHeroProduct() {
   return db
@@ -62,8 +63,11 @@ export function getAllProducts() {
       id: products.id,
       name: products.name,
       slug: products.slug,
+      sku: products.sku,
       price: products.price,
+      purchasePrice: products.purchasePrice,
       stock: products.stock,
+      minStock: products.minStock,
       featured: products.featured,
       active: products.active,
       createdAt: products.createdAt,
@@ -150,8 +154,19 @@ export async function getProductBySlug(slug: string) {
   return { ...product, images };
 }
 
-export function createProduct(data: ProductInput) {
-  return db.insert(products).values(data).returning();
+export async function createProduct(data: ProductInput) {
+  let categoryName: string | null = null;
+  if (data.categoryId) {
+    const [category] = await db
+      .select({ name: categories.name })
+      .from(categories)
+      .where(eq(categories.id, data.categoryId))
+      .limit(1);
+    categoryName = category?.name ?? null;
+  }
+
+  const sku = await generateProductSku(categoryName);
+  return db.insert(products).values({ ...data, sku }).returning();
 }
 
 export function updateProduct(id: number, data: Partial<ProductInput>) {

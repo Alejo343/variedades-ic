@@ -1,0 +1,242 @@
+Documento de Reglas de Negocio
+Sistema de Gestión de Inventario, Ventas y Consignación
+
+Versión: 1.0
+
+Cliente: Pendiente
+
+Desarrollador: David Galeano
+
+1. Objetivo
+
+Definir las reglas de negocio que regirán el funcionamiento del sistema para garantizar la integridad de la información, el correcto control del inventario, la gestión de vendedores por consignación y el manejo financiero del negocio.
+
+2. Reglas Generales
+RN-001 – Usuario del sistema
+
+El sistema será utilizado únicamente por el propietario del negocio, quien tendrá acceso total a todas las funcionalidades.
+
+RN-002 – Integridad de la información
+
+Toda operación realizada en el sistema deberá quedar registrada con su fecha y hora.
+
+RN-003 – Eliminación de información
+
+No se permitirá eliminar información que tenga relación con otros registros del sistema (por ejemplo, un proveedor con compras registradas o un producto con movimientos de inventario). En su lugar, los registros podrán marcarse como inactivos.
+
+3. Productos
+RN-004 – Código único
+
+Cada producto deberá tener un SKU único generado automáticamente por el sistema.
+
+RN-005 – Precio de compra
+
+Todo producto deberá tener registrado un precio de compra.
+
+RN-006 – Precio de venta
+
+Todo producto deberá tener registrado un precio de venta.
+
+RN-007 – Variantes
+
+Las variantes de un producto manejarán inventario independiente cuando corresponda.
+
+RN-008 – Stock mínimo
+
+Cada producto podrá tener un stock mínimo configurado para generar alertas.
+
+RN-009 – Garantía
+
+Cada producto podrá tener un tiempo de garantía configurable.
+
+4. Compras
+RN-010 – Registro obligatorio
+
+Toda compra deberá estar asociada a un proveedor.
+
+RN-011 – Actualización de inventario
+
+Al registrar una compra, el inventario aumentará automáticamente.
+
+RN-012 – Cuentas por pagar
+
+Cuando una compra sea realizada a crédito, el sistema generará automáticamente una cuenta por pagar al proveedor.
+
+RN-013 – Pago de compras
+
+Una cuenta por pagar podrá cancelarse mediante uno o varios pagos, hasta completar el valor total de la compra.
+
+5. Inventario
+RN-014 – Existencias
+
+El inventario nunca podrá quedar con cantidades negativas.
+
+RN-015 – Movimientos
+
+Todo cambio en el inventario deberá generar un movimiento registrado.
+
+Tipos de movimiento:
+
+Compra
+Venta
+Entrega a vendedor
+Devolución
+Ajuste
+Pérdida
+Daño
+Robo
+RN-016 – Ajustes
+
+Los ajustes de inventario deberán registrar el motivo correspondiente.
+
+6. Vendedores
+RN-017 – Asignación de productos
+
+Solo el propietario podrá entregar productos a los vendedores.
+
+RN-018 – Múltiples entregas
+
+Un vendedor podrá recibir múltiples entregas de mercancía.
+
+RN-019 – Inventario por vendedor
+
+Cada vendedor tendrá un inventario independiente del inventario principal.
+
+RN-020 – Venta
+
+Un vendedor no podrá vender más productos de los que tenga asignados.
+
+RN-021 – Devolución
+
+Toda devolución realizada por un vendedor incrementará automáticamente el inventario principal.
+
+RN-022 – Productos dañados o perdidos
+
+Los productos reportados como dañados o perdidos por un vendedor serán asumidos económicamente por dicho vendedor.
+
+7. Ventas
+RN-023 – Registro de ventas
+
+Todas las ventas realizadas por los vendedores deberán ser registradas por el propietario.
+
+RN-024 – Información mínima
+
+Cada venta deberá registrar:
+
+Fecha
+Vendedor
+Producto
+Cantidad
+Precio de venta
+RN-025 – Inventario
+
+Toda venta disminuirá automáticamente el inventario del vendedor.
+
+RN-026 – Cálculo automático
+
+El sistema calculará automáticamente:
+
+Total de la venta.
+Valor acumulado vendido por el vendedor.
+Comisión del vendedor.
+8. Liquidaciones
+RN-027 – Periodicidad
+
+Las liquidaciones de los vendedores serán diarias.
+
+RN-028 – Pago completo
+
+Las liquidaciones deberán realizarse por el valor total correspondiente al período. No se permitirán pagos parciales.
+
+RN-029 – Comisión
+
+La comisión del vendedor será calculada automáticamente con base en la configuración definida para dicho vendedor.
+
+RN-030 – Estado
+
+Una liquidación podrá tener los siguientes estados:
+
+Pendiente.
+Liquidada.
+9. Caja
+RN-031 – Ingresos
+
+Todo dinero recibido deberá registrarse como ingreso de caja.
+
+RN-032 – Gastos
+
+Todo gasto deberá registrarse indicando su concepto.
+
+RN-033 – Saldo
+
+El saldo de caja será calculado automáticamente mediante:
+
+Saldo = Ingresos − Gastos
+
+10. Reportes
+RN-034 – Información en tiempo real
+
+Todos los reportes deberán reflejar la información actualizada del sistema.
+
+RN-035 – Inventario
+
+El reporte de inventario mostrará únicamente las existencias disponibles en el momento de la consulta.
+
+RN-036 – Vendedores
+
+Será posible consultar el inventario asignado a cada vendedor.
+
+RN-037 – Caja
+
+Será posible consultar el historial de ingresos y gastos.
+
+RN-038 – Compras
+
+Será posible consultar el historial de compras por proveedor.
+
+11. Restricciones
+RN-039
+
+No será posible eliminar un producto que tenga movimientos de inventario registrados.
+
+RN-040
+
+No será posible eliminar un proveedor con compras registradas.
+
+RN-041
+
+No será posible registrar ventas con cantidades superiores al inventario disponible del vendedor.
+
+RN-042
+
+No será posible registrar entregas de productos cuando el inventario principal sea insuficiente.
+
+RN-043
+
+No será posible registrar devoluciones superiores a la cantidad de productos asignados al vendedor.
+
+RN-044
+
+No será posible registrar compras con cantidades iguales o inferiores a cero.
+
+RN-045
+
+No será posible registrar ventas con precios negativos o cantidades negativas.
+
+12. Consideraciones futuras
+
+Estas reglas no aplican en la primera versión, pero el diseño del sistema debe permitir incorporarlas sin cambios importantes:
+
+Múltiples sucursales.
+Múltiples usuarios y roles.
+Acceso para vendedores.
+Apertura y cierre de caja.
+Facturación electrónica.
+Gestión de clientes.
+Cuentas por cobrar.
+Integración con lectores de códigos de barras.
+Impresión de comprobantes.
+Exportación de reportes a Excel y PDF.
+Observación
+
+Estas reglas representan las políticas actuales del negocio y sirven como base para la implementación del sistema. Cualquier cambio en la operación (por ejemplo, permitir pagos parciales a vendedores o agregar nuevos roles de usuario) deberá reflejarse en una nueva versión de este documento antes de modificar el software.

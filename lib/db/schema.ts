@@ -1,4 +1,7 @@
-import { pgTable, serial, varchar, text, integer, boolean, timestamp, date } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, text, integer, boolean, timestamp, date, check, pgSequence } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+
+export const productSkuSeq = pgSequence("product_sku_seq", { startWith: 1, increment: 1 });
 
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
@@ -16,9 +19,14 @@ export const products = pgTable("products", {
   name: varchar("name", { length: 200 }).notNull(),
   slug: varchar("slug", { length: 200 }).notNull().unique(),
   description: text("description"),
+  sku: varchar("sku", { length: 50 }).notNull().unique(),
   price: integer("price").notNull(),
+  purchasePrice: integer("purchase_price").default(0).notNull(),
   categoryId: integer("category_id").references(() => categories.id),
   stock: integer("stock").default(0).notNull(),
+  minStock: integer("min_stock").default(0).notNull(),
+  warrantyMonths: integer("warranty_months"),
+  hasVariants: boolean("has_variants").default(false).notNull(),
   featured: boolean("featured").default(false).notNull(),
   active: boolean("active").default(true).notNull(),
   whatsappText: text("whatsapp_text"),
@@ -86,6 +94,99 @@ export const salesOrderItems = pgTable("sales_order_items", {
   unitPrice: integer("unit_price"),
 });
 
+export const inventoryMovements = pgTable(
+  "inventory_movements",
+  {
+    id: serial("id").primaryKey(),
+    productId: integer("product_id").notNull().references(() => products.id),
+    variantId: integer("variant_id"),
+    ownerType: varchar("owner_type", { length: 10 }).notNull(),
+    sellerId: integer("seller_id"),
+    type: varchar("type", { length: 20 }).notNull(),
+    quantityDelta: integer("quantity_delta").notNull(),
+    unitCost: integer("unit_cost"),
+    reason: text("reason"),
+    sourceType: varchar("source_type", { length: 30 }),
+    sourceId: integer("source_id"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [check("quantity_delta_not_zero", sql`${table.quantityDelta} <> 0`)],
+);
+
+export const sellers = pgTable("sellers", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  phone: varchar("phone", { length: 50 }),
+  city: varchar("city", { length: 100 }),
+  commissionType: varchar("commission_type", { length: 15 }).notNull(),
+  commissionValue: integer("commission_value").notNull(),
+  active: boolean("active").default(true).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const cashMovements = pgTable(
+  "cash_movements",
+  {
+    id: serial("id").primaryKey(),
+    type: varchar("type", { length: 10 }).notNull(),
+    amount: integer("amount").notNull(),
+    concept: varchar("concept", { length: 200 }).notNull(),
+    movementDate: timestamp("movement_date").defaultNow().notNull(),
+    sourceType: varchar("source_type", { length: 30 }),
+    sourceId: integer("source_id"),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [check("amount_positive", sql`${table.amount} > 0`)],
+);
+
+export const directSales = pgTable("direct_sales", {
+  id: serial("id").primaryKey(),
+  saleDate: timestamp("sale_date").defaultNow().notNull(),
+  totalAmount: integer("total_amount").default(0).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const directSaleItems = pgTable(
+  "direct_sale_items",
+  {
+    id: serial("id").primaryKey(),
+    saleId: integer("sale_id").notNull().references(() => directSales.id, { onDelete: "cascade" }),
+    productId: integer("product_id").notNull().references(() => products.id),
+    variantId: integer("variant_id"),
+    quantity: integer("quantity").notNull(),
+    unitPrice: integer("unit_price").notNull(),
+    subtotal: integer("subtotal").notNull(),
+  },
+  (table) => [
+    check("quantity_positive", sql`${table.quantity} > 0`),
+    check("unit_price_not_negative", sql`${table.unitPrice} >= 0`),
+  ],
+);
+
+export const sellerDeliveries = pgTable("seller_deliveries", {
+  id: serial("id").primaryKey(),
+  sellerId: integer("seller_id").notNull().references(() => sellers.id),
+  deliveryDate: timestamp("delivery_date").defaultNow().notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const sellerDeliveryItems = pgTable(
+  "seller_delivery_items",
+  {
+    id: serial("id").primaryKey(),
+    deliveryId: integer("delivery_id").notNull().references(() => sellerDeliveries.id, { onDelete: "cascade" }),
+    productId: integer("product_id").notNull().references(() => products.id),
+    variantId: integer("variant_id"),
+    quantity: integer("quantity").notNull(),
+    unitCost: integer("unit_cost"),
+  },
+  (table) => [check("delivery_quantity_positive", sql`${table.quantity} > 0`)],
+);
+
 export type Category = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
 export type Product = typeof products.$inferSelect;
@@ -102,3 +203,17 @@ export type SalesOrder = typeof salesOrders.$inferSelect;
 export type NewSalesOrder = typeof salesOrders.$inferInsert;
 export type SalesOrderItem = typeof salesOrderItems.$inferSelect;
 export type NewSalesOrderItem = typeof salesOrderItems.$inferInsert;
+export type InventoryMovement = typeof inventoryMovements.$inferSelect;
+export type NewInventoryMovement = typeof inventoryMovements.$inferInsert;
+export type Seller = typeof sellers.$inferSelect;
+export type NewSeller = typeof sellers.$inferInsert;
+export type CashMovement = typeof cashMovements.$inferSelect;
+export type NewCashMovement = typeof cashMovements.$inferInsert;
+export type DirectSale = typeof directSales.$inferSelect;
+export type NewDirectSale = typeof directSales.$inferInsert;
+export type DirectSaleItem = typeof directSaleItems.$inferSelect;
+export type NewDirectSaleItem = typeof directSaleItems.$inferInsert;
+export type SellerDelivery = typeof sellerDeliveries.$inferSelect;
+export type NewSellerDelivery = typeof sellerDeliveries.$inferInsert;
+export type SellerDeliveryItem = typeof sellerDeliveryItems.$inferSelect;
+export type NewSellerDeliveryItem = typeof sellerDeliveryItems.$inferInsert;

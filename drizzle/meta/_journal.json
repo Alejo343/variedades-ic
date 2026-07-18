@@ -15,6 +15,41 @@
       "when": 1778431367357,
       "tag": "0001_acoustic_spot",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784355156479,
+      "tag": "0002_boring_quicksilver",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784355185379,
+      "tag": "0003_futuristic_ma_gnuci",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784355317013,
+      "tag": "0004_superb_ken_ellis",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784390127064,
+      "tag": "0005_panoramic_next_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784391282825,
+      "tag": "0006_careful_vermin",
+      "breakpoints": true
     }
   ]
 }

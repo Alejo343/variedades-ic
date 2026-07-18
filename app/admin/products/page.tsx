@@ -28,6 +28,7 @@ export default async function ProductsPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">SKU</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Nombre</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Categoría</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Precio</th>
@@ -39,6 +40,7 @@ export default async function ProductsPage() {
           <tbody className="divide-y divide-gray-100">
             {products.map((p) => (
               <tr key={p.id} className="hover:bg-gray-50">
+                <td className="px-4 py-3 text-gray-500 font-mono text-xs">{p.sku}</td>
                 <td className="px-4 py-3 font-medium text-gray-800">
                   {p.name}
                   {p.featured && (
@@ -51,7 +53,11 @@ export default async function ProductsPage() {
                 <td className="px-4 py-3 text-gray-800">{formatCOP(p.price)}</td>
                 <td
                   className={`px-4 py-3 font-medium ${
-                    p.stock <= 5 ? "text-orange-600" : "text-gray-800"
+                    p.stock === 0
+                      ? "text-red-600"
+                      : p.minStock > 0 && p.stock <= p.minStock
+                        ? "text-orange-600"
+                        : "text-gray-800"
                   }`}
                 >
                   {p.stock}
