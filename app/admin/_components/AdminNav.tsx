@@ -19,6 +19,7 @@ const links = [
   { href: "/admin/seller-losses", label: "Pérdidas/daños/robos" },
   { href: "/admin/settlements", label: "Liquidaciones" },
   { href: "/admin/cash", label: "Caja" },
+  { href: "/admin/reports", label: "Reportes" },
 ];
 
 export function AdminNav() {

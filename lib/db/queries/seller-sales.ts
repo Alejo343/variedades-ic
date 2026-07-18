@@ -1,6 +1,6 @@
 import { db } from "../index";
 import { sellerSales, sellerSaleItems, inventoryMovements, products, sellers } from "../schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import type { SellerSaleInput } from "@/lib/validations";
 import { deductStock } from "@/lib/domain/stock";
 import { calculateCommission, type CommissionConfig } from "@/lib/domain/commission";
@@ -59,6 +59,27 @@ export async function getSellerSaleById(id: number) {
     .where(eq(sellerSaleItems.saleId, id));
 
   return { ...sale, items };
+}
+
+export async function getSellerSalesSummary() {
+  const rows = await db
+    .select({
+      sellerId: sellerSales.sellerId,
+      sellerName: sellers.name,
+      count: sql<string>`COUNT(*)`,
+      totalAmount: sql<string>`COALESCE(SUM(${sellerSales.totalAmount}), 0)`,
+      totalCommission: sql<string>`COALESCE(SUM(${sellerSales.commissionAmount}), 0)`,
+    })
+    .from(sellerSales)
+    .leftJoin(sellers, eq(sellerSales.sellerId, sellers.id))
+    .groupBy(sellerSales.sellerId, sellers.name);
+
+  return rows.map((r) => ({
+    ...r,
+    count: Number(r.count),
+    totalAmount: Number(r.totalAmount),
+    totalCommission: Number(r.totalCommission),
+  }));
 }
 
 export async function createSellerSale(data: SellerSaleInput): Promise<CreateSellerSaleResult> {

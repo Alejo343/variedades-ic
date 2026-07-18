@@ -1,5 +1,5 @@
 import { db } from "../index";
-import { inventoryMovements, products } from "../schema";
+import { inventoryMovements, products, sellers } from "../schema";
 import { and, eq, sql } from "drizzle-orm";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -32,6 +32,25 @@ export async function getSellerInventory(sellerId: number) {
     .leftJoin(products, eq(inventoryMovements.productId, products.id))
     .where(and(eq(inventoryMovements.ownerType, "seller"), eq(inventoryMovements.sellerId, sellerId)))
     .groupBy(inventoryMovements.productId, products.name, products.price, products.purchasePrice)
+    .having(sql`SUM(${inventoryMovements.quantityDelta}) > 0`);
+
+  return rows.map((r) => ({ ...r, quantity: Number(r.quantity) }));
+}
+
+export async function getAllSellersInventory() {
+  const rows = await db
+    .select({
+      sellerId: inventoryMovements.sellerId,
+      sellerName: sellers.name,
+      productId: inventoryMovements.productId,
+      productName: products.name,
+      quantity: sql<string>`SUM(${inventoryMovements.quantityDelta})`,
+    })
+    .from(inventoryMovements)
+    .leftJoin(products, eq(inventoryMovements.productId, products.id))
+    .leftJoin(sellers, eq(inventoryMovements.sellerId, sellers.id))
+    .where(eq(inventoryMovements.ownerType, "seller"))
+    .groupBy(inventoryMovements.sellerId, sellers.name, inventoryMovements.productId, products.name)
     .having(sql`SUM(${inventoryMovements.quantityDelta}) > 0`);
 
   return rows.map((r) => ({ ...r, quantity: Number(r.quantity) }));

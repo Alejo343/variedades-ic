@@ -1,6 +1,6 @@
 import { db } from "../index";
-import { sellerReturns, sellerReturnItems, inventoryMovements, sellers } from "../schema";
-import { eq, desc } from "drizzle-orm";
+import { sellerReturns, sellerReturnItems, inventoryMovements, sellers, products } from "../schema";
+import { eq, desc, sql } from "drizzle-orm";
 import type { SellerReturnInput } from "@/lib/validations";
 import { deductStock } from "@/lib/domain/stock";
 import { getSellerBalance } from "./seller-inventory";
@@ -22,6 +22,20 @@ export function getAllSellerReturns() {
     .from(sellerReturns)
     .leftJoin(sellers, eq(sellerReturns.sellerId, sellers.id))
     .orderBy(desc(sellerReturns.returnDate));
+}
+
+export async function getReturnedProductsSummary() {
+  const rows = await db
+    .select({
+      productId: sellerReturnItems.productId,
+      productName: products.name,
+      totalQuantity: sql<string>`COALESCE(SUM(${sellerReturnItems.quantity}), 0)`,
+    })
+    .from(sellerReturnItems)
+    .leftJoin(products, eq(sellerReturnItems.productId, products.id))
+    .groupBy(sellerReturnItems.productId, products.name);
+
+  return rows.map((r) => ({ ...r, totalQuantity: Number(r.totalQuantity) }));
 }
 
 export async function createSellerReturn(data: SellerReturnInput): Promise<CreateSellerReturnResult> {

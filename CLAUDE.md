@@ -80,7 +80,7 @@ This project uses Next.js **16** (see `package.json`). APIs and conventions may 
 **Archivos clave del backend:**
 
 - `lib/db/schema.ts` — tablas: `categories`, `products`, `product_images`, `distributors`, `purchase_orders`, `purchase_order_items`, `sales_orders`, `sales_order_items`, `inventory_movements`, `sellers`, `cash_movements`, `direct_sales`, `direct_sale_items`, `seller_deliveries`, `seller_delivery_items`, `seller_sales`, `seller_sale_items`, `seller_returns`, `seller_return_items`, `seller_losses`, `seller_loss_items`, `settlements`, `purchase_payments`; secuencia `product_sku_seq`
-- `lib/db/queries/categories.ts` / `products.ts` / `distributors.ts` / `purchase-orders.ts` / `sales-orders.ts` / `inventory.ts` / `sellers.ts` / `cash.ts` / `direct-sales.ts` / `seller-deliveries.ts` / `seller-inventory.ts` / `seller-sales.ts` / `seller-returns.ts` / `seller-losses.ts` / `settlements.ts` / `purchase-payments.ts` — queries Drizzle
+- `lib/db/queries/categories.ts` / `products.ts` / `distributors.ts` / `purchase-orders.ts` / `sales-orders.ts` / `inventory.ts` / `sellers.ts` / `cash.ts` / `direct-sales.ts` / `seller-deliveries.ts` / `seller-inventory.ts` / `seller-sales.ts` / `seller-returns.ts` / `seller-losses.ts` / `settlements.ts` / `purchase-payments.ts` / `reports.ts` — queries Drizzle
 - `lib/domain/order-status.ts` — máquina de estados pura (transiciones válidas de compras/ventas), con tests
 - `lib/domain/stock.ts` — aritmética de stock pura (`receiveStock`, `deductStock`), con tests
 - `lib/domain/inventory-movement.ts` — `applyMovement`/`validateAdjustmentReason`, con tests
@@ -173,7 +173,7 @@ mínima → `npm run test` + `npm run lint` + `npm run build` en verde):
 | 6 | Devoluciones y pérdidas/daños/robos de vendedor | ✅ listo |
 | 7 | Liquidaciones (`settlements`) | ✅ listo |
 | 8 | Compras a crédito / cuentas por pagar (`purchase_payments`) | ✅ listo |
-| 9 | Reportes consolidados | ⬜ pendiente |
+| 9 | Reportes consolidados | ✅ listo |
 | 10 | Variantes de producto (`product_variants`) | ⬜ pendiente |
 
 **Fase 1 — completada:**
@@ -579,6 +579,83 @@ inventario) cubren bien una venta de mostrador instantánea.
   `purchaseType` descrito arriba, encontrado y corregido en el mismo flujo
   de verificación.
 
+**Fase 9 — completada:**
+
+- Cubre los 12 reportes de RF-16 en una sola página `/admin/reports`, sin
+  tabla nueva — todo se deriva por agregación sobre lo que ya existía
+  (mismo criterio "derivar, no duplicar" de todas las fases anteriores).
+- **Decisión de negocio pedida al usuario**: la fórmula de "Utilidad" no
+  estaba definida en `reglas.txt`/`requisitos.txt`. Se presentaron tres
+  opciones (bruta / tras comisiones / neta con gastos de caja); el usuario
+  delegó la elección. Se recomendó y quedó implementada la **utilidad
+  bruta**: `ventas − (cantidad × products.purchasePrice)` sumado sobre las
+  tres fuentes de venta (WhatsApp, local, vendedores) — no resta comisiones
+  de vendedor ni gastos de caja sueltos, porque esos ya se ven aparte en
+  Caja/Liquidaciones y mezclarlos complicaría comparar el número entre
+  periodos. **Limitación conocida, no resuelta**: el costo usado es el
+  `purchasePrice` *actual* del producto, no un snapshot histórico del costo
+  al momento de cada venta (ese snapshot no existe en `sales_order_items`/
+  `direct_sale_items`/`seller_sale_items` — solo `purchase_order_items`
+  guarda `unitCost`). Si el costo de compra de un producto cambia, la
+  utilidad de ventas pasadas se recalcula con el costo nuevo, no el
+  vigente en su momento.
+- **Distinción "estado" vs "flujo"**: un filtro de fecha (`?from=&to=`)
+  afecta solo a los reportes de flujo — Compras, Ventas, Utilidad, Caja
+  (ingresos/gastos del periodo) — porque tiene sentido acotarlos a un
+  rango. Los reportes de estado — Inventario actual, Stock mínimo,
+  Agotados, Inventario/pendientes por vendedor, Cuentas por pagar, saldo
+  de Caja — siempre muestran el momento actual sin importar el filtro,
+  siguiendo RN-035 ("el reporte de inventario mostrará únicamente las
+  existencias disponibles en el momento de la consulta"). Ventas por
+  vendedor y Productos devueltos quedaron como histórico completo (sin
+  filtro de fecha) por simplicidad — no se conectó `seller_sales`/
+  `seller_returns` al rango para no multiplicar la complejidad de la
+  primera versión; queda como mejora futura si se necesita.
+- Query nueva `lib/db/queries/reports.ts`: `getInventorySummary`
+  (productos activos/unidades/valor a costo), `getPurchasesReport`
+  (excluye pedidos `cancelado`, agrupado por proveedor — cubre RN-038),
+  `getSalesReport` (une `salesOrders` en estado `confirmado`/`entregado`
+  + `direct_sales` + `seller_sales`, cada uno con su propio filtro de
+  fecha), `getProfitReport` (reutiliza `getSalesReport` + tres queries de
+  costo con `innerJoin` a `products`, una por canal de venta — se evitó
+  un solo query con múltiples joins porque unir varias tablas de items
+  antes de agregar infla los totales).
+- Extensiones a archivos existentes (mismo criterio "un archivo por
+  dominio de query" de siempre): `getAllSellersInventory` en
+  `seller-inventory.ts` (como `getSellerInventory` pero para todos los
+  vendedores en una sola consulta agrupada, en vez de N+1), `getSellerSalesSummary`
+  en `seller-sales.ts`, `getReturnedProductsSummary` en
+  `seller-returns.ts`. Cuentas por pagar reutiliza `getAccountsPayableSummary`
+  tal cual (Fase 8); Stock mínimo/Agotados reutilizan `getLowStock`/
+  `getOutOfStock` tal cual (Fase 1); Caja reutiliza `getCashBalance`/
+  `getAllCashMovements` tal cual (Fase 2), filtrando el rango de fecha en
+  JS sobre la lista ya traída (volumen bajo, no amerita una query nueva).
+- **Inconsistencia de unidades heredada, no corregida en esta fase**:
+  `purchase_orders.totalCost`/`purchase_payments.amount` siguen en
+  centavos (legado desde antes del pivote — ver Fase 8), mientras que
+  `sales_orders`/`direct_sales`/`seller_sales`/`cash_movements`/
+  `products.purchasePrice` están en pesos directos. El reporte usa dos
+  formateadores distintos (`formatCOP` para pesos, `formatCOPCentavos`
+  para los campos heredados de `purchase_orders`) en vez de normalizar la
+  base de datos — una migración de unidades queda fuera de alcance de esta
+  fase y como deuda técnica pendiente.
+- Sin tabla ni endpoint de escritura nuevos — toda la fase es de sólo
+  lectura, así que no hay UI de creación/edición ni rutas `POST`.
+- UI: `/admin/reports`, con `DateRangeFilter` (client component,
+  `?from=&to=` en la URL) y tarjetas por reporte. Nav: "Reportes".
+- Verificado con `npm run test` (51/51) + `npm run lint` + `npm run build`
+  en verde, más flujo manual en navegador: los totales del reporte
+  coincidieron exactamente con los datos acumulados de las fases
+  anteriores (Compras $65.000 excluyendo el pedido cancelado de la Fase 8;
+  Ventas $350.000 en 3 canales — $50.000 WhatsApp + $100.000 local +
+  $200.000 vendedores en 3 ventas; comisión $20.000 = 10% de $200.000;
+  Caja $295.000 de saldo = $345.000 ingresos − $50.000 gastos; Cuentas por
+  pagar $5.000, el único pedido a crédito sin saldar; Productos devueltos
+  con la unidad devuelta en la Fase 6); y probado el filtro de fecha con
+  un rango futuro sin datos, confirmando que Compras/Ventas/Utilidad/Caja
+  (ingresos y gastos) bajan a 0 mientras que Inventario actual, Cuentas
+  por pagar y el saldo de Caja permanecen sin cambios.
+
 Guía para Claude Code al trabajar en este repositorio. Léela antes de tocar código.
 
 ## Cómo trabajamos aquí (spec-driven + tests)
@@ -701,13 +778,21 @@ La idea clave: cada capa tiene una responsabilidad y no invade a las demás.
   `deductStock`), columna "Saldo pendiente" por proveedor en
   `/admin/distributors`. De paso corrigió un bug de `.default()` en Zod que
   reseteaba `purchaseType`/`status` en cada PUT parcial que no los incluyera
-  (ver detalle en "Fase 8 — completada" arriba). Ver "Roadmap: pivote a
-  gestión integral de la empresa" arriba para las fases 9-10 pendientes.
+  (ver detalle en "Fase 8 — completada" arriba).
+- Fase 9 del pivote: reportes consolidados en `/admin/reports` — los 12
+  reportes de RF-16 (inventario, stock mínimo, agotados, compras, ventas,
+  utilidad, caja, cuentas por pagar, inventario/pendientes por vendedor,
+  ventas por vendedor, productos devueltos), todo derivado por agregación,
+  sin tablas nuevas. Filtro de fecha solo para los reportes de flujo
+  (Compras/Ventas/Utilidad/Caja); utilidad bruta = ventas − costo de compra
+  actual (decisión de negocio, ver "Fase 9 — completada" arriba para el
+  detalle y limitaciones). Ver "Roadmap: pivote a gestión integral de la
+  empresa" arriba para la fase 10 pendiente.
 
 **Próximo:**
 
-- Fase 9 del pivote: reportes consolidados (inventario, compras, ventas,
-  utilidad, caja, cuentas por pagar, ventas/inventario por vendedor).
+- Fase 10 del pivote: variantes de producto (`product_variants`) — última
+  fase del roadmap, su forma exacta se define con el usuario al llegar.
 - Poblar la BD con productos reales (tarea del roadmap original, aún pendiente).
 
 **Decisiones tomadas:**
@@ -733,6 +818,21 @@ La idea clave: cada capa tiene una responsabilidad y no invade a las demás.
   las ventas cobradas del día): simplemente omite el movimiento de caja sin
   avisar. No se ha discutido con el usuario qué debería pasar en ese caso
   (¿la empresa le debe al vendedor? ¿se registra como gasto?).
+- Inconsistencia de unidades monetarias entre tablas: `purchase_orders`/
+  `purchase_payments` guardan pesos en centavos (legado desde antes del
+  pivote), mientras que `sales_orders`/`direct_sales`/`seller_sales`/
+  `cash_movements`/`products.purchasePrice`/`products.price` guardan pesos
+  directos. `/admin/reports` y `/admin/purchase-orders` lo compensan con
+  formateadores distintos por sección en vez de normalizar la base de
+  datos — sería mejor resolverlo con una migración de unidades en algún
+  momento, en vez de seguir arrastrando dos convenciones.
+- El reporte de "Utilidad" (`/admin/reports`) usa el `purchasePrice`
+  *actual* del producto como costo, no un snapshot histórico del costo al
+  momento de cada venta (ese snapshot no se guarda en los items de venta).
+  Si el costo de compra de un producto cambia, la utilidad de ventas
+  pasadas se recalcula con el costo nuevo. Es "utilidad bruta" (ventas −
+  costo de compra) por decisión explícita del usuario — no resta
+  comisiones de vendedor ni gastos de caja.
 
 ## Comandos
 
