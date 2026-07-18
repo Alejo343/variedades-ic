@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 
 type Seller = { id: number; name: string };
 
-export function SellerPicker({ sellers }: { sellers: Seller[] }) {
+export function SellerPicker({ sellers, basePath }: { sellers: Seller[]; basePath: string }) {
   const router = useRouter();
 
   return (
@@ -13,7 +13,7 @@ export function SellerPicker({ sellers }: { sellers: Seller[] }) {
       <select
         defaultValue=""
         onChange={(e) => {
-          if (e.target.value) router.push(`/admin/seller-sales/new?sellerId=${e.target.value}`);
+          if (e.target.value) router.push(`${basePath}?sellerId=${e.target.value}`);
         }}
         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
       >

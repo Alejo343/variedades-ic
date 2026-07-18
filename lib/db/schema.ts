@@ -215,6 +215,48 @@ export const sellerSaleItems = pgTable(
   ],
 );
 
+export const sellerReturns = pgTable("seller_returns", {
+  id: serial("id").primaryKey(),
+  sellerId: integer("seller_id").notNull().references(() => sellers.id),
+  returnDate: timestamp("return_date").defaultNow().notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const sellerReturnItems = pgTable(
+  "seller_return_items",
+  {
+    id: serial("id").primaryKey(),
+    returnId: integer("return_id").notNull().references(() => sellerReturns.id, { onDelete: "cascade" }),
+    productId: integer("product_id").notNull().references(() => products.id),
+    variantId: integer("variant_id"),
+    quantity: integer("quantity").notNull(),
+  },
+  (table) => [check("return_quantity_positive", sql`${table.quantity} > 0`)],
+);
+
+export const sellerLosses = pgTable("seller_losses", {
+  id: serial("id").primaryKey(),
+  sellerId: integer("seller_id").notNull().references(() => sellers.id),
+  lossDate: timestamp("loss_date").defaultNow().notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const sellerLossItems = pgTable(
+  "seller_loss_items",
+  {
+    id: serial("id").primaryKey(),
+    lossId: integer("loss_id").notNull().references(() => sellerLosses.id, { onDelete: "cascade" }),
+    productId: integer("product_id").notNull().references(() => products.id),
+    variantId: integer("variant_id"),
+    quantity: integer("quantity").notNull(),
+    type: varchar("type", { length: 10 }).notNull(),
+    unitCost: integer("unit_cost").notNull(),
+  },
+  (table) => [check("loss_quantity_positive", sql`${table.quantity} > 0`)],
+);
+
 export type Category = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
 export type Product = typeof products.$inferSelect;
@@ -249,3 +291,11 @@ export type SellerSale = typeof sellerSales.$inferSelect;
 export type NewSellerSale = typeof sellerSales.$inferInsert;
 export type SellerSaleItem = typeof sellerSaleItems.$inferSelect;
 export type NewSellerSaleItem = typeof sellerSaleItems.$inferInsert;
+export type SellerReturn = typeof sellerReturns.$inferSelect;
+export type NewSellerReturn = typeof sellerReturns.$inferInsert;
+export type SellerReturnItem = typeof sellerReturnItems.$inferSelect;
+export type NewSellerReturnItem = typeof sellerReturnItems.$inferInsert;
+export type SellerLoss = typeof sellerLosses.$inferSelect;
+export type NewSellerLoss = typeof sellerLosses.$inferInsert;
+export type SellerLossItem = typeof sellerLossItems.$inferSelect;
+export type NewSellerLossItem = typeof sellerLossItems.$inferInsert;

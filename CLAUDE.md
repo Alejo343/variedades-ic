@@ -79,8 +79,8 @@ This project uses Next.js **16** (see `package.json`). APIs and conventions may 
 
 **Archivos clave del backend:**
 
-- `lib/db/schema.ts` — tablas: `categories`, `products`, `product_images`, `distributors`, `purchase_orders`, `purchase_order_items`, `sales_orders`, `sales_order_items`, `inventory_movements`, `sellers`, `cash_movements`, `direct_sales`, `direct_sale_items`, `seller_deliveries`, `seller_delivery_items`, `seller_sales`, `seller_sale_items`; secuencia `product_sku_seq`
-- `lib/db/queries/categories.ts` / `products.ts` / `distributors.ts` / `purchase-orders.ts` / `sales-orders.ts` / `inventory.ts` / `sellers.ts` / `cash.ts` / `direct-sales.ts` / `seller-deliveries.ts` / `seller-inventory.ts` / `seller-sales.ts` — queries Drizzle
+- `lib/db/schema.ts` — tablas: `categories`, `products`, `product_images`, `distributors`, `purchase_orders`, `purchase_order_items`, `sales_orders`, `sales_order_items`, `inventory_movements`, `sellers`, `cash_movements`, `direct_sales`, `direct_sale_items`, `seller_deliveries`, `seller_delivery_items`, `seller_sales`, `seller_sale_items`, `seller_returns`, `seller_return_items`, `seller_losses`, `seller_loss_items`; secuencia `product_sku_seq`
+- `lib/db/queries/categories.ts` / `products.ts` / `distributors.ts` / `purchase-orders.ts` / `sales-orders.ts` / `inventory.ts` / `sellers.ts` / `cash.ts` / `direct-sales.ts` / `seller-deliveries.ts` / `seller-inventory.ts` / `seller-sales.ts` / `seller-returns.ts` / `seller-losses.ts` — queries Drizzle
 - `lib/domain/order-status.ts` — máquina de estados pura (transiciones válidas de compras/ventas), con tests
 - `lib/domain/stock.ts` — aritmética de stock pura (`receiveStock`, `deductStock`), con tests
 - `lib/domain/inventory-movement.ts` — `applyMovement`/`validateAdjustmentReason`, con tests
@@ -168,7 +168,7 @@ mínima → `npm run test` + `npm run lint` + `npm run build` en verde):
 | 3 | Entregas a vendedores (`seller_deliveries`) | ✅ listo |
 | 4 | Inventario por vendedor (lectura, agregación sobre el ledger) | ✅ listo |
 | 5 | Ventas de vendedor (`seller_sales`, distinto de `salesOrders`) | ✅ listo |
-| 6 | Devoluciones y pérdidas/daños/robos de vendedor | ⬜ pendiente |
+| 6 | Devoluciones y pérdidas/daños/robos de vendedor | ✅ listo |
 | 7 | Liquidaciones (`settlements`) | ⬜ pendiente |
 | 8 | Compras a crédito / cuentas por pagar (`purchase_payments`) | ⬜ pendiente |
 | 9 | Reportes consolidados | ⬜ pendiente |
@@ -408,6 +408,48 @@ inventario) cubren bien una venta de mostrador instantánea.
   la BD que el ledger generó una sola fila (`seller -1`, sin fila
   `principal`).
 
+**Fase 6 — completada:**
+
+- Schema: `seller_returns`/`seller_return_items` (`quantity` CHECK>0, sin
+  precio — una devolución no es una transacción monetaria) y
+  `seller_losses`/`seller_loss_items` (`type`: `perdida`|`dano`|`robo`,
+  `unitCost` NOT NULL — snapshot para poder cobrarlo en la liquidación de
+  la Fase 7).
+- `getSellerInventory` ahora también selecciona `products.purchasePrice`
+  (como `productPurchasePrice`) para precargar el costo unitario en el
+  formulario de pérdidas — a diferencia de ventas/devoluciones, una pérdida
+  se valora al costo de compra, no al precio de venta.
+- Query `createSellerReturn` (`lib/db/queries/seller-returns.ts`): mismo
+  patrón fail-fast que ventas (valida `getSellerBalance`+`deductStock`
+  contra RN-043 antes de escribir), luego por cada item escribe DOS
+  movimientos en la misma transacción — `seller -qty` y `principal +qty`
+  (este último vía `recordPrincipalMovement`, reutilizado tal cual) —
+  cumpliendo RN-021 (toda devolución regresa al inventario principal).
+- Query `createSellerLoss` (`lib/db/queries/seller-losses.ts`): mismo
+  patrón fail-fast, pero escribe un solo movimiento `seller -qty` con el
+  `type` que corresponda (`perdida`/`dano`/`robo`) y su `unitCost` — nunca
+  toca el inventario principal, porque el costo lo asume el vendedor
+  (RN-022). Se aplicó la misma validación de saldo que en devoluciones (no
+  se puede reportar perder/dañar/robar más de lo que el vendedor tiene
+  asignado) por analogía razonable con RN-043, ya que las reglas no lo
+  dicen explícitamente para este caso — señalado como tal en el diseño
+  original.
+- Refactor: `SellerPicker` se movió de `app/admin/seller-sales/_components/`
+  a `app/admin/_components/` (compartido) con un prop `basePath`, ahora que
+  tres flujos distintos (ventas, devoluciones, pérdidas) lo necesitan con
+  el mismo patrón "elegir vendedor → formulario limitado a su inventario".
+- APIs: `POST /api/admin/seller-returns` y `POST /api/admin/seller-losses`.
+- UI: `/admin/seller-returns` y `/admin/seller-losses`, mismo patrón de dos
+  pasos (elegir vendedor vía `?sellerId=` → formulario).
+- Verificado con `npm run test` (45/45) + `npm run lint` + `npm run build`
+  en verde, más flujo manual en navegador: devolución de 1 unidad → stock
+  principal 4→5, inventario del vendedor 2→1 (RN-021 confirmado); daño de
+  la última unidad → inventario del vendedor 1→0 (desaparece de la lista),
+  stock principal **sin cambios** en 5 (RN-022 confirmado); y verificado en
+  la BD que el ledger generó exactamente las filas esperadas por cada
+  operación (`seller -1` + `principal +1` para la devolución; solo
+  `seller -1` con `unit_cost=30000` para el daño).
+
 Guía para Claude Code al trabajar en este repositorio. Léela antes de tocar código.
 
 ## Cómo trabajamos aquí (spec-driven + tests)
@@ -511,13 +553,20 @@ La idea clave: cada capa tiene una responsabilidad y no invade a las demás.
   distinto de `salesOrders`), transacción que valida RN-020/041 vía
   `getSellerBalance`+`deductStock` antes de escribir, calcula comisión con
   `lib/domain/commission.ts`, y descuenta solo el inventario del vendedor
-  (nunca el principal). Ver "Roadmap: pivote a gestión integral de la
-  empresa" arriba para el detalle y las fases 6-10 pendientes.
+  (nunca el principal).
+- Fase 6 del pivote: devoluciones (`seller_returns`, RN-021/043 — devuelve
+  al inventario principal) y pérdidas/daños/robos (`seller_losses`,
+  RN-022 — el costo lo asume el vendedor, nunca toca el principal) de
+  vendedor. `SellerPicker` ahora es un componente compartido
+  (`app/admin/_components/SellerPicker.tsx`) usado por ventas, devoluciones
+  y pérdidas. Ver "Roadmap: pivote a gestión integral de la empresa" arriba
+  para el detalle y las fases 7-10 pendientes.
 
 **Próximo:**
 
-- Fase 6 del pivote: devoluciones y pérdidas/daños/robos de vendedor
-  (`seller_returns`, `seller_losses`).
+- Fase 7 del pivote: liquidaciones (`settlements`) — cierra el día por
+  vendedor, calcula `amountDue = totalSales - totalCommission + totalLosses`,
+  y al marcarse "liquidada" genera el ingreso correspondiente en caja.
 - Poblar la BD con productos reales (tarea del roadmap original, aún pendiente).
 
 **Decisiones tomadas:**

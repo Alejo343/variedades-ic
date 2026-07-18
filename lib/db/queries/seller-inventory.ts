@@ -25,12 +25,13 @@ export async function getSellerInventory(sellerId: number) {
       productId: inventoryMovements.productId,
       productName: products.name,
       productPrice: products.price,
+      productPurchasePrice: products.purchasePrice,
       quantity: sql<string>`SUM(${inventoryMovements.quantityDelta})`,
     })
     .from(inventoryMovements)
     .leftJoin(products, eq(inventoryMovements.productId, products.id))
     .where(and(eq(inventoryMovements.ownerType, "seller"), eq(inventoryMovements.sellerId, sellerId)))
-    .groupBy(inventoryMovements.productId, products.name, products.price)
+    .groupBy(inventoryMovements.productId, products.name, products.price, products.purchasePrice)
     .having(sql`SUM(${inventoryMovements.quantityDelta}) > 0`);
 
   return rows.map((r) => ({ ...r, quantity: Number(r.quantity) }));

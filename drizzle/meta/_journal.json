@@ -57,6 +57,13 @@
       "when": 1784407486850,
       "tag": "0007_amazing_pyro",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784409931182,
+      "tag": "0008_true_stone_men",
+      "breakpoints": true
     }
   ]
 }

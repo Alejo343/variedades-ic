@@ -15,6 +15,8 @@ const links = [
   { href: "/admin/sellers", label: "Vendedores" },
   { href: "/admin/deliveries", label: "Entregas" },
   { href: "/admin/seller-sales", label: "Ventas de vendedores" },
+  { href: "/admin/seller-returns", label: "Devoluciones" },
+  { href: "/admin/seller-losses", label: "Pérdidas/daños/robos" },
   { href: "/admin/cash", label: "Caja" },
 ];
 

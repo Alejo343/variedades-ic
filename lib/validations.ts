@@ -122,6 +122,30 @@ export const sellerSaleSchema = z.object({
   notes: z.string().optional(),
 });
 
+export const sellerReturnItemSchema = z.object({
+  productId: z.number().int(),
+  quantity: z.number().int().min(1),
+});
+
+export const sellerReturnSchema = z.object({
+  sellerId: z.number().int(),
+  items: z.array(sellerReturnItemSchema).min(1, "Debe incluir al menos un producto"),
+  notes: z.string().optional(),
+});
+
+export const sellerLossItemSchema = z.object({
+  productId: z.number().int(),
+  quantity: z.number().int().min(1),
+  type: z.enum(["perdida", "dano", "robo"]),
+  unitCost: z.number().int().min(0),
+});
+
+export const sellerLossSchema = z.object({
+  sellerId: z.number().int(),
+  items: z.array(sellerLossItemSchema).min(1, "Debe incluir al menos un producto"),
+  notes: z.string().optional(),
+});
+
 export type CategoryInput = z.infer<typeof categorySchema>;
 export type ProductInput = z.infer<typeof productSchema>;
 export type DistributorInput = z.infer<typeof distributorSchema>;
@@ -138,6 +162,10 @@ export type SellerDeliveryItemInput = z.infer<typeof sellerDeliveryItemSchema>;
 export type SellerDeliveryInput = z.infer<typeof sellerDeliverySchema>;
 export type SellerSaleItemInput = z.infer<typeof sellerSaleItemSchema>;
 export type SellerSaleInput = z.infer<typeof sellerSaleSchema>;
+export type SellerReturnItemInput = z.infer<typeof sellerReturnItemSchema>;
+export type SellerReturnInput = z.infer<typeof sellerReturnSchema>;
+export type SellerLossItemInput = z.infer<typeof sellerLossItemSchema>;
+export type SellerLossInput = z.infer<typeof sellerLossSchema>;
 
 export function toSlug(name: string): string {
   return name
