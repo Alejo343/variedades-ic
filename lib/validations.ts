@@ -110,6 +110,18 @@ export const sellerDeliverySchema = z.object({
   notes: z.string().optional(),
 });
 
+export const sellerSaleItemSchema = z.object({
+  productId: z.number().int(),
+  quantity: z.number().int().min(1),
+  unitPrice: z.number().int().min(0),
+});
+
+export const sellerSaleSchema = z.object({
+  sellerId: z.number().int(),
+  items: z.array(sellerSaleItemSchema).min(1, "Debe incluir al menos un producto"),
+  notes: z.string().optional(),
+});
+
 export type CategoryInput = z.infer<typeof categorySchema>;
 export type ProductInput = z.infer<typeof productSchema>;
 export type DistributorInput = z.infer<typeof distributorSchema>;
@@ -124,6 +136,8 @@ export type DirectSaleItemInput = z.infer<typeof directSaleItemSchema>;
 export type DirectSaleInput = z.infer<typeof directSaleSchema>;
 export type SellerDeliveryItemInput = z.infer<typeof sellerDeliveryItemSchema>;
 export type SellerDeliveryInput = z.infer<typeof sellerDeliverySchema>;
+export type SellerSaleItemInput = z.infer<typeof sellerSaleItemSchema>;
+export type SellerSaleInput = z.infer<typeof sellerSaleSchema>;
 
 export function toSlug(name: string): string {
   return name

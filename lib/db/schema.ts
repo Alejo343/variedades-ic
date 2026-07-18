@@ -187,6 +187,34 @@ export const sellerDeliveryItems = pgTable(
   (table) => [check("delivery_quantity_positive", sql`${table.quantity} > 0`)],
 );
 
+export const sellerSales = pgTable("seller_sales", {
+  id: serial("id").primaryKey(),
+  sellerId: integer("seller_id").notNull().references(() => sellers.id),
+  saleDate: timestamp("sale_date").defaultNow().notNull(),
+  totalAmount: integer("total_amount").default(0).notNull(),
+  commissionAmount: integer("commission_amount").default(0).notNull(),
+  settlementId: integer("settlement_id"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const sellerSaleItems = pgTable(
+  "seller_sale_items",
+  {
+    id: serial("id").primaryKey(),
+    saleId: integer("sale_id").notNull().references(() => sellerSales.id, { onDelete: "cascade" }),
+    productId: integer("product_id").notNull().references(() => products.id),
+    variantId: integer("variant_id"),
+    quantity: integer("quantity").notNull(),
+    unitPrice: integer("unit_price").notNull(),
+    subtotal: integer("subtotal").notNull(),
+  },
+  (table) => [
+    check("seller_sale_quantity_positive", sql`${table.quantity} > 0`),
+    check("seller_sale_unit_price_not_negative", sql`${table.unitPrice} >= 0`),
+  ],
+);
+
 export type Category = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
 export type Product = typeof products.$inferSelect;
@@ -217,3 +245,7 @@ export type SellerDelivery = typeof sellerDeliveries.$inferSelect;
 export type NewSellerDelivery = typeof sellerDeliveries.$inferInsert;
 export type SellerDeliveryItem = typeof sellerDeliveryItems.$inferSelect;
 export type NewSellerDeliveryItem = typeof sellerDeliveryItems.$inferInsert;
+export type SellerSale = typeof sellerSales.$inferSelect;
+export type NewSellerSale = typeof sellerSales.$inferInsert;
+export type SellerSaleItem = typeof sellerSaleItems.$inferSelect;
+export type NewSellerSaleItem = typeof sellerSaleItems.$inferInsert;

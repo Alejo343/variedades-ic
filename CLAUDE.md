@@ -79,8 +79,8 @@ This project uses Next.js **16** (see `package.json`). APIs and conventions may 
 
 **Archivos clave del backend:**
 
-- `lib/db/schema.ts` — tablas: `categories`, `products`, `product_images`, `distributors`, `purchase_orders`, `purchase_order_items`, `sales_orders`, `sales_order_items`, `inventory_movements`, `sellers`, `cash_movements`, `direct_sales`, `direct_sale_items`, `seller_deliveries`, `seller_delivery_items`; secuencia `product_sku_seq`
-- `lib/db/queries/categories.ts` / `products.ts` / `distributors.ts` / `purchase-orders.ts` / `sales-orders.ts` / `inventory.ts` / `sellers.ts` / `cash.ts` / `direct-sales.ts` / `seller-deliveries.ts` / `seller-inventory.ts` — queries Drizzle
+- `lib/db/schema.ts` — tablas: `categories`, `products`, `product_images`, `distributors`, `purchase_orders`, `purchase_order_items`, `sales_orders`, `sales_order_items`, `inventory_movements`, `sellers`, `cash_movements`, `direct_sales`, `direct_sale_items`, `seller_deliveries`, `seller_delivery_items`, `seller_sales`, `seller_sale_items`; secuencia `product_sku_seq`
+- `lib/db/queries/categories.ts` / `products.ts` / `distributors.ts` / `purchase-orders.ts` / `sales-orders.ts` / `inventory.ts` / `sellers.ts` / `cash.ts` / `direct-sales.ts` / `seller-deliveries.ts` / `seller-inventory.ts` / `seller-sales.ts` — queries Drizzle
 - `lib/domain/order-status.ts` — máquina de estados pura (transiciones válidas de compras/ventas), con tests
 - `lib/domain/stock.ts` — aritmética de stock pura (`receiveStock`, `deductStock`), con tests
 - `lib/domain/inventory-movement.ts` — `applyMovement`/`validateAdjustmentReason`, con tests
@@ -167,7 +167,7 @@ mínima → `npm run test` + `npm run lint` + `npm run build` en verde):
 | 2 | Vendedores (`sellers`) + Caja (`cash_movements`) + Ventas en local (`direct_sales`) | ✅ listo |
 | 3 | Entregas a vendedores (`seller_deliveries`) | ✅ listo |
 | 4 | Inventario por vendedor (lectura, agregación sobre el ledger) | ✅ listo |
-| 5 | Ventas de vendedor (`seller_sales`, distinto de `salesOrders`) | ⬜ pendiente |
+| 5 | Ventas de vendedor (`seller_sales`, distinto de `salesOrders`) | ✅ listo |
 | 6 | Devoluciones y pérdidas/daños/robos de vendedor | ⬜ pendiente |
 | 7 | Liquidaciones (`settlements`) | ⬜ pendiente |
 | 8 | Compras a crédito / cuentas por pagar (`purchase_payments`) | ⬜ pendiente |
@@ -370,6 +370,44 @@ inventario) cubren bien una venta de mostrador instantánea.
   prueba muestra correctamente "Audífonos in ear con Bluetooth 1Hora — 3",
   coincidiendo con la entrega registrada en la Fase 3.
 
+**Fase 5 — completada:**
+
+- Schema: `seller_sales` (`sellerId`, `saleDate`, `totalAmount`,
+  `commissionAmount`, `settlementId` nullable sin FK todavía — se conecta a
+  `settlements` en la Fase 7) + `seller_sale_items` (`productId`,
+  `variantId` nullable, `quantity`/`unitPrice` con CHECK, `subtotal`
+  inmutable).
+- `getSellerBalance` (Fase 4) se refactorizó para aceptar `db | tx` como
+  primer parámetro — necesario para poder leer el saldo del vendedor
+  *dentro* de la misma transacción que escribe la venta (si se usara `db`
+  a secas se leería fuera de la transacción, con riesgo de inconsistencia).
+  `getSellerInventory` también ahora selecciona `products.price` para
+  poder precargar el precio de venta en el formulario.
+- Query `createSellerSale` (`lib/db/queries/seller-sales.ts`): primero
+  valida TODOS los items contra `getSellerBalance` + `deductStock`
+  (RN-020/041, sin escribir nada — mismo patrón fail-fast que
+  `confirmSalesOrder`), luego inserta la cabecera, un movimiento
+  `ownerType: 'seller'` por item (nunca toca el inventario principal —
+  RN-025), calcula `commissionAmount` con `lib/domain/commission.ts#calculateCommission`
+  usando el `commissionType`/`commissionValue` del vendedor, y actualiza la
+  cabecera con los totales.
+- API: `POST /api/admin/seller-sales` (único endpoint).
+- UI: `/admin/seller-sales/new` — primero selecciona vendedor (query param
+  `?sellerId=`), luego un formulario tipo POS cuyo desplegable de productos
+  está limitado al inventario actual de ese vendedor (muestra "disp. N"),
+  con precio precargado desde `products.price`.
+- Verificado con `npm run test` (45/45) + `npm run lint` + `npm run build`
+  en verde, más flujo manual en navegador: intento de vender 5 unidades
+  cuando el vendedor solo tenía 3 fue rechazado por el servidor con
+  "Stock insuficiente: hay 3, se requieren 5" (confirmado quitando el
+  `max` del input vía JS para que el intento realmente llegara al
+  servidor, no solo la validación HTML5 del navegador) y no se escribió
+  nada en `seller_sales`; venta válida de 1 unidad → inventario del
+  vendedor 3→2, stock principal sin tocar (verificado en `/admin/products`),
+  comisión calculada en $5.000 (10% de $50.000, correcto), y confirmado en
+  la BD que el ledger generó una sola fila (`seller -1`, sin fila
+  `principal`).
+
 Guía para Claude Code al trabajar en este repositorio. Léela antes de tocar código.
 
 ## Cómo trabajamos aquí (spec-driven + tests)
@@ -468,14 +506,18 @@ La idea clave: cada capa tiene una responsabilidad y no invade a las demás.
   acredita al vendedor en el mismo ledger.
 - Fase 4 del pivote: inventario por vendedor (`lib/db/queries/seller-inventory.ts#getSellerBalance`/`getSellerInventory`,
   agregación sobre el ledger, sin contadores redundantes), página de
-  detalle `/admin/sellers/[id]`. Ver "Roadmap: pivote a gestión integral de
-  la empresa" arriba para el detalle y las fases 5-10 pendientes.
+  detalle `/admin/sellers/[id]`.
+- Fase 5 del pivote: ventas de vendedor (`seller_sales`/`seller_sale_items`,
+  distinto de `salesOrders`), transacción que valida RN-020/041 vía
+  `getSellerBalance`+`deductStock` antes de escribir, calcula comisión con
+  `lib/domain/commission.ts`, y descuenta solo el inventario del vendedor
+  (nunca el principal). Ver "Roadmap: pivote a gestión integral de la
+  empresa" arriba para el detalle y las fases 6-10 pendientes.
 
 **Próximo:**
 
-- Fase 5 del pivote: ventas de vendedor (`seller_sales`, distinto de
-  `salesOrders`), primera vez que se usa `getSellerBalance` para validar
-  RN-020/041 (no vender más de lo asignado).
+- Fase 6 del pivote: devoluciones y pérdidas/daños/robos de vendedor
+  (`seller_returns`, `seller_losses`).
 - Poblar la BD con productos reales (tarea del roadmap original, aún pendiente).
 
 **Decisiones tomadas:**

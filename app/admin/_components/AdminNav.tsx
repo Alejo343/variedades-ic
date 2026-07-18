@@ -14,6 +14,7 @@ const links = [
   { href: "/admin/direct-sales", label: "Ventas en local" },
   { href: "/admin/sellers", label: "Vendedores" },
   { href: "/admin/deliveries", label: "Entregas" },
+  { href: "/admin/seller-sales", label: "Ventas de vendedores" },
   { href: "/admin/cash", label: "Caja" },
 ];
 

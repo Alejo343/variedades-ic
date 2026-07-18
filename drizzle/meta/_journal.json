@@ -50,6 +50,13 @@
       "when": 1784391282825,
       "tag": "0006_careful_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784407486850,
+      "tag": "0007_amazing_pyro",
+      "breakpoints": true
     }
   ]
 }
