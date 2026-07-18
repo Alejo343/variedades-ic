@@ -80,7 +80,7 @@ This project uses Next.js **16** (see `package.json`). APIs and conventions may 
 **Archivos clave del backend:**
 
 - `lib/db/schema.ts` — tablas: `categories`, `products`, `product_images`, `distributors`, `purchase_orders`, `purchase_order_items`, `sales_orders`, `sales_order_items`, `inventory_movements`, `sellers`, `cash_movements`, `direct_sales`, `direct_sale_items`, `seller_deliveries`, `seller_delivery_items`; secuencia `product_sku_seq`
-- `lib/db/queries/categories.ts` / `products.ts` / `distributors.ts` / `purchase-orders.ts` / `sales-orders.ts` / `inventory.ts` / `sellers.ts` / `cash.ts` / `direct-sales.ts` / `seller-deliveries.ts` — queries Drizzle
+- `lib/db/queries/categories.ts` / `products.ts` / `distributors.ts` / `purchase-orders.ts` / `sales-orders.ts` / `inventory.ts` / `sellers.ts` / `cash.ts` / `direct-sales.ts` / `seller-deliveries.ts` / `seller-inventory.ts` — queries Drizzle
 - `lib/domain/order-status.ts` — máquina de estados pura (transiciones válidas de compras/ventas), con tests
 - `lib/domain/stock.ts` — aritmética de stock pura (`receiveStock`, `deductStock`), con tests
 - `lib/domain/inventory-movement.ts` — `applyMovement`/`validateAdjustmentReason`, con tests
@@ -166,7 +166,7 @@ mínima → `npm run test` + `npm run lint` + `npm run build` en verde):
 | 1 | Ledger de movimientos + campos base de producto (sku, purchasePrice, minStock, warrantyMonths, hasVariants) | ✅ listo |
 | 2 | Vendedores (`sellers`) + Caja (`cash_movements`) + Ventas en local (`direct_sales`) | ✅ listo |
 | 3 | Entregas a vendedores (`seller_deliveries`) | ✅ listo |
-| 4 | Inventario por vendedor (lectura, agregación sobre el ledger) | ⬜ pendiente |
+| 4 | Inventario por vendedor (lectura, agregación sobre el ledger) | ✅ listo |
 | 5 | Ventas de vendedor (`seller_sales`, distinto de `salesOrders`) | ⬜ pendiente |
 | 6 | Devoluciones y pérdidas/daños/robos de vendedor | ⬜ pendiente |
 | 7 | Liquidaciones (`settlements`) | ⬜ pendiente |
@@ -349,6 +349,27 @@ inventario) cubren bien una venta de mostrador instantánea.
   BD que el ledger generó las dos filas esperadas
   (`principal -3` sin `sellerId`, `seller +3` con `sellerId`).
 
+**Fase 4 — completada:**
+
+- Queries: `lib/db/queries/seller-inventory.ts` — `getSellerBalance(sellerId,
+  productId)` y `getSellerInventory(sellerId)`, ambas agregando
+  (`SUM(quantityDelta)`) sobre `inventory_movements` filtrado por
+  `ownerType='seller'`; `getSellerInventory` además hace `GROUP BY` +
+  `HAVING SUM(...) > 0` para mostrar solo lo que el vendedor tiene
+  actualmente (no lo que alguna vez tuvo). Archivo nuevo separado de
+  `inventory.ts` (que es del lado principal) y de `sellers.ts` (que es el
+  CRUD del catálogo), siguiendo el criterio de un archivo por dominio de
+  query.
+- Sin tests: son queries de agregación sobre Drizzle, no lógica de dominio
+  pura — mismo criterio que `getLowStock`/`getOutOfStock` en la Fase 1.
+- UI: nueva página de detalle `/admin/sellers/[id]` (info del vendedor +
+  tabla de inventario actual), separada de `/admin/sellers/[id]/edit`. El
+  listado de vendedores ahora enlaza el nombre a esta página de detalle.
+- Verificado con `npm run test` (45/45) + `npm run lint` + `npm run build`
+  en verde, más flujo manual en navegador: el detalle del vendedor de
+  prueba muestra correctamente "Audífonos in ear con Bluetooth 1Hora — 3",
+  coincidiendo con la entrega registrada en la Fase 3.
+
 Guía para Claude Code al trabajar en este repositorio. Léela antes de tocar código.
 
 ## Cómo trabajamos aquí (spec-driven + tests)
@@ -444,13 +465,17 @@ La idea clave: cada capa tiene una responsabilidad y no invade a las demás.
   transaccional único tipo POS).
 - Fase 3 del pivote: entregas a vendedores (`seller_deliveries`/
   `seller_delivery_items`), transacción única que descuenta principal y
-  acredita al vendedor en el mismo ledger. Ver "Roadmap: pivote a gestión
-  integral de la empresa" arriba para el detalle y las fases 4-10 pendientes.
+  acredita al vendedor en el mismo ledger.
+- Fase 4 del pivote: inventario por vendedor (`lib/db/queries/seller-inventory.ts#getSellerBalance`/`getSellerInventory`,
+  agregación sobre el ledger, sin contadores redundantes), página de
+  detalle `/admin/sellers/[id]`. Ver "Roadmap: pivote a gestión integral de
+  la empresa" arriba para el detalle y las fases 5-10 pendientes.
 
 **Próximo:**
 
-- Fase 4 del pivote: inventario por vendedor (lectura, agregación sobre el
-  ledger — `getSellerBalance`/`getSellerInventory`).
+- Fase 5 del pivote: ventas de vendedor (`seller_sales`, distinto de
+  `salesOrders`), primera vez que se usa `getSellerBalance` para validar
+  RN-020/041 (no vender más de lo asignado).
 - Poblar la BD con productos reales (tarea del roadmap original, aún pendiente).
 
 **Decisiones tomadas:**

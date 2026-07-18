@@ -42,7 +42,11 @@ export default async function SellersPage() {
             )}
             {sellers.map((s) => (
               <tr key={s.id} className="hover:bg-gray-50 transition">
-                <td className="px-5 py-3 font-medium text-gray-800">{s.name}</td>
+                <td className="px-5 py-3 font-medium text-gray-800">
+                  <Link href={`/admin/sellers/${s.id}`} className="hover:underline">
+                    {s.name}
+                  </Link>
+                </td>
                 <td className="px-5 py-3 text-gray-600">{s.city ?? "—"}</td>
                 <td className="px-5 py-3 text-gray-600">{s.phone ?? "—"}</td>
                 <td className="px-5 py-3 text-gray-600">
