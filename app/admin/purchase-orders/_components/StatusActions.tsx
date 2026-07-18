@@ -8,13 +8,6 @@ type Props = {
   status: string;
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  pendiente: "Pendiente",
-  en_viaje: "En viaje",
-  recibido: "Recibido",
-  cancelado: "Cancelado",
-};
-
 export function StatusActions({ orderId, status }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);

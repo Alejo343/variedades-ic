@@ -1,7 +1,8 @@
 import { db } from "../index";
 import { purchaseOrders, purchaseOrderItems, distributors, products } from "../schema";
-import { eq, desc, sql, inArray } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import type { PurchaseOrderInput, PurchaseOrderItemInput } from "@/lib/validations";
+import { canTransitionPurchaseOrder, type PurchaseOrderStatus } from "@/lib/domain/order-status";
 
 export function getAllPurchaseOrders() {
   return db
@@ -74,10 +75,10 @@ export function addPurchaseOrderItem(data: PurchaseOrderItemInput) {
   return db.insert(purchaseOrderItems).values(data).returning();
 }
 
-export function updatePurchaseOrderStatus(id: number, status: string) {
+export function updatePurchaseOrder(id: number, data: Partial<PurchaseOrderInput>) {
   return db
     .update(purchaseOrders)
-    .set({ status, updatedAt: new Date() })
+    .set({ ...data, updatedAt: new Date() })
     .where(eq(purchaseOrders.id, id))
     .returning();
 }
@@ -90,7 +91,9 @@ export async function markPurchaseOrderReceived(id: number) {
       .where(eq(purchaseOrders.id, id))
       .limit(1);
 
-    if (!order || order.stockUpdated) return null;
+    if (!order || order.stockUpdated || !canTransitionPurchaseOrder(order.status as PurchaseOrderStatus, "recibido")) {
+      return null;
+    }
 
     const items = await tx
       .select()

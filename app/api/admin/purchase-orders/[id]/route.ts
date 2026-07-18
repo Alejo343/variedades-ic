@@ -3,10 +3,11 @@ import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import {
   getPurchaseOrderById,
-  updatePurchaseOrderStatus,
+  updatePurchaseOrder,
   deletePurchaseOrder,
 } from "@/lib/db/queries/purchase-orders";
 import { purchaseOrderSchema } from "@/lib/validations";
+import { canTransitionPurchaseOrder, type PurchaseOrderStatus } from "@/lib/domain/order-status";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -28,18 +29,31 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
   const { id } = await ctx.params;
   const body = await req.json();
 
-  if (body.status) {
-    const [updated] = await updatePurchaseOrderStatus(Number(id), body.status);
-    if (!updated) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-    return NextResponse.json(updated);
-  }
-
   const parsed = purchaseOrderSchema.partial().safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const [updated] = await updatePurchaseOrderStatus(Number(id), parsed.data.status ?? "pendiente");
+  if (parsed.data.status) {
+    if (parsed.data.status === "recibido") {
+      return NextResponse.json(
+        { error: "Usa el endpoint /receive para marcar un pedido como recibido" },
+        { status: 400 }
+      );
+    }
+
+    const current = await getPurchaseOrderById(Number(id));
+    if (!current) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+
+    if (!canTransitionPurchaseOrder(current.status as PurchaseOrderStatus, parsed.data.status)) {
+      return NextResponse.json(
+        { error: `No se puede pasar de '${current.status}' a '${parsed.data.status}'` },
+        { status: 400 }
+      );
+    }
+  }
+
+  const [updated] = await updatePurchaseOrder(Number(id), parsed.data);
   if (!updated) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   return NextResponse.json(updated);
 }

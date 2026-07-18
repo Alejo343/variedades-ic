@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
-import { getSalesOrderById, updateSalesOrder, deleteSalesOrder } from "@/lib/db/queries/sales-orders";
+import {
+  getSalesOrderById,
+  updateSalesOrder,
+  deleteSalesOrder,
+  confirmSalesOrder,
+} from "@/lib/db/queries/sales-orders";
 import { salesOrderSchema } from "@/lib/validations";
+import { canTransitionSalesOrder, type SalesOrderStatus } from "@/lib/domain/order-status";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -27,6 +33,24 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  if (parsed.data.status) {
+    if (parsed.data.status === "confirmado") {
+      const result = await confirmSalesOrder(Number(id));
+      if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
+      return NextResponse.json(result.order);
+    }
+
+    const current = await getSalesOrderById(Number(id));
+    if (!current) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+
+    if (!canTransitionSalesOrder(current.status as SalesOrderStatus, parsed.data.status)) {
+      return NextResponse.json(
+        { error: `No se puede pasar de '${current.status}' a '${parsed.data.status}'` },
+        { status: 400 }
+      );
+    }
   }
 
   const [updated] = await updateSalesOrder(Number(id), parsed.data);
