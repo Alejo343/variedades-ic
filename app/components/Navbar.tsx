@@ -34,14 +34,9 @@ function CloseIcon() {
   )
 }
 
-const navLinks = [
-  { label: 'Tecnología', href: '#tecnologia' },
-  { label: 'Belleza', href: '#belleza' },
-  { label: 'Hogar', href: '#hogar' },
-  { label: 'Productos', href: '#productos' },
-]
+type NavCategory = { name: string; slug: string }
 
-export default function Navbar() {
+export default function Navbar({ categories = [] }: { categories?: NavCategory[] }) {
   const { font, toggleFont } = useFont()
   const [menuOpen, setMenuOpen] = useState(false)
   const [cartHover, setCartHover] = useState(false)
@@ -93,10 +88,10 @@ export default function Navbar() {
           style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', alignItems: 'center', gap: '2px' }}
           role="list"
         >
-          {navLinks.map((link) => (
-            <li key={link.href}>
+          {categories.map((cat) => (
+            <li key={cat.slug}>
               <Link
-                href={link.href}
+                href={`/productos?categoria=${cat.slug}`}
                 style={{
                   display: 'inline-block',
                   padding: '6px 16px',
@@ -121,10 +116,40 @@ export default function Navbar() {
                   el.style.background = ''
                 }}
               >
-                {link.label}
+                {cat.name}
               </Link>
             </li>
           ))}
+          <li>
+            <Link
+              href="/productos"
+              style={{
+                display: 'inline-block',
+                padding: '6px 16px',
+                fontFamily: 'var(--font-orbitron)',
+                fontSize: '11px',
+                fontWeight: 600,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                color: '#475569',
+                textDecoration: 'none',
+                borderRadius: '2px',
+                transition: 'color 0.2s, background 0.2s',
+              }}
+              onMouseEnter={e => {
+                const el = e.currentTarget as HTMLElement
+                el.style.color = '#60a5fa'
+                el.style.background = 'rgba(59,130,246,0.06)'
+              }}
+              onMouseLeave={e => {
+                const el = e.currentTarget as HTMLElement
+                el.style.color = '#475569'
+                el.style.background = ''
+              }}
+            >
+              Catálogo
+            </Link>
+          </li>
         </ul>
 
         {/* Right actions */}
@@ -228,10 +253,10 @@ export default function Navbar() {
           }}
         >
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '2px' }} role="list">
-            {navLinks.map((link) => (
-              <li key={link.href}>
+            {categories.map((cat) => (
+              <li key={cat.slug}>
                 <Link
-                  href={link.href}
+                  href={`/productos?categoria=${cat.slug}`}
                   style={{
                     display: 'block', padding: '12px 16px', borderRadius: '2px',
                     fontFamily: 'var(--font-orbitron)', fontSize: '12px',
@@ -253,10 +278,37 @@ export default function Navbar() {
                     el.style.background = ''
                   }}
                 >
-                  {link.label}
+                  {cat.name}
                 </Link>
               </li>
             ))}
+            <li>
+              <Link
+                href="/productos"
+                style={{
+                  display: 'block', padding: '12px 16px', borderRadius: '2px',
+                  fontFamily: 'var(--font-orbitron)', fontSize: '12px',
+                  fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase',
+                  color: '#475569', textDecoration: 'none',
+                  transition: 'all 0.2s', borderLeft: '2px solid transparent',
+                }}
+                onClick={() => setMenuOpen(false)}
+                onMouseEnter={e => {
+                  const el = e.currentTarget as HTMLElement
+                  el.style.color = '#60a5fa'
+                  el.style.borderLeftColor = '#3b82f6'
+                  el.style.background = 'rgba(59,130,246,0.05)'
+                }}
+                onMouseLeave={e => {
+                  const el = e.currentTarget as HTMLElement
+                  el.style.color = '#475569'
+                  el.style.borderLeftColor = 'transparent'
+                  el.style.background = ''
+                }}
+              >
+                Catálogo
+              </Link>
+            </li>
           </ul>
           <div style={{ borderTop: '1px solid rgba(59,130,246,0.08)', marginTop: '12px', paddingTop: '12px' }}>
             <button

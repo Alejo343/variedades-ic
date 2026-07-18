@@ -1,6 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
+
+type HeroProduct = {
+  id: number
+  name: string
+  slug: string
+  price: number
+  stock: number
+  categoryName: string | null
+  categorySlug: string | null
+  primaryImage: string | null
+}
 
 const TRUST = [
   {
@@ -56,14 +68,11 @@ function HeadphonesIcon() {
   )
 }
 
-export default function Hero() {
-  const [added, setAdded] = useState(false)
+function formatPrice(cents: number): string {
+  return '$' + cents.toLocaleString('es-CO')
+}
 
-  const handleAdd = () => {
-    setAdded(true)
-    setTimeout(() => setAdded(false), 1800)
-  }
-
+export default function Hero({ heroProduct }: { heroProduct: HeroProduct | null }) {
   return (
     <section
       className="relative min-h-screen flex flex-col overflow-hidden pt-16"
@@ -230,133 +239,117 @@ export default function Hero() {
             </div>
 
             {/* RIGHT: featured product card */}
-            <div className="slide-in-right hidden lg:block" aria-label="Producto destacado">
-              {/* Gradient border wrapper */}
-              <div
-                className="hero-card"
-                style={{
-                  padding: '1px', borderRadius: '4px',
-                  background: 'linear-gradient(145deg, rgba(59,130,246,0.5) 0%, rgba(6,182,212,0.25) 50%, rgba(59,130,246,0.08) 100%)',
-                }}
-              >
-                <div style={{ background: '#060f1d', borderRadius: '3px', overflow: 'hidden' }}>
+            {heroProduct && (
+              <div className="slide-in-right hidden lg:block" aria-label="Producto destacado">
+                {/* Gradient border wrapper */}
+                <div
+                  className="hero-card"
+                  style={{
+                    padding: '1px', borderRadius: '4px',
+                    background: 'linear-gradient(145deg, rgba(59,130,246,0.5) 0%, rgba(6,182,212,0.25) 50%, rgba(59,130,246,0.08) 100%)',
+                  }}
+                >
+                  <div style={{ background: '#060f1d', borderRadius: '3px', overflow: 'hidden' }}>
 
-                  {/* Placeholder image */}
-                  <div style={{
-                    height: '260px', position: 'relative',
-                    background: 'linear-gradient(135deg, #0d1e38 0%, #041020 100%)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <div
-                      aria-hidden="true"
-                      style={{
-                        position: 'absolute', inset: 0, pointerEvents: 'none',
-                        backgroundImage: 'radial-gradient(rgba(59,130,246,0.08) 1px, transparent 1px)',
-                        backgroundSize: '20px 20px',
-                      }}
-                    />
-                    {/* Rings */}
-                    <div style={{ position: 'relative', width: '170px', height: '170px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1px solid rgba(59,130,246,0.14)' }} aria-hidden="true" />
-                      <div style={{ position: 'absolute', inset: '24px', borderRadius: '50%', border: '1px solid rgba(59,130,246,0.22)', background: 'rgba(59,130,246,0.03)' }} aria-hidden="true" />
-                      <div style={{ position: 'absolute', inset: '50px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%)' }} aria-hidden="true" />
-                      <HeadphonesIcon />
-                    </div>
-                    {/* Badge */}
+                    {/* Image area */}
                     <div style={{
-                      position: 'absolute', top: '16px', right: '16px',
-                      padding: '5px 12px', borderRadius: '2px',
-                      background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)',
-                      fontFamily: 'var(--font-orbitron)', fontSize: '9px',
-                      fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#60a5fa',
+                      height: '260px', position: 'relative',
+                      background: 'linear-gradient(135deg, #0d1e38 0%, #041020 100%)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}>
-                      ★ Más Vendido
-                    </div>
-                    <div
-                      aria-hidden="true"
-                      style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '72px', background: 'linear-gradient(to top, #060f1d, transparent)' }}
-                    />
-                  </div>
-
-                  {/* Product details */}
-                  <div style={{ padding: '24px 24px 28px' }}>
-                    <p style={{
-                      fontFamily: 'var(--font-outfit)', fontSize: '10px',
-                      letterSpacing: '0.26em', textTransform: 'uppercase',
-                      color: '#06b6d4', marginBottom: '8px',
-                    }}>
-                      Tecnología
-                    </p>
-                    <h2 style={{
-                      fontFamily: 'var(--font-orbitron)', fontSize: '0.9375rem',
-                      fontWeight: 700, color: '#e2e8f0', lineHeight: 1.3, marginBottom: '14px',
-                    }}>
-                      Audífonos Bluetooth Pro X
-                    </h2>
-
-                    {/* Specs */}
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '18px' }}>
-                      {['40h batería', 'ANC activo', 'IP54'].map(spec => (
-                        <span key={spec} style={{
-                          padding: '3px 10px', borderRadius: '999px',
-                          background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.14)',
-                          fontFamily: 'var(--font-outfit)', fontSize: '11px', color: '#64748b',
-                        }}>
-                          {spec}
-                        </span>
-                      ))}
-                    </div>
-
-                    {/* Rating */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '22px' }}>
-                      <div style={{ display: 'flex', gap: '2px' }} aria-label="4.8 de 5 estrellas">
-                        {[1, 2, 3, 4, 5].map(i => (
-                          <svg key={i} width="13" height="13" viewBox="0 0 24 24"
-                            fill={i <= 4 ? '#f59e0b' : 'none'} stroke="#f59e0b" strokeWidth="2" aria-hidden="true">
-                            <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" />
-                          </svg>
-                        ))}
-                      </div>
-                      <span style={{ fontFamily: 'var(--font-outfit)', fontSize: '11px', color: '#475569' }}>
-                        4.8 · 124 reseñas
-                      </span>
-                    </div>
-
-                    {/* Price + CTA */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <span style={{
-                        fontFamily: 'var(--font-orbitron)', fontSize: '1.625rem',
-                        fontWeight: 800, color: '#3b82f6', lineHeight: 1,
+                      {heroProduct.primaryImage ? (
+                        <Image
+                          src={heroProduct.primaryImage}
+                          alt={heroProduct.name}
+                          fill
+                          style={{ objectFit: 'contain', padding: '16px' }}
+                          sizes="460px"
+                        />
+                      ) : (
+                        <>
+                          <div
+                            aria-hidden="true"
+                            style={{
+                              position: 'absolute', inset: 0, pointerEvents: 'none',
+                              backgroundImage: 'radial-gradient(rgba(59,130,246,0.08) 1px, transparent 1px)',
+                              backgroundSize: '20px 20px',
+                            }}
+                          />
+                          <div style={{ position: 'relative', width: '170px', height: '170px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '1px solid rgba(59,130,246,0.14)' }} aria-hidden="true" />
+                            <div style={{ position: 'absolute', inset: '24px', borderRadius: '50%', border: '1px solid rgba(59,130,246,0.22)', background: 'rgba(59,130,246,0.03)' }} aria-hidden="true" />
+                            <div style={{ position: 'absolute', inset: '50px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%)' }} aria-hidden="true" />
+                            <HeadphonesIcon />
+                          </div>
+                        </>
+                      )}
+                      {/* Badge */}
+                      <div style={{
+                        position: 'absolute', top: '16px', right: '16px',
+                        padding: '5px 12px', borderRadius: '2px',
+                        background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)',
+                        fontFamily: 'var(--font-orbitron)', fontSize: '9px',
+                        fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#60a5fa',
                       }}>
-                        $89.900
-                      </span>
-                      <button
-                        onClick={handleAdd}
-                        style={{
-                          flex: 1, padding: '13px 0',
-                          background: added ? 'linear-gradient(135deg, #065f46, #059669)' : 'linear-gradient(135deg, #1d4ed8, #3b82f6)',
-                          border: 'none', borderRadius: '2px',
-                          color: '#fff', fontFamily: 'var(--font-orbitron)',
-                          fontSize: '11px', fontWeight: 700,
-                          letterSpacing: '0.1em', textTransform: 'uppercase',
-                          cursor: 'pointer', transition: 'all 0.2s',
-                          boxShadow: added ? '0 0 20px rgba(5,150,105,0.4)' : '0 0 20px rgba(59,130,246,0.35)',
-                        }}
-                        onMouseEnter={e => {
-                          if (!added) (e.currentTarget as HTMLElement).style.boxShadow = '0 0 36px rgba(59,130,246,0.6)'
-                        }}
-                        onMouseLeave={e => {
-                          if (!added) (e.currentTarget as HTMLElement).style.boxShadow = '0 0 20px rgba(59,130,246,0.35)'
-                        }}
-                        aria-label={`${added ? 'Agregado' : 'Agregar'} Audífonos Bluetooth Pro X al carrito`}
-                      >
-                        {added ? '✓ Agregado' : '+ Agregar'}
-                      </button>
+                        ★ Destacado
+                      </div>
+                      <div
+                        aria-hidden="true"
+                        style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '72px', background: 'linear-gradient(to top, #060f1d, transparent)' }}
+                      />
+                    </div>
+
+                    {/* Product details */}
+                    <div style={{ padding: '24px 24px 28px' }}>
+                      {heroProduct.categoryName && (
+                        <p style={{
+                          fontFamily: 'var(--font-outfit)', fontSize: '10px',
+                          letterSpacing: '0.26em', textTransform: 'uppercase',
+                          color: '#06b6d4', marginBottom: '8px',
+                        }}>
+                          {heroProduct.categoryName}
+                        </p>
+                      )}
+                      <h2 style={{
+                        fontFamily: 'var(--font-orbitron)', fontSize: '0.9375rem',
+                        fontWeight: 700, color: '#e2e8f0', lineHeight: 1.3, marginBottom: '22px',
+                      }}>
+                        {heroProduct.name}
+                      </h2>
+
+                      {/* Price + CTA */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <span style={{
+                          fontFamily: 'var(--font-orbitron)', fontSize: '1.625rem',
+                          fontWeight: 800, color: '#3b82f6', lineHeight: 1,
+                        }}>
+                          {formatPrice(heroProduct.price)}
+                        </span>
+                        <Link
+                          href={`/productos/${heroProduct.slug}`}
+                          style={{
+                            flex: 1, padding: '13px 0', textAlign: 'center',
+                            background: 'linear-gradient(135deg, #1d4ed8, #3b82f6)',
+                            borderRadius: '2px', textDecoration: 'none',
+                            color: '#fff', fontFamily: 'var(--font-orbitron)',
+                            fontSize: '11px', fontWeight: 700,
+                            letterSpacing: '0.1em', textTransform: 'uppercase',
+                            display: 'block',
+                            boxShadow: '0 0 20px rgba(59,130,246,0.35)',
+                            transition: 'box-shadow 0.2s',
+                          }}
+                          onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 0 36px rgba(59,130,246,0.6)' }}
+                          onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 0 20px rgba(59,130,246,0.35)' }}
+                          aria-label={`Ver ${heroProduct.name}`}
+                        >
+                          Ver Producto →
+                        </Link>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
           </div>
         </div>

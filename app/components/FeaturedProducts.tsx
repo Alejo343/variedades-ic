@@ -118,7 +118,7 @@ function ProductCard({ product, delay }: { product: FeaturedProduct; delay: numb
             src={product.primaryImage}
             alt={product.name}
             fill
-            style={{ objectFit: 'cover' }}
+            style={{ objectFit: 'contain', padding: '12px' }}
             sizes="(max-width: 768px) 100vw, 260px"
           />
         ) : (

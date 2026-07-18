@@ -3,6 +3,31 @@ import { products, categories, productImages } from "../schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import type { ProductInput } from "@/lib/validations";
 
+export function getHeroProduct() {
+  return db
+    .select({
+      id: products.id,
+      name: products.name,
+      slug: products.slug,
+      price: products.price,
+      stock: products.stock,
+      featured: products.featured,
+      categoryName: categories.name,
+      categorySlug: categories.slug,
+      primaryImage: sql<string | null>`(
+        SELECT url FROM product_images
+        WHERE product_id = ${products.id}
+        ORDER BY is_primary DESC, display_order ASC
+        LIMIT 1
+      )`,
+    })
+    .from(products)
+    .leftJoin(categories, eq(products.categoryId, categories.id))
+    .where(eq(products.active, true))
+    .orderBy(desc(products.featured), desc(products.createdAt))
+    .limit(1);
+}
+
 export function getPublicProducts(categorySlug?: string) {
   return db
     .select({

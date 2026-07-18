@@ -169,7 +169,7 @@ export default async function ProductosPage({
                             src={p.primaryImage}
                             alt={p.name}
                             fill
-                            style={{ objectFit: 'cover' }}
+                            style={{ objectFit: 'contain', padding: '12px' }}
                             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 248px"
                             priority={idx < 4}
                             loading={idx < 4 ? 'eager' : 'lazy'}
