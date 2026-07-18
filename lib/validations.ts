@@ -35,7 +35,8 @@ export const distributorSchema = z.object({
 
 export const purchaseOrderSchema = z.object({
   distributorId: z.number().int().nullable().optional(),
-  status: z.enum(["pendiente", "en_viaje", "recibido", "cancelado"]).optional().default("pendiente"),
+  status: z.enum(["pendiente", "en_viaje", "recibido", "cancelado"]).optional(),
+  purchaseType: z.enum(["contado", "credito"]).optional(),
   expectedDate: z.string().nullable().optional(),
   totalCost: z.number().int().min(0).nullable().optional(),
   notes: z.string().optional(),
@@ -151,6 +152,12 @@ export const settlementSchema = z.object({
   periodDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida (formato AAAA-MM-DD)"),
 });
 
+export const purchasePaymentSchema = z.object({
+  amount: z.number().int().min(1, "El monto debe ser mayor a 0"),
+  method: z.string().optional(),
+  notes: z.string().optional(),
+});
+
 export type CategoryInput = z.infer<typeof categorySchema>;
 export type ProductInput = z.infer<typeof productSchema>;
 export type DistributorInput = z.infer<typeof distributorSchema>;
@@ -172,6 +179,7 @@ export type SellerReturnInput = z.infer<typeof sellerReturnSchema>;
 export type SellerLossItemInput = z.infer<typeof sellerLossItemSchema>;
 export type SellerLossInput = z.infer<typeof sellerLossSchema>;
 export type SettlementInput = z.infer<typeof settlementSchema>;
+export type PurchasePaymentInput = z.infer<typeof purchasePaymentSchema>;
 
 export function toSlug(name: string): string {
   return name

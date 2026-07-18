@@ -79,8 +79,8 @@ This project uses Next.js **16** (see `package.json`). APIs and conventions may 
 
 **Archivos clave del backend:**
 
-- `lib/db/schema.ts` — tablas: `categories`, `products`, `product_images`, `distributors`, `purchase_orders`, `purchase_order_items`, `sales_orders`, `sales_order_items`, `inventory_movements`, `sellers`, `cash_movements`, `direct_sales`, `direct_sale_items`, `seller_deliveries`, `seller_delivery_items`, `seller_sales`, `seller_sale_items`, `seller_returns`, `seller_return_items`, `seller_losses`, `seller_loss_items`, `settlements`; secuencia `product_sku_seq`
-- `lib/db/queries/categories.ts` / `products.ts` / `distributors.ts` / `purchase-orders.ts` / `sales-orders.ts` / `inventory.ts` / `sellers.ts` / `cash.ts` / `direct-sales.ts` / `seller-deliveries.ts` / `seller-inventory.ts` / `seller-sales.ts` / `seller-returns.ts` / `seller-losses.ts` / `settlements.ts` — queries Drizzle
+- `lib/db/schema.ts` — tablas: `categories`, `products`, `product_images`, `distributors`, `purchase_orders`, `purchase_order_items`, `sales_orders`, `sales_order_items`, `inventory_movements`, `sellers`, `cash_movements`, `direct_sales`, `direct_sale_items`, `seller_deliveries`, `seller_delivery_items`, `seller_sales`, `seller_sale_items`, `seller_returns`, `seller_return_items`, `seller_losses`, `seller_loss_items`, `settlements`, `purchase_payments`; secuencia `product_sku_seq`
+- `lib/db/queries/categories.ts` / `products.ts` / `distributors.ts` / `purchase-orders.ts` / `sales-orders.ts` / `inventory.ts` / `sellers.ts` / `cash.ts` / `direct-sales.ts` / `seller-deliveries.ts` / `seller-inventory.ts` / `seller-sales.ts` / `seller-returns.ts` / `seller-losses.ts` / `settlements.ts` / `purchase-payments.ts` — queries Drizzle
 - `lib/domain/order-status.ts` — máquina de estados pura (transiciones válidas de compras/ventas), con tests
 - `lib/domain/stock.ts` — aritmética de stock pura (`receiveStock`, `deductStock`), con tests
 - `lib/domain/inventory-movement.ts` — `applyMovement`/`validateAdjustmentReason`, con tests
@@ -172,7 +172,7 @@ mínima → `npm run test` + `npm run lint` + `npm run build` en verde):
 | 5 | Ventas de vendedor (`seller_sales`, distinto de `salesOrders`) | ✅ listo |
 | 6 | Devoluciones y pérdidas/daños/robos de vendedor | ✅ listo |
 | 7 | Liquidaciones (`settlements`) | ✅ listo |
-| 8 | Compras a crédito / cuentas por pagar (`purchase_payments`) | ⬜ pendiente |
+| 8 | Compras a crédito / cuentas por pagar (`purchase_payments`) | ✅ listo |
 | 9 | Reportes consolidados | ⬜ pendiente |
 | 10 | Variantes de producto (`product_variants`) | ⬜ pendiente |
 
@@ -512,6 +512,73 @@ inventario) cubren bien una venta de mostrador instantánea.
   `fetch` directo a la API como por la UI real con "Ya existe una
   liquidación para este vendedor en esta fecha".
 
+**Fase 8 — completada:**
+
+- Schema: `purchase_orders` gana `purchaseType` (`'contado'|'credito'`,
+  default `'contado'`); nueva tabla `purchase_payments` (`purchaseOrderId`
+  FK cascade, `amount` CHECK>0, `paidAt`, `method` nullable, `notes`
+  nullable). La "cuenta por pagar" sigue el mismo criterio que el saldo de
+  caja y el inventario de vendedor: es un valor **derivado**
+  (`totalCost - SUM(purchase_payments.amount)`), no una columna guardada —
+  no hay tabla ni campo "deuda pendiente" separado.
+- Dominio: **sin módulo nuevo** — se reutiliza `lib/domain/stock.ts#deductStock`
+  tal cual para validar que un pago no exceda el saldo pendiente
+  (`deductStock(pending, amount)`; el "stock" aquí es dinero, no unidades),
+  siguiendo el mismo criterio ya usado para saldo de vendedor en las Fases
+  5/6. A diferencia de esos casos, el mensaje de error NO se reenvía tal
+  cual (`result.reason` dice "Stock insuficiente...", incorrecto para un
+  contexto de dinero): el query arma su propio mensaje ("Saldo
+  insuficiente: hay X pendiente, se intentó pagar Y") a partir de los
+  campos numéricos del resultado.
+- Query `lib/db/queries/purchase-payments.ts`: `getPurchaseOrderBalance`
+  (agrega pagos, devuelve `totalCost`/`totalPaid`/`pending`),
+  `getPaymentsForOrder`, `createPurchasePayment` (transaccional: rechaza si
+  el pedido no es a crédito, si está `cancelado`, o si el monto excede el
+  saldo — mismo patrón fail-fast que el resto del sistema),
+  `getAccountsPayableSummary` (agregación en dos consultas —costo total de
+  compras a crédito no canceladas y pagos recibidos, ambas agrupadas por
+  `distributorId`— combinadas en JS; se evitó un solo JOIN+GROUP BY porque
+  unir `purchase_payments` con `purchase_orders` antes de agrupar por
+  distribuidor infla el `totalCost` una vez por cada pago).
+- **Bug encontrado y corregido durante la verificación manual**: el PUT
+  genérico de pedidos (`purchaseOrderSchema.partial()`) usaba
+  `.optional().default(...)` en `status` y `purchaseType`. En Zod, `.default()`
+  rellena el valor por defecto incluso bajo `.partial()` cuando la clave no
+  viene en el body — así que un PUT parcial como `{status: "cancelado"}`
+  (lo único que envía `StatusActions`) sobreescribía silenciosamente
+  `purchaseType` a `'contado'` en cada cambio de estado, aunque el pedido
+  fuera a crédito. Confirmado en vivo: un pedido creado como `credito` quedó
+  como `contado` tras cancelarlo vía la UI real. Corregido quitando
+  `.default(...)` de ambos campos en el schema — el valor por defecto en
+  creación lo sigue poniendo la capa de queries (`data.status ?? "pendiente"`,
+  `data.purchaseType ?? "contado"` en `createPurchaseOrder`), que es donde
+  ya vivía antes de este fix. El mismo defecto ya existía para `status`
+  desde antes de esta fase (latente, nunca disparado porque `StatusActions`
+  siempre envía `status` explícito); quedó corregido igual como efecto
+  colateral.
+- API: `POST /api/admin/purchase-orders/{id}/payments` (único endpoint de
+  escritura; lectura de pagos y saldo se hace directo desde el Server
+  Component de detalle, mismo patrón que `/admin/inventory`).
+- UI: selector "Tipo de compra" (Contado/Crédito) en el formulario de
+  creación; columna "Tipo" en el listado; en el detalle del pedido,
+  sección "Cuenta por pagar" (solo si `purchaseType==='credito'`): costo
+  total/pagado/saldo pendiente, historial de pagos, y formulario para
+  registrar un nuevo pago (oculto si el saldo ya es 0 o el pedido está
+  cancelado). Columna "Saldo pendiente" agregada al listado de
+  `/admin/distributors` (RF-04, "consultar saldos pendientes con
+  proveedores"), usando `getAccountsPayableSummary`.
+- Verificado con `npm run test` (51/51) + `npm run lint` + `npm run build`
+  en verde, más flujo manual en navegador: pedido a crédito por $50.000 →
+  pago parcial de $20.000 → saldo $30.000; intento de pagar $50.000 sobre
+  ese saldo rechazado con "Saldo insuficiente: hay 3000000 pendiente, se
+  intentó pagar 5000000"; pago del resto ($30.000) → saldo $0 y el
+  formulario de pago desaparece; segundo pedido a crédito sin pagos por
+  $80.000 → columna "Saldo pendiente" del distribuidor mostró correctamente
+  $80.000 (excluyendo el primer pedido ya saldado); intento de pagar un
+  pedido `contado` rechazado con "Este pedido no es a crédito"; y el bug de
+  `purchaseType` descrito arriba, encontrado y corregido en el mismo flujo
+  de verificación.
+
 Guía para Claude Code al trabajar en este repositorio. Léela antes de tocar código.
 
 ## Cómo trabajamos aquí (spec-driven + tests)
@@ -626,15 +693,21 @@ La idea clave: cada capa tiene una responsabilidad y no invade a las demás.
   vendedor (`UNIQUE(sellerId, periodDate)`), calcula `amountDue = totalSales
   - totalCommission + totalLosses` (`lib/domain/settlement.ts`), transición
   `pendiente → liquidada` validada (`lib/domain/settlement-status.ts`), y al
-  liquidar genera el ingreso correspondiente en caja. Ver "Roadmap: pivote a
-  gestión integral de la empresa" arriba para el detalle y las fases 8-10
-  pendientes.
+  liquidar genera el ingreso correspondiente en caja.
+- Fase 8 del pivote: compras a crédito / cuentas por pagar
+  (`purchase_payments`) — `purchaseType` (`contado`|`credito`) en
+  `purchase_orders`, saldo pendiente derivado (`totalCost - SUM(pagos)`,
+  nunca guardado), pagos parciales con tope en el saldo (reutiliza
+  `deductStock`), columna "Saldo pendiente" por proveedor en
+  `/admin/distributors`. De paso corrigió un bug de `.default()` en Zod que
+  reseteaba `purchaseType`/`status` en cada PUT parcial que no los incluyera
+  (ver detalle en "Fase 8 — completada" arriba). Ver "Roadmap: pivote a
+  gestión integral de la empresa" arriba para las fases 9-10 pendientes.
 
 **Próximo:**
 
-- Fase 8 del pivote: compras a crédito / cuentas por pagar
-  (`purchase_payments`) — `purchaseType` (`contado`|`credito`) en
-  `purchase_orders`, pagos parciales con tope en el saldo pendiente.
+- Fase 9 del pivote: reportes consolidados (inventario, compras, ventas,
+  utilidad, caja, cuentas por pagar, ventas/inventario por vendedor).
 - Poblar la BD con productos reales (tarea del roadmap original, aún pendiente).
 
 **Decisiones tomadas:**

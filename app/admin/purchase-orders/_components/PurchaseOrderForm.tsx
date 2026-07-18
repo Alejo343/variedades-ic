@@ -27,6 +27,7 @@ export function PurchaseOrderForm({ distributors, products }: Props) {
 
   const [form, setForm] = useState({
     distributorId: "" as string | number,
+    purchaseType: "contado" as "contado" | "credito",
     expectedDate: "",
     notes: "",
   });
@@ -75,6 +76,7 @@ export function PurchaseOrderForm({ distributors, products }: Props) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         distributorId: form.distributorId ? Number(form.distributorId) : null,
+        purchaseType: form.purchaseType,
         expectedDate: form.expectedDate || null,
         totalCost: total || null,
         notes: form.notes || undefined,
@@ -128,6 +130,20 @@ export function PurchaseOrderForm({ distributors, products }: Props) {
                 {d.name}{d.city ? ` (${d.city})` : ""}
               </option>
             ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de compra</label>
+          <select
+            value={form.purchaseType}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, purchaseType: e.target.value as "contado" | "credito" }))
+            }
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="contado">Contado</option>
+            <option value="credito">Crédito</option>
           </select>
         </div>
 

@@ -10,6 +10,7 @@ export function getAllPurchaseOrders() {
     .select({
       id: purchaseOrders.id,
       status: purchaseOrders.status,
+      purchaseType: purchaseOrders.purchaseType,
       orderDate: purchaseOrders.orderDate,
       expectedDate: purchaseOrders.expectedDate,
       totalCost: purchaseOrders.totalCost,
@@ -29,6 +30,7 @@ export async function getPurchaseOrderById(id: number) {
     .select({
       id: purchaseOrders.id,
       status: purchaseOrders.status,
+      purchaseType: purchaseOrders.purchaseType,
       orderDate: purchaseOrders.orderDate,
       expectedDate: purchaseOrders.expectedDate,
       totalCost: purchaseOrders.totalCost,
@@ -66,6 +68,7 @@ export function createPurchaseOrder(data: PurchaseOrderInput) {
   return db.insert(purchaseOrders).values({
     distributorId: data.distributorId ?? null,
     status: data.status ?? "pendiente",
+    purchaseType: data.purchaseType ?? "contado",
     expectedDate: data.expectedDate ?? null,
     totalCost: data.totalCost ?? null,
     notes: data.notes,

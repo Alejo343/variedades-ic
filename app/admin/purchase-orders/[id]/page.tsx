@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { db } from "@/lib/db";
 import { getPurchaseOrderById } from "@/lib/db/queries/purchase-orders";
+import { getPurchaseOrderBalance, getPaymentsForOrder } from "@/lib/db/queries/purchase-payments";
 import { StatusActions } from "../_components/StatusActions";
+import { PaymentForm } from "../_components/PaymentForm";
 
 const STATUS_STYLES: Record<string, string> = {
   pendiente: "bg-yellow-100 text-yellow-700",
@@ -40,6 +43,11 @@ export default async function PurchaseOrderDetailPage({
     0
   );
 
+  const isCredito = order.purchaseType === "credito";
+  const [balance, payments] = isCredito
+    ? await Promise.all([getPurchaseOrderBalance(db, order.id), getPaymentsForOrder(order.id)])
+    : [null, []];
+
   return (
     <div className="max-w-2xl flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -65,6 +73,7 @@ export default async function PurchaseOrderDetailPage({
 
       <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col gap-3 text-sm">
         <Row label="Distribuidor" value={order.distributorName ?? "—"} />
+        <Row label="Tipo de compra" value={isCredito ? "Crédito" : "Contado"} />
         <Row
           label="Fecha del pedido"
           value={new Date(order.orderDate).toLocaleDateString("es-CO")}
@@ -125,6 +134,50 @@ export default async function PurchaseOrderDetailPage({
       </div>
 
       <StatusActions orderId={order.id} status={order.status} />
+
+      {isCredito && balance && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-gray-100 font-semibold text-gray-700">
+            Cuenta por pagar
+          </div>
+          <div className="p-5 flex flex-col gap-4">
+            <div className="flex flex-col gap-2 text-sm">
+              <Row label="Costo total" value={formatCOP(balance.totalCost)} />
+              <Row label="Pagado" value={formatCOP(balance.totalPaid)} />
+              <Row label="Saldo pendiente" value={formatCOP(balance.pending)} />
+            </div>
+
+            {payments.length > 0 && (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="text-left px-3 py-2 font-medium text-gray-600">Fecha</th>
+                    <th className="text-right px-3 py-2 font-medium text-gray-600">Monto</th>
+                    <th className="text-left px-3 py-2 font-medium text-gray-600">Método</th>
+                    <th className="text-left px-3 py-2 font-medium text-gray-600">Notas</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {payments.map((p) => (
+                    <tr key={p.id}>
+                      <td className="px-3 py-2 text-gray-600">
+                        {new Date(p.paidAt).toLocaleString("es-CO")}
+                      </td>
+                      <td className="px-3 py-2 text-right text-gray-800">{formatCOP(p.amount)}</td>
+                      <td className="px-3 py-2 text-gray-600">{p.method ?? "—"}</td>
+                      <td className="px-3 py-2 text-gray-600">{p.notes ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {order.status !== "cancelado" && (
+              <PaymentForm orderId={order.id} pending={balance.pending} />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

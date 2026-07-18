@@ -1,8 +1,20 @@
 import Link from "next/link";
 import { getAllDistributors } from "@/lib/db/queries/distributors";
+import { getAccountsPayableSummary } from "@/lib/db/queries/purchase-payments";
+
+function formatCOP(n: number) {
+  return new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(n / 100);
+}
 
 export default async function DistributorsPage() {
-  const distributors = await getAllDistributors();
+  const [distributors, payableBalances] = await Promise.all([
+    getAllDistributors(),
+    getAccountsPayableSummary(),
+  ]);
 
   return (
     <div>
@@ -24,13 +36,14 @@ export default async function DistributorsPage() {
               <th className="text-left px-5 py-3 font-medium text-gray-600">Ciudad</th>
               <th className="text-left px-5 py-3 font-medium text-gray-600">Teléfono</th>
               <th className="text-left px-5 py-3 font-medium text-gray-600">Estado</th>
+              <th className="text-right px-5 py-3 font-medium text-gray-600">Saldo pendiente</th>
               <th className="px-5 py-3" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {distributors.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-8 text-center text-gray-400">
+                <td colSpan={6} className="px-5 py-8 text-center text-gray-400">
                   No hay distribuidores registrados
                 </td>
               </tr>
@@ -50,6 +63,9 @@ export default async function DistributorsPage() {
                   >
                     {d.active ? "Activo" : "Inactivo"}
                   </span>
+                </td>
+                <td className="px-5 py-3 text-right text-gray-700">
+                  {payableBalances.has(d.id) ? formatCOP(payableBalances.get(d.id)!) : "—"}
                 </td>
                 <td className="px-5 py-3 text-right">
                   <Link

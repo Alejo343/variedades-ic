@@ -57,6 +57,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   id: serial("id").primaryKey(),
   distributorId: integer("distributor_id").references(() => distributors.id),
   status: varchar("status", { length: 20 }).default("pendiente").notNull(),
+  purchaseType: varchar("purchase_type", { length: 10 }).default("contado").notNull(),
   orderDate: timestamp("order_date").defaultNow().notNull(),
   expectedDate: date("expected_date"),
   totalCost: integer("total_cost"),
@@ -274,6 +275,20 @@ export const settlements = pgTable(
   (table) => [unique("settlements_seller_period_unique").on(table.sellerId, table.periodDate)],
 );
 
+export const purchasePayments = pgTable(
+  "purchase_payments",
+  {
+    id: serial("id").primaryKey(),
+    purchaseOrderId: integer("purchase_order_id").notNull().references(() => purchaseOrders.id, { onDelete: "cascade" }),
+    amount: integer("amount").notNull(),
+    paidAt: timestamp("paid_at").defaultNow().notNull(),
+    method: varchar("method", { length: 30 }),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [check("purchase_payment_amount_positive", sql`${table.amount} > 0`)],
+);
+
 export type Category = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
 export type Product = typeof products.$inferSelect;
@@ -318,3 +333,5 @@ export type SellerLossItem = typeof sellerLossItems.$inferSelect;
 export type NewSellerLossItem = typeof sellerLossItems.$inferInsert;
 export type Settlement = typeof settlements.$inferSelect;
 export type NewSettlement = typeof settlements.$inferInsert;
+export type PurchasePayment = typeof purchasePayments.$inferSelect;
+export type NewPurchasePayment = typeof purchasePayments.$inferInsert;

@@ -45,6 +45,7 @@ export default async function PurchaseOrdersPage() {
               <th className="text-left px-5 py-3 font-medium text-gray-600">#</th>
               <th className="text-left px-5 py-3 font-medium text-gray-600">Distribuidor</th>
               <th className="text-left px-5 py-3 font-medium text-gray-600">Estado</th>
+              <th className="text-left px-5 py-3 font-medium text-gray-600">Tipo</th>
               <th className="text-left px-5 py-3 font-medium text-gray-600">F. esperada</th>
               <th className="text-right px-5 py-3 font-medium text-gray-600">Total</th>
               <th className="px-5 py-3" />
@@ -53,7 +54,7 @@ export default async function PurchaseOrdersPage() {
           <tbody className="divide-y divide-gray-50">
             {orders.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-8 text-center text-gray-400">
+                <td colSpan={7} className="px-5 py-8 text-center text-gray-400">
                   No hay pedidos de compra registrados
                 </td>
               </tr>
@@ -71,6 +72,17 @@ export default async function PurchaseOrdersPage() {
                     }`}
                   >
                     {STATUS_LABELS[o.status] ?? o.status}
+                  </span>
+                </td>
+                <td className="px-5 py-3">
+                  <span
+                    className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                      o.purchaseType === "credito"
+                        ? "bg-purple-100 text-purple-700"
+                        : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {o.purchaseType === "credito" ? "Crédito" : "Contado"}
                   </span>
                 </td>
                 <td className="px-5 py-3 text-gray-600">
