@@ -19,7 +19,6 @@ export const productSchema = z.object({
   stock: z.number().int().min(0).optional().default(0),
   minStock: z.number().int().min(0).optional().default(0),
   warrantyMonths: z.number().int().min(0).nullable().optional(),
-  hasVariants: z.boolean().optional().default(false),
   featured: z.boolean().optional().default(false),
   active: z.boolean().optional().default(true),
   whatsappText: z.string().optional(),

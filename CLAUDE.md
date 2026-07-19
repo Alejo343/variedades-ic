@@ -156,16 +156,19 @@ resumen y decisiones clave abajo.
 - Caja registra ingreso automático también en ventas directas por WhatsApp,
   no solo en liquidaciones de vendedores.
 - Garantía: `warrantyMonths` (integer, meses), no texto libre.
-- Variantes de producto (RN-007) quedan diferidas a la última fase del
-  roadmap; mientras tanto `variantId` ya existe (nullable) en
-  `inventory_movements` para no tener que migrar después.
+- Variantes de producto (RN-007): descartadas. El negocio no maneja
+  variantes de producto (decisión explícita del usuario). La Fase 10
+  original ("conectar variantId en toda la UI de items") se eliminó del
+  roadmap; las columnas `variantId`/`hasVariants` que se habían reservado
+  "por si acaso" en la Fase 1 se quitaron del schema — ver "Fase 10 —
+  descartada" más abajo.
 
 **Fases del roadmap** (cada una: contrato → test de dominio → implementación
 mínima → `npm run test` + `npm run lint` + `npm run build` en verde):
 
 | # | Fase | Estado |
 |---|------|--------|
-| 1 | Ledger de movimientos + campos base de producto (sku, purchasePrice, minStock, warrantyMonths, hasVariants) | ✅ listo |
+| 1 | Ledger de movimientos + campos base de producto (sku, purchasePrice, minStock, warrantyMonths) | ✅ listo |
 | 2 | Vendedores (`sellers`) + Caja (`cash_movements`) + Ventas en local (`direct_sales`) | ✅ listo |
 | 3 | Entregas a vendedores (`seller_deliveries`) | ✅ listo |
 | 4 | Inventario por vendedor (lectura, agregación sobre el ledger) | ✅ listo |
@@ -174,14 +177,16 @@ mínima → `npm run test` + `npm run lint` + `npm run build` en verde):
 | 7 | Liquidaciones (`settlements`) | ✅ listo |
 | 8 | Compras a crédito / cuentas por pagar (`purchase_payments`) | ✅ listo |
 | 9 | Reportes consolidados | ✅ listo |
-| 10 | Variantes de producto (`product_variants`) | ⬜ pendiente |
+| 10 | Variantes de producto (`product_variants`) | ❌ descartada |
 
 **Fase 1 — completada:**
 
 - Schema: `products` gana `sku` (unique, not null), `purchasePrice`,
-  `minStock`, `warrantyMonths`, `hasVariants`; nueva tabla
-  `inventory_movements` (con `variantId`/`sellerId` nullable, listos para
-  fases futuras, y CHECK `quantity_delta <> 0`); secuencia `product_sku_seq`.
+  `minStock`, `warrantyMonths`, y (más tarde eliminado, ver "Fase 10 —
+  descartada") `hasVariants`; nueva tabla `inventory_movements` (con
+  `sellerId` nullable y, hasta la Fase 10, un `variantId` también nullable
+  reservado "por si acaso" — quitado en esa fase; CHECK `quantity_delta <>
+  0`); secuencia `product_sku_seq`.
 - Dominio: `lib/domain/inventory-movement.ts` (`applyMovement`,
   `validateAdjustmentReason`) y `lib/domain/sku.ts` (`getSkuPrefix`,
   `formatSku`), ambos con tests.
@@ -264,7 +269,6 @@ inventario) cubren bien una venta de mostrador instantánea.
     id          serial PK
     saleId      integer NOT NULL FK -> direct_sales.id (cascade)
     productId   integer NOT NULL FK -> products.id
-    variantId   integer NULL   -- listo para la fase 10, igual que en inventory_movements
     quantity    integer NOT NULL   -- CHECK > 0, RN-045
     unitPrice   integer NOT NULL   -- CHECK >= 0, RN-045
     subtotal    integer NOT NULL   -- quantity*unitPrice, historia inmutable
@@ -323,8 +327,8 @@ inventario) cubren bien una venta de mostrador instantánea.
 **Fase 3 — completada:**
 
 - Schema: `seller_deliveries` (`sellerId`, `deliveryDate`, `notes`) +
-  `seller_delivery_items` (`productId`, `variantId` nullable, `quantity`
-  CHECK>0, `unitCost`). Sin columna `status` — decisión ya tomada de que la
+  `seller_delivery_items` (`productId`, `quantity` CHECK>0, `unitCost`).
+  Sin columna `status` — decisión ya tomada de que la
   entrega es una operación atómica (el propietario es el único que opera,
   no hay "confirmación de recepción" del vendedor en este alcance).
 - Query `createSellerDelivery` (`lib/db/queries/seller-deliveries.ts`):
@@ -377,8 +381,7 @@ inventario) cubren bien una venta de mostrador instantánea.
 - Schema: `seller_sales` (`sellerId`, `saleDate`, `totalAmount`,
   `commissionAmount`, `settlementId` nullable sin FK todavía — se conecta a
   `settlements` en la Fase 7) + `seller_sale_items` (`productId`,
-  `variantId` nullable, `quantity`/`unitPrice` con CHECK, `subtotal`
-  inmutable).
+  `quantity`/`unitPrice` con CHECK, `subtotal` inmutable).
 - `getSellerBalance` (Fase 4) se refactorizó para aceptar `db | tx` como
   primer parámetro — necesario para poder leer el saldo del vendedor
   *dentro* de la misma transacción que escribe la venta (si se usara `db`
@@ -656,6 +659,36 @@ inventario) cubren bien una venta de mostrador instantánea.
   (ingresos y gastos) bajan a 0 mientras que Inventario actual, Cuentas
   por pagar y el saldo de Caja permanecen sin cambios.
 
+**Fase 10 — descartada:**
+
+Antes de diseñarla se le preguntó al usuario el alcance real (¿variantes
+conectadas en todos los flujos, o solo catálogo/inventario?, ¿atributos
+libres o fijos?, ¿precio propio o heredado?). La respuesta fue que el
+negocio **no maneja variantes de producto** — RN-007/RF-01 las mencionan en
+`reglas.txt`/`requisitos.txt`, pero no aplican a este negocio en la
+práctica, así que se descarta toda la fase en vez de construir algo sin
+caso de uso real.
+
+Limpieza aplicada (migración `drizzle/0011_thin_whizzer.sql`):
+
+- Se eliminó la columna `variant_id` (nullable, nunca usada) de las 6
+  tablas donde se había reservado "por si acaso" desde la Fase 1:
+  `inventory_movements`, `direct_sale_items`, `seller_delivery_items`,
+  `seller_sale_items`, `seller_return_items`, `seller_loss_items`.
+- Se eliminó `products.hasVariants` (boolean, siempre `false`, sin uso en
+  ninguna query ni UI) y su campo correspondiente en
+  `lib/validations.ts#productSchema`.
+- Ninguna de las columnas eliminadas tenía FK ni datos reales (todas
+  nullable/siempre en su valor por defecto), así que la migración no
+  perdió información — coincide con la convención del proyecto de no dejar
+  columnas para "por si algún día" (`AGENTS.md`/CLAUDE.md: "no diseñes
+  para requisitos hipotéticos futuros").
+- Las menciones históricas de `variantId`/`hasVariants` en las secciones
+  "Fase 1/2/3/5 — completada" de este archivo se corrigieron para reflejar
+  que esas columnas ya no existen (en su momento se documentaron como
+  "reservadas para la Fase 10").
+- El roadmap de 10 fases queda cerrado: 9 completadas, 1 descartada.
+
 Guía para Claude Code al trabajar en este repositorio. Léela antes de tocar código.
 
 ## Cómo trabajamos aquí (spec-driven + tests)
@@ -786,14 +819,17 @@ La idea clave: cada capa tiene una responsabilidad y no invade a las demás.
   sin tablas nuevas. Filtro de fecha solo para los reportes de flujo
   (Compras/Ventas/Utilidad/Caja); utilidad bruta = ventas − costo de compra
   actual (decisión de negocio, ver "Fase 9 — completada" arriba para el
-  detalle y limitaciones). Ver "Roadmap: pivote a gestión integral de la
-  empresa" arriba para la fase 10 pendiente.
+  detalle y limitaciones).
+- Fase 10 del pivote (variantes de producto) **descartada**: el negocio no
+  maneja variantes. Se eliminaron del schema las columnas `variantId`
+  (6 tablas) y `products.hasVariants` que se habían reservado desde la
+  Fase 1 "por si acaso" — ver "Fase 10 — descartada" arriba. El roadmap de
+  10 fases queda cerrado (9 completadas, 1 descartada).
 
 **Próximo:**
 
-- Fase 10 del pivote: variantes de producto (`product_variants`) — última
-  fase del roadmap, su forma exacta se define con el usuario al llegar.
-- Poblar la BD con productos reales (tarea del roadmap original, aún pendiente).
+- Poblar la BD con productos reales (tarea del roadmap original, aún
+  pendiente — es lo único que queda del roadmap inicial).
 
 **Decisiones tomadas:**
 
@@ -812,8 +848,6 @@ La idea clave: cada capa tiene una responsabilidad y no invade a las demás.
 - La suite de tests solo cubre `lib/domain/*` y `lib/validations.ts` (lógica
   pura). Las API routes, las queries de Drizzle y los componentes se verifican
   manualmente (`npm run dev` + flujo real, `npm run lint`, `npm run build`).
-- Variantes de producto (RN-007) siguen sin definirse del todo (qué atributos
-  varían, si tienen SKU/precio propio) — se resuelve al llegar a la fase 10.
 - `markSettlementLiquidada` no maneja `amountDue` negativo (comisión supera
   las ventas cobradas del día): simplemente omite el movimiento de caja sin
   avisar. No se ha discutido con el usuario qué debería pasar en ese caso

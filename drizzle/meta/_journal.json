@@ -78,6 +78,13 @@
       "when": 1784414286652,
       "tag": "0010_cloudy_deathbird",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784418938195,
+      "tag": "0011_thin_whizzer",
+      "breakpoints": true
     }
   ]
 }
