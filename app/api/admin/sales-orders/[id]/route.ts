@@ -7,7 +7,7 @@ import {
   deleteSalesOrder,
   confirmSalesOrder,
 } from "@/lib/db/queries/sales-orders";
-import { salesOrderSchema } from "@/lib/validations";
+import { salesOrderSchema, accountSelectionSchema } from "@/lib/validations";
 import { canTransitionSalesOrder, type SalesOrderStatus } from "@/lib/domain/order-status";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -37,7 +37,12 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 
   if (parsed.data.status) {
     if (parsed.data.status === "confirmado") {
-      const result = await confirmSalesOrder(Number(id));
+      const accountParsed = accountSelectionSchema.safeParse(body);
+      if (!accountParsed.success) {
+        return NextResponse.json({ error: accountParsed.error.flatten() }, { status: 400 });
+      }
+
+      const result = await confirmSalesOrder(Number(id), accountParsed.data.accountId);
       if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
       return NextResponse.json(result.order);
     }

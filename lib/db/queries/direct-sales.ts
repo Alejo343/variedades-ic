@@ -1,5 +1,5 @@
 import { db } from "../index";
-import { directSales, directSaleItems, products } from "../schema";
+import { directSales, directSaleItems, products, cashAccounts } from "../schema";
 import { eq, desc } from "drizzle-orm";
 import type { DirectSaleInput } from "@/lib/validations";
 import { recordPrincipalMovement } from "./inventory";
@@ -10,7 +10,19 @@ export type CreateDirectSaleResult =
   | { ok: false; error: string };
 
 export function getAllDirectSales() {
-  return db.select().from(directSales).orderBy(desc(directSales.saleDate));
+  return db
+    .select({
+      id: directSales.id,
+      saleDate: directSales.saleDate,
+      totalAmount: directSales.totalAmount,
+      accountId: directSales.accountId,
+      accountName: cashAccounts.name,
+      notes: directSales.notes,
+      createdAt: directSales.createdAt,
+    })
+    .from(directSales)
+    .leftJoin(cashAccounts, eq(directSales.accountId, cashAccounts.id))
+    .orderBy(desc(directSales.saleDate));
 }
 
 export async function getDirectSaleById(id: number) {
@@ -40,7 +52,7 @@ export async function createDirectSale(data: DirectSaleInput): Promise<CreateDir
     return await db.transaction(async (tx) => {
       const [sale] = await tx
         .insert(directSales)
-        .values({ totalAmount: 0, notes: data.notes ?? null })
+        .values({ totalAmount: 0, accountId: data.accountId, notes: data.notes ?? null })
         .returning();
 
       let totalAmount = 0;
@@ -79,6 +91,7 @@ export async function createDirectSale(data: DirectSaleInput): Promise<CreateDir
           type: "ingreso",
           amount: totalAmount,
           concept: `Venta en local #${sale.id}`,
+          accountId: data.accountId,
           sourceType: "direct_sale",
           sourceId: sale.id,
         });

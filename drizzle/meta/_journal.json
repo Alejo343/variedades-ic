@@ -85,6 +85,41 @@
       "when": 1784418938195,
       "tag": "0011_thin_whizzer",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784421247521,
+      "tag": "0012_salty_gabe_jones",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1784423791482,
+      "tag": "0013_happy_robbie_robertson",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1790310587390,
+      "tag": "0014_burly_mimic",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1790310632557,
+      "tag": "0015_cloudy_captain_flint",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1790311098822,
+      "tag": "0016_blue_guardian",
+      "breakpoints": true
     }
   ]
 }

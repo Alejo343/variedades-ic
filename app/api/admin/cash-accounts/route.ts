@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getAllProducts, createProduct } from "@/lib/db/queries/products";
-import { productSchema } from "@/lib/validations";
+import { getAllCashAccounts, createCashAccount } from "@/lib/db/queries/cash-accounts";
+import { cashAccountSchema } from "@/lib/validations";
 
 export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
-  const data = await getAllProducts();
+  const data = await getAllCashAccounts();
   return NextResponse.json(data);
 }
 
@@ -16,19 +16,12 @@ export async function POST(req: Request) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const body = await req.json();
-  const parsed = productSchema.safeParse(body);
+  const parsed = cashAccountSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  try {
-    const [product] = await createProduct(parsed.data);
-    return NextResponse.json(product, { status: 201 });
-  } catch (err) {
-    if ((err as { code?: string }).code === "23505") {
-      return NextResponse.json({ error: "Ya existe un producto con ese código de proveedor" }, { status: 400 });
-    }
-    throw err;
-  }
+  const [account] = await createCashAccount(parsed.data);
+  return NextResponse.json(account, { status: 201 });
 }

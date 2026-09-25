@@ -30,13 +30,14 @@ export default async function DirectSalesPage() {
             <tr>
               <th className="text-left px-5 py-3 font-medium text-gray-600">Fecha</th>
               <th className="text-left px-5 py-3 font-medium text-gray-600">Total</th>
+              <th className="text-left px-5 py-3 font-medium text-gray-600">Cuenta</th>
               <th className="text-left px-5 py-3 font-medium text-gray-600">Notas</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {sales.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-5 py-8 text-center text-gray-400">
+                <td colSpan={4} className="px-5 py-8 text-center text-gray-400">
                   No hay ventas en local registradas
                 </td>
               </tr>
@@ -45,6 +46,7 @@ export default async function DirectSalesPage() {
               <tr key={s.id} className="hover:bg-gray-50 transition">
                 <td className="px-5 py-3 text-gray-600">{new Date(s.saleDate).toLocaleString("es-CO")}</td>
                 <td className="px-5 py-3 font-medium text-gray-800">{formatCOP(s.totalAmount)}</td>
+                <td className="px-5 py-3 text-gray-500">{s.accountName ?? "—"}</td>
                 <td className="px-5 py-3 text-gray-500">{s.notes ?? "—"}</td>
               </tr>
             ))}

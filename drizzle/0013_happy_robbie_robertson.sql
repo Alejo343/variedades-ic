@@ -1,0 +1,1 @@
+ALTER TABLE "seller_delivery_items" DROP COLUMN "unit_cost";

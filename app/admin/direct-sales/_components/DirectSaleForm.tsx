@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 type Product = { id: number; name: string; price: number };
+type Account = { id: number; name: string };
 
 type Row = { productId: number | ""; quantity: number; unitPrice: number };
 
@@ -11,9 +12,10 @@ function emptyRow(): Row {
   return { productId: "", quantity: 1, unitPrice: 0 };
 }
 
-export function DirectSaleForm({ products }: { products: Product[] }) {
+export function DirectSaleForm({ products, accounts }: { products: Product[]; accounts: Account[] }) {
   const router = useRouter();
   const [rows, setRows] = useState<Row[]>([emptyRow()]);
+  const [accountId, setAccountId] = useState<number | "">("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -52,10 +54,16 @@ export function DirectSaleForm({ products }: { products: Product[] }) {
       return;
     }
 
+    if (accountId === "") {
+      setLoading(false);
+      setError("Selecciona la cuenta");
+      return;
+    }
+
     const res = await fetch("/api/admin/direct-sales", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items, notes }),
+      body: JSON.stringify({ items, accountId, notes }),
     });
 
     setLoading(false);
@@ -133,6 +141,23 @@ export function DirectSaleForm({ products }: { products: Product[] }) {
       >
         + Agregar producto
       </button>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Cuenta</label>
+        <select
+          value={accountId}
+          onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : "")}
+          required
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Selecciona...</option>
+          {accounts.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </select>
+      </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">

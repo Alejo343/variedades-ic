@@ -48,7 +48,7 @@ export function addSalesOrderItem(data: SalesOrderItemInput) {
   return db.insert(salesOrderItems).values(data).returning();
 }
 
-export async function confirmSalesOrder(id: number): Promise<ConfirmSalesOrderResult> {
+export async function confirmSalesOrder(id: number, accountId: number): Promise<ConfirmSalesOrderResult> {
   try {
     return await db.transaction(async (tx) => {
       const [order] = await tx.select().from(salesOrders).where(eq(salesOrders.id, id)).limit(1);
@@ -97,6 +97,7 @@ export async function confirmSalesOrder(id: number): Promise<ConfirmSalesOrderRe
           type: "ingreso",
           amount: updated.totalPrice,
           concept: `Venta por WhatsApp #${id} — ${updated.customerName}`,
+          accountId,
           sourceType: "sales_order",
           sourceId: id,
         });

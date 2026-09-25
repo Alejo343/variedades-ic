@@ -23,6 +23,10 @@ export const products = pgTable("products", {
   price: integer("price").notNull(),
   purchasePrice: integer("purchase_price").default(0).notNull(),
   categoryId: integer("category_id").references(() => categories.id),
+  // Code the distributor assigns to this specific product (their own SKU for
+  // it) — not a reference to distributors.id, just a free-text uniqueness
+  // guard so the same distributor product isn't registered twice.
+  distributorCode: varchar("distributor_code", { length: 100 }).unique(),
   stock: integer("stock").default(0).notNull(),
   minStock: integer("min_stock").default(0).notNull(),
   warrantyMonths: integer("warranty_months"),
@@ -124,6 +128,18 @@ export const sellers = pgTable("sellers", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Real money accounts (e.g. "Efectivo", "Transferencia") — cash_movements,
+// direct_sales and purchase_payments all reference one, so each account's
+// balance (SUM of its own movements) reflects real money, not just a tag.
+export const cashAccounts = pgTable("cash_accounts", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  type: varchar("type", { length: 15 }).default("efectivo").notNull(),
+  active: boolean("active").default(true).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const cashMovements = pgTable(
   "cash_movements",
   {
@@ -134,6 +150,7 @@ export const cashMovements = pgTable(
     movementDate: timestamp("movement_date").defaultNow().notNull(),
     sourceType: varchar("source_type", { length: 30 }),
     sourceId: integer("source_id"),
+    accountId: integer("account_id").notNull().references(() => cashAccounts.id),
     notes: text("notes"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
@@ -144,6 +161,7 @@ export const directSales = pgTable("direct_sales", {
   id: serial("id").primaryKey(),
   saleDate: timestamp("sale_date").defaultNow().notNull(),
   totalAmount: integer("total_amount").default(0).notNull(),
+  accountId: integer("account_id").notNull().references(() => cashAccounts.id),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -275,7 +293,7 @@ export const purchasePayments = pgTable(
     purchaseOrderId: integer("purchase_order_id").notNull().references(() => purchaseOrders.id, { onDelete: "cascade" }),
     amount: integer("amount").notNull(),
     paidAt: timestamp("paid_at").defaultNow().notNull(),
-    method: varchar("method", { length: 30 }),
+    accountId: integer("account_id").notNull().references(() => cashAccounts.id),
     notes: text("notes"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
@@ -302,6 +320,8 @@ export type InventoryMovement = typeof inventoryMovements.$inferSelect;
 export type NewInventoryMovement = typeof inventoryMovements.$inferInsert;
 export type Seller = typeof sellers.$inferSelect;
 export type NewSeller = typeof sellers.$inferInsert;
+export type CashAccount = typeof cashAccounts.$inferSelect;
+export type NewCashAccount = typeof cashAccounts.$inferInsert;
 export type CashMovement = typeof cashMovements.$inferSelect;
 export type NewCashMovement = typeof cashMovements.$inferInsert;
 export type DirectSale = typeof directSales.$inferSelect;

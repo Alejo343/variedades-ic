@@ -39,9 +39,16 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const [updated] = await updateProduct(Number(id), parsed.data);
-  if (!updated) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
-  return NextResponse.json(updated);
+  try {
+    const [updated] = await updateProduct(Number(id), parsed.data);
+    if (!updated) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
+    return NextResponse.json(updated);
+  } catch (err) {
+    if ((err as { code?: string }).code === "23505") {
+      return NextResponse.json({ error: "Ya existe un producto con ese código de proveedor" }, { status: 400 });
+    }
+    throw err;
+  }
 }
 
 export async function DELETE(_req: NextRequest, ctx: Ctx) {

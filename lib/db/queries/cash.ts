@@ -1,6 +1,6 @@
 import { db } from "../index";
-import { cashMovements } from "../schema";
-import { desc, sql } from "drizzle-orm";
+import { cashMovements, cashAccounts } from "../schema";
+import { desc, eq, sql } from "drizzle-orm";
 import type { CashMovementInput } from "@/lib/validations";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -9,6 +9,7 @@ export type RecordCashMovementInput = {
   type: "ingreso" | "gasto";
   amount: number;
   concept: string;
+  accountId: number;
   sourceType?: string | null;
   sourceId?: number | null;
   notes?: string | null;
@@ -21,6 +22,7 @@ export function recordCashMovement(dbOrTx: typeof db | Tx, data: RecordCashMovem
       type: data.type,
       amount: data.amount,
       concept: data.concept,
+      accountId: data.accountId,
       sourceType: data.sourceType ?? null,
       sourceId: data.sourceId ?? null,
       notes: data.notes ?? null,
@@ -33,7 +35,23 @@ export function createCashMovement(data: CashMovementInput) {
 }
 
 export function getAllCashMovements() {
-  return db.select().from(cashMovements).orderBy(desc(cashMovements.movementDate));
+  return db
+    .select({
+      id: cashMovements.id,
+      type: cashMovements.type,
+      amount: cashMovements.amount,
+      concept: cashMovements.concept,
+      movementDate: cashMovements.movementDate,
+      sourceType: cashMovements.sourceType,
+      sourceId: cashMovements.sourceId,
+      accountId: cashMovements.accountId,
+      accountName: cashAccounts.name,
+      notes: cashMovements.notes,
+      createdAt: cashMovements.createdAt,
+    })
+    .from(cashMovements)
+    .leftJoin(cashAccounts, eq(cashMovements.accountId, cashAccounts.id))
+    .orderBy(desc(cashMovements.movementDate));
 }
 
 export async function getCashBalance(): Promise<number> {

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getAllSettlements } from "@/lib/db/queries/settlements";
+import { getActiveCashAccounts } from "@/lib/db/queries/cash-accounts";
 import { LiquidateButton } from "./_components/LiquidateButton";
 
 function formatCOP(amount: number) {
@@ -11,7 +12,7 @@ function formatCOP(amount: number) {
 }
 
 export default async function SettlementsPage() {
-  const settlements = await getAllSettlements();
+  const [settlements, accounts] = await Promise.all([getAllSettlements(), getActiveCashAccounts()]);
 
   return (
     <div>
@@ -65,7 +66,7 @@ export default async function SettlementsPage() {
                   </span>
                 </td>
                 <td className="px-5 py-3 text-right">
-                  {s.status === "pendiente" && <LiquidateButton id={s.id} />}
+                  {s.status === "pendiente" && <LiquidateButton id={s.id} accounts={accounts} />}
                 </td>
               </tr>
             ))}

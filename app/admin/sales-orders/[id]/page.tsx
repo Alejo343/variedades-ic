@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getSalesOrderById } from "@/lib/db/queries/sales-orders";
+import { getActiveCashAccounts } from "@/lib/db/queries/cash-accounts";
 import { SalesStatusActions } from "../_components/SalesStatusActions";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -31,7 +32,7 @@ export default async function SalesOrderDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const order = await getSalesOrderById(Number(id));
+  const [order, accounts] = await Promise.all([getSalesOrderById(Number(id)), getActiveCashAccounts()]);
 
   if (!order) notFound();
 
@@ -118,7 +119,7 @@ export default async function SalesOrderDetailPage({
         </table>
       </div>
 
-      <SalesStatusActions orderId={order.id} status={order.status} />
+      <SalesStatusActions orderId={order.id} status={order.status} accounts={accounts} />
     </div>
   );
 }

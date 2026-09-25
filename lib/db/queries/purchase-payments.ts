@@ -1,8 +1,9 @@
 import { db } from "../index";
-import { purchaseOrders, purchasePayments } from "../schema";
+import { purchaseOrders, purchasePayments, cashAccounts, distributors } from "../schema";
 import { eq, desc, and, isNotNull, sql } from "drizzle-orm";
 import type { PurchasePaymentInput } from "@/lib/validations";
 import { deductStock } from "@/lib/domain/stock";
+import { recordCashMovement } from "./cash";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -35,8 +36,18 @@ export async function getPurchaseOrderBalance(dbOrTx: typeof db | Tx, purchaseOr
 
 export function getPaymentsForOrder(purchaseOrderId: number) {
   return db
-    .select()
+    .select({
+      id: purchasePayments.id,
+      purchaseOrderId: purchasePayments.purchaseOrderId,
+      amount: purchasePayments.amount,
+      paidAt: purchasePayments.paidAt,
+      accountId: purchasePayments.accountId,
+      accountName: cashAccounts.name,
+      notes: purchasePayments.notes,
+      createdAt: purchasePayments.createdAt,
+    })
     .from(purchasePayments)
+    .leftJoin(cashAccounts, eq(purchasePayments.accountId, cashAccounts.id))
     .where(eq(purchasePayments.purchaseOrderId, purchaseOrderId))
     .orderBy(desc(purchasePayments.paidAt));
 }
@@ -73,10 +84,32 @@ export async function createPurchasePayment(
         .values({
           purchaseOrderId,
           amount: data.amount,
-          method: data.method ?? null,
+          accountId: data.accountId,
           notes: data.notes ?? null,
         })
         .returning();
+
+      const [order] = await tx
+        .select({ distributorId: purchaseOrders.distributorId })
+        .from(purchaseOrders)
+        .where(eq(purchaseOrders.id, purchaseOrderId))
+        .limit(1);
+
+      const [distributor] = order?.distributorId
+        ? await tx.select({ name: distributors.name }).from(distributors).where(eq(distributors.id, order.distributorId)).limit(1)
+        : [null];
+
+      // purchase_payments.amount is in centavos (legacy unit, see CLAUDE.md
+      // "Inconsistencia de unidades monetarias"); cash_movements.amount is in
+      // whole pesos like every other cash source, so it needs converting.
+      await recordCashMovement(tx, {
+        type: "gasto",
+        amount: Math.round(data.amount / 100),
+        concept: `Pago a distribuidor${distributor ? ` ${distributor.name}` : ""} — pedido #${purchaseOrderId}`,
+        accountId: data.accountId,
+        sourceType: "purchase_payment",
+        sourceId: payment.id,
+      });
 
       return { ok: true, payment };
     });

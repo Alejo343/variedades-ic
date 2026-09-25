@@ -3,28 +3,35 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+type Account = { id: number; name: string };
+
 type Props = {
   orderId: number;
   pending: number;
+  accounts: Account[];
 };
 
-export function PaymentForm({ orderId, pending }: Props) {
+export function PaymentForm({ orderId, pending, accounts }: Props) {
   const router = useRouter();
   const [amount, setAmount] = useState(pending);
-  const [method, setMethod] = useState("");
+  const [accountId, setAccountId] = useState<number | "">("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (accountId === "") {
+      setError("Selecciona la cuenta");
+      return;
+    }
     setLoading(true);
     setError("");
 
     const res = await fetch(`/api/admin/purchase-orders/${orderId}/payments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount, method: method || undefined, notes: notes || undefined }),
+      body: JSON.stringify({ amount, accountId, notes: notes || undefined }),
     });
 
     setLoading(false);
@@ -36,7 +43,7 @@ export function PaymentForm({ orderId, pending }: Props) {
     }
 
     setAmount(0);
-    setMethod("");
+    setAccountId("");
     setNotes("");
     router.refresh();
   }
@@ -55,13 +62,19 @@ export function PaymentForm({ orderId, pending }: Props) {
           placeholder="Monto (centavos)"
           className="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <input
-          type="text"
-          value={method}
-          onChange={(e) => setMethod(e.target.value)}
-          placeholder="Método (opcional)"
+        <select
+          value={accountId}
+          onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : "")}
+          required
           className="flex-1 min-w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+        >
+          <option value="">Cuenta...</option>
+          {accounts.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </select>
       </div>
       <input
         type="text"

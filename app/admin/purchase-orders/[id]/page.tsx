@@ -3,6 +3,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { getPurchaseOrderById } from "@/lib/db/queries/purchase-orders";
 import { getPurchaseOrderBalance, getPaymentsForOrder } from "@/lib/db/queries/purchase-payments";
+import { getActiveCashAccounts } from "@/lib/db/queries/cash-accounts";
 import { StatusActions } from "../_components/StatusActions";
 import { PaymentForm } from "../_components/PaymentForm";
 
@@ -44,9 +45,9 @@ export default async function PurchaseOrderDetailPage({
   );
 
   const isCredito = order.purchaseType === "credito";
-  const [balance, payments] = isCredito
-    ? await Promise.all([getPurchaseOrderBalance(db, order.id), getPaymentsForOrder(order.id)])
-    : [null, []];
+  const [balance, payments, accounts] = isCredito
+    ? await Promise.all([getPurchaseOrderBalance(db, order.id), getPaymentsForOrder(order.id), getActiveCashAccounts()])
+    : [null, [], []];
 
   return (
     <div className="max-w-2xl flex flex-col gap-6">
@@ -153,7 +154,7 @@ export default async function PurchaseOrderDetailPage({
                   <tr>
                     <th className="text-left px-3 py-2 font-medium text-gray-600">Fecha</th>
                     <th className="text-right px-3 py-2 font-medium text-gray-600">Monto</th>
-                    <th className="text-left px-3 py-2 font-medium text-gray-600">Método</th>
+                    <th className="text-left px-3 py-2 font-medium text-gray-600">Cuenta</th>
                     <th className="text-left px-3 py-2 font-medium text-gray-600">Notas</th>
                   </tr>
                 </thead>
@@ -164,7 +165,7 @@ export default async function PurchaseOrderDetailPage({
                         {new Date(p.paidAt).toLocaleString("es-CO")}
                       </td>
                       <td className="px-3 py-2 text-right text-gray-800">{formatCOP(p.amount)}</td>
-                      <td className="px-3 py-2 text-gray-600">{p.method ?? "—"}</td>
+                      <td className="px-3 py-2 text-gray-600">{p.accountName ?? "—"}</td>
                       <td className="px-3 py-2 text-gray-600">{p.notes ?? "—"}</td>
                     </tr>
                   ))}
@@ -173,7 +174,7 @@ export default async function PurchaseOrderDetailPage({
             )}
 
             {order.status !== "cancelado" && (
-              <PaymentForm orderId={order.id} pending={balance.pending} />
+              <PaymentForm orderId={order.id} pending={balance.pending} accounts={accounts} />
             )}
           </div>
         </div>

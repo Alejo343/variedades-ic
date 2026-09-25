@@ -4,6 +4,16 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import type { ProductInput } from "@/lib/validations";
 import { generateProductSku } from "./inventory";
 
+export async function findProductByDistributorCode(code: string) {
+  const [product] = await db
+    .select({ id: products.id, name: products.name, distributorCode: products.distributorCode })
+    .from(products)
+    .where(sql`lower(${products.distributorCode}) = lower(${code})`)
+    .limit(1);
+
+  return product ?? null;
+}
+
 export function getHeroProduct() {
   return db
     .select({
@@ -64,6 +74,7 @@ export function getAllProducts() {
       name: products.name,
       slug: products.slug,
       sku: products.sku,
+      distributorCode: products.distributorCode,
       price: products.price,
       purchasePrice: products.purchasePrice,
       stock: products.stock,

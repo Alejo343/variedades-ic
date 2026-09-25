@@ -689,6 +689,130 @@ Limpieza aplicada (migración `drizzle/0011_thin_whizzer.sql`):
   "reservadas para la Fase 10").
 - El roadmap de 10 fases queda cerrado: 9 completadas, 1 descartada.
 
+## Portación de funcionalidades desde variedades-ic-mobile
+
+Completada (sesión 2026-09-25). Contexto: `variedades-ic-mobile` (repo
+hermano, 100% offline/SQLite, ver su propio `CLAUDE.md`) arrancó portando
+la lógica de este repo y desde ahí desarrolló varias sesiones propias,
+agregando funcionalidades de negocio que no existían acá. El objetivo final
+del usuario es una sola base de datos compartida; esta sesión solo trae las
+funcionalidades de negocio al repo web (Postgres) — la sincronización real
+de datos entre ambos queda para después. De las 5 funcionalidades nuevas
+documentadas en el móvil, se portaron las 3 de negocio (las otras 2 —
+preferencia de tema, identidad visual/Lucide/animación de venta — son
+específicas de React Native, no aplican a un admin web).
+
+**Hallazgo antes de empezar**: el repo ya tenía aplicado en la base de
+datos real (migraciones `0012`/`0013`, sin commitear) un intento anterior
+de `paymentMethod` en `direct_sales` y la eliminación de `unit_cost` en
+`seller_delivery_items` — exactamente el diseño que en el móvil se
+abandonó en la misma sesión en que se creó, reemplazado por
+`cash_accounts`. Se dejaron esas dos migraciones tal cual (historial de un
+camino abandonado, mismo criterio de "nunca reescribir migraciones ya
+aplicadas") y se construyó `cash_accounts` encima, restaurando `unit_cost`
+en el camino.
+
+**Cuentas de caja (`cash_accounts`)** — la pieza más grande:
+
+- Tabla nueva `cash_accounts` (`name`, `type: efectivo|banco`, `active`,
+  `notes`); `cash_movements.accountId`, `direct_sales.accountId`,
+  `purchase_payments.accountId` ahora `NOT NULL REFERENCES cash_accounts`.
+  `direct_sales.paymentMethod` y `purchase_payments.method` eliminados.
+- Migraciones `0014` (solo adiciones: tabla + columnas nullable + siembra
+  de las cuentas "Efectivo"/"Transferencia" + backfill a mano desde los
+  valores viejos) y `0015` (solo drops/alters: `NOT NULL` + eliminar las
+  columnas viejas) — separadas en dos corridas de `drizzle-kit generate`
+  para que un mismo run nunca vea "columna agregada + columna quitada" en
+  la misma tabla (evita el prompt interactivo de "¿es un rename?", mismo
+  problema que ya había documentado el móvil para SQLite; en Postgres con
+  `ALTER TABLE` por columna alcanzó con 2 pasos en vez de los 3 que usó
+  SQLite).
+- **Bug real corregido**: `createPurchasePayment` (pagar a un distribuidor)
+  nunca generaba un `cash_movements` — se agregó esa llamada, la corrección
+  que motivó todo el diseño de cuentas en el móvil también acá.
+- Nuevo archivo `lib/db/queries/cash-accounts.ts` (CRUD + `getCashAccountsWithBalances`,
+  saldo derivado por `SUM` sobre `cash_movements`, nunca guardado — mismo
+  criterio que `getCashBalance()`).
+- Todas las fuentes que escriben en caja ahora piden cuenta: movimiento
+  manual, venta en local, pago a distribuidor, liquidación de vendedor, y
+  **confirmar un pedido de WhatsApp** (`salesOrders`, canal exclusivo de la
+  web, no existe en móvil) — la acción "Confirmar pedido" en
+  `SalesStatusActions.tsx` ahora muestra un selector de cuenta y queda
+  deshabilitada hasta elegir una antes de llamar a `confirmSalesOrder(id,
+  accountId)`.
+- UI nueva: `/admin/cash/accounts` (CRUD, mismo patrón que
+  `/admin/distributors`), accesible desde "Gestionar cuentas" en
+  `/admin/cash`.
+- **Bug real encontrado y corregido durante la verificación manual en
+  navegador** (no typecheck/lint/build no lo detectan, es un error de
+  unidades en tiempo de ejecución): `createPurchasePayment` pasaba
+  `data.amount` tal cual a `recordCashMovement`, pero `purchase_payments.amount`
+  está en centavos (legado, ver "Riesgos abiertos" más abajo) mientras
+  `cash_movements.amount` espera pesos directos — un pago de $5.000
+  quedaba registrado como gasto de $500.000. Corregido con
+  `Math.round(data.amount / 100)` antes de `recordCashMovement`.
+  **El mismo defecto ya existía, sin corregir, en `confirmSalesOrder`**
+  (pedidos de WhatsApp) desde la Fase 2 original del pivote — encontrado en
+  la misma verificación pero dejado sin corregir a petición del usuario,
+  documentado en "Riesgos abiertos".
+
+**Código de proveedor único por producto**:
+
+- `products.distributorCode` (`varchar(100)`, nullable, `.unique()`) — no
+  es referencia a `distributors.id`, es el código propio del proveedor
+  para ese producto puntual, texto libre.
+- `findProductByDistributorCode` (case-insensitive, sin filtrar por
+  `active`) + `GET /api/admin/products/by-distributor-code?code=`.
+- `ProductForm.tsx`: campo opcional; al guardar, si hay código, consulta el
+  endpoint antes de escribir — si encuentra otro producto (no el que se
+  está editando), bloquea el guardado y muestra "Ir a editar {nombre}".
+  Las rutas de creación/edición además atrapan la violación de unicidad de
+  Postgres (`23505`) como red de seguridad detrás de esa validación.
+
+**Importación de compras desde Excel (.xlsx)**:
+
+- `lib/domain/purchase-import.ts` + `.test.ts` (11 tests), puerto casi
+  literal del mismo archivo en el móvil: `parseCOPNumber`,
+  `parseImportSheet` (columnas fijas por posición — A=código sin usar,
+  B=nombre, C=cantidad, D=valor, E=total sin usar, se recalcula),
+  `resolveImportRows` (empareja por nombre normalizado, fusiona filas del
+  mismo producto, genera slug único para productos nuevos). Misma
+  limitación heredada: el código de columna A no se usa para emparejar
+  (no hay forma de mapearlo al SKU autogenerado), así que un nombre
+  distinto entre archivos crea un producto duplicado — riesgo conocido, sin
+  resolver, igual que en el móvil.
+- `PurchaseOrderForm.tsx`: botón "Importar desde Excel" — lee el archivo
+  con `file.arrayBuffer()` + `XLSX.read`/`utils.sheet_to_json`, resuelve
+  contra el catálogo completo (no solo activos), crea los productos nuevos
+  secuencialmente vía `POST /api/admin/products` (sin transacción que
+  abarque todo el import, mismo límite aceptado que en móvil) y fusiona
+  todo en el carrito existente. Nueva dependencia `xlsx@^0.18.5` (misma
+  versión que móvil — **tiene vulnerabilidades conocidas sin parchear en
+  el paquete de npm**, prototype pollution y ReDoS en SheetJS; riesgo
+  acotado porque es una ruta autenticada de admin que solo procesa
+  archivos que el propio dueño del negocio sube, no input público, pero
+  queda anotado aquí como trade-off consciente, no pasado por alto).
+
+**Verificación**: `npm run test` (62/62, 11 nuevos) + `npm run lint` +
+`npm run build` en verde, más flujo manual completo en navegador real
+(login con credenciales de prueba regeneradas, ver nota abajo): cuenta
+nueva creada, venta en local con cuenta elegida reflejada en su saldo, pago
+a distribuidor generando el gasto que antes no se generaba, liquidación de
+vendedor con cuenta pidiendo selección y actualizando el saldo correcto,
+pedido de WhatsApp rechazado por falta de stock sin tocar caja
+(fail-fast confirmado) y luego confirmado con éxito generando el ingreso
+en la cuenta elegida, producto con código de proveedor bloqueando un
+duplicado (comparación case-insensitive) sin bloquearse a sí mismo al
+editar, e importación de un `.xlsx` de prueba con una fila existente, una
+nueva y una inválida (fila "TOTAL") resuelta exactamente como se esperaba.
+
+**Nota de sesión**: no se tenía la contraseña del admin (`ADMIN_EMAIL` sí,
+solo el hash bcrypt en `.env.local`, no el texto plano) para hacer la
+verificación en navegador. A petición del usuario se generó un hash nuevo
+para una contraseña de prueba y se reemplazó en `.env.local` (no
+versionado) — la contraseña activa ahora es la que se le compartió al
+usuario en esa sesión, no la original.
+
 Guía para Claude Code al trabajar en este repositorio. Léela antes de tocar código.
 
 ## Cómo trabajamos aquí (spec-driven + tests)
@@ -860,6 +984,22 @@ La idea clave: cada capa tiene una responsabilidad y no invade a las demás.
   formateadores distintos por sección en vez de normalizar la base de
   datos — sería mejor resolverlo con una migración de unidades en algún
   momento, en vez de seguir arrastrando dos convenciones.
+- **Bug real, encontrado en la verificación manual de la portación de
+  cuentas de caja (sesión 2026-09-25), no corregido a petición del
+  usuario**: `confirmSalesOrder` (`lib/db/queries/sales-orders.ts`) pasa
+  `updated.totalPrice` tal cual a `recordCashMovement` — pero
+  `sales_orders.totalPrice` está en centavos (mismo legado que
+  `purchase_orders` de arriba), mientras `cash_movements.amount` espera
+  pesos directos. Cada venta confirmada por WhatsApp infla su ingreso en
+  caja 100x (ej. un pedido de $500 genera un ingreso de $50.000 en vez de
+  $500) — confirmado en vivo con el pedido #3 de prueba ($100 → "+$10.000"
+  en `/admin/cash`). El mismo defecto existía en `createPurchasePayment`
+  (pagos a distribuidores) y sí se corrigió en esa misma sesión
+  (`Math.round(data.amount / 100)` antes de `recordCashMovement`) — aplicar
+  el mismo fix acá es la corrección obvia, pendiente de que el usuario
+  decida qué hacer con los movimientos históricos ya insertados con el
+  monto inflado (2 en los datos de prueba actuales, posiblemente más si
+  hay pedidos de WhatsApp confirmados en datos reales).
 - El reporte de "Utilidad" (`/admin/reports`) usa el `purchasePrice`
   *actual* del producto como costo, no un snapshot histórico del costo al
   momento de cada venta (ese snapshot no se guarda en los items de venta).

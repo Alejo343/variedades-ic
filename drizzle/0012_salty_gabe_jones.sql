@@ -1,0 +1,1 @@
+ALTER TABLE "direct_sales" ADD COLUMN "payment_method" varchar(20);

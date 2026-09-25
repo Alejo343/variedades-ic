@@ -90,7 +90,7 @@ export async function createSettlement(sellerId: number, periodDate: string): Pr
   }
 }
 
-export async function markSettlementLiquidada(id: number): Promise<CreateSettlementResult> {
+export async function markSettlementLiquidada(id: number, accountId: number): Promise<CreateSettlementResult> {
   try {
     return await db.transaction(async (tx) => {
       const [settlement] = await tx.select().from(settlements).where(eq(settlements.id, id)).limit(1);
@@ -111,6 +111,7 @@ export async function markSettlementLiquidada(id: number): Promise<CreateSettlem
           type: "ingreso",
           amount: updated.amountDue,
           concept: `Liquidación vendedor #${updated.sellerId} — ${updated.periodDate}`,
+          accountId,
           sourceType: "settlement",
           sourceId: updated.id,
         });

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import * as XLSX from "xlsx";
 import type { Distributor } from "@/lib/db/schema";
+import { parseImportSheet, resolveImportRows } from "@/lib/domain/purchase-import";
 
-type SimpleProduct = { id: number; name: string; price: number };
+type SimpleProduct = { id: number; name: string; price: number; sku: string; slug: string; active: boolean };
 
 type Item = {
   productId: number;
@@ -22,8 +24,10 @@ function formatCOP(n: number) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n / 100);
 }
 
-export function PurchaseOrderForm({ distributors, products }: Props) {
+export function PurchaseOrderForm({ distributors, products: allProducts }: Props) {
   const router = useRouter();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const activeProducts = allProducts.filter((p) => p.active);
 
   const [form, setForm] = useState({
     distributorId: "" as string | number,
@@ -37,10 +41,13 @@ export function PurchaseOrderForm({ distributors, products }: Props) {
   const [itemCost, setItemCost] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importSummary, setImportSummary] = useState("");
+  const [importSkipped, setImportSkipped] = useState<{ rowNumber: number; reason: string }[]>([]);
 
   function addItem() {
     if (!selectedProduct) return;
-    const product = products.find((p) => p.id === Number(selectedProduct));
+    const product = activeProducts.find((p) => p.id === Number(selectedProduct));
     if (!product) return;
     if (items.some((i) => i.productId === product.id)) {
       setError("Ese producto ya está en la lista");
@@ -58,6 +65,68 @@ export function PurchaseOrderForm({ distributors, products }: Props) {
 
   function removeItem(productId: number) {
     setItems((prev) => prev.filter((i) => i.productId !== productId));
+  }
+
+  function mergeItem(item: Item) {
+    setItems((prev) => {
+      const existing = prev.find((i) => i.productId === item.productId);
+      if (existing) {
+        return prev.map((i) =>
+          i.productId === item.productId ? { ...i, quantity: i.quantity + item.quantity } : i,
+        );
+      }
+      return [...prev, item];
+    });
+  }
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setError("");
+    setImportSummary("");
+    setImportSkipped([]);
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const sheetRows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+      const { rows, skipped } = parseImportSheet(sheetRows);
+      const resolved = resolveImportRows(
+        rows,
+        allProducts.map((p) => ({ id: p.id, name: p.name, sku: p.sku, slug: p.slug })),
+      );
+
+      let created = 0;
+      for (const row of resolved) {
+        if (row.kind === "existing") {
+          mergeItem({ productId: row.productId, productName: row.name, quantity: row.quantity, unitCost: row.unitCost });
+        } else {
+          const res = await fetch("/api/admin/products", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: row.name, slug: row.slug, price: row.unitCost, purchasePrice: row.unitCost }),
+          });
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error?.formErrors?.[0] ?? `Error al crear el producto "${row.name}"`);
+          }
+          const product = await res.json();
+          created += 1;
+          mergeItem({ productId: product.id, productName: row.name, quantity: row.quantity, unitCost: row.unitCost });
+        }
+      }
+
+      setImportSummary(`${resolved.length} filas importadas, ${created} producto(s) nuevo(s) creado(s).`);
+      setImportSkipped(skipped);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al importar el archivo");
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
   }
 
   const total = items.reduce((sum, i) => sum + i.quantity * i.unitCost, 0);
@@ -171,7 +240,40 @@ export function PurchaseOrderForm({ distributors, products }: Props) {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col gap-4">
-        <h2 className="font-semibold text-gray-700">Productos</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold text-gray-700">Productos</h2>
+          <div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleImport}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={importing}
+              className="border border-gray-300 text-sm text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition disabled:opacity-60"
+            >
+              {importing ? "Importando..." : "Importar desde Excel"}
+            </button>
+          </div>
+        </div>
+
+        {importSummary && <p className="text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">{importSummary}</p>}
+        {importSkipped.length > 0 && (
+          <div className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+            <p className="font-medium">{importSkipped.length} fila(s) omitida(s):</p>
+            <ul className="list-disc list-inside">
+              {importSkipped.map((s) => (
+                <li key={s.rowNumber}>
+                  Fila {s.rowNumber}: {s.reason}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="flex gap-2 flex-wrap">
           <select
@@ -180,7 +282,7 @@ export function PurchaseOrderForm({ distributors, products }: Props) {
             className="flex-1 min-w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="">— Seleccionar producto —</option>
-            {products.map((p) => (
+            {activeProducts.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>

@@ -24,6 +24,7 @@ export function ProductForm({ categories, initial }: Props) {
     name: initial?.name ?? "",
     slug: initial?.slug ?? "",
     description: initial?.description ?? "",
+    distributorCode: initial?.distributorCode ?? "",
     price: initial?.price ?? 0,
     purchasePrice: initial?.purchasePrice ?? 0,
     categoryId: initial?.categoryId ?? null as number | null,
@@ -34,6 +35,7 @@ export function ProductForm({ categories, initial }: Props) {
     active: initial?.active ?? true,
     whatsappText: initial?.whatsappText ?? "",
   });
+  const [duplicateProduct, setDuplicateProduct] = useState<{ id: number; name: string } | null>(null);
 
   const [imgs, setImgs] = useState<Img[]>(
     initial?.images.map((i) => ({
@@ -83,6 +85,20 @@ export function ProductForm({ categories, initial }: Props) {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setDuplicateProduct(null);
+
+    if (form.distributorCode.trim()) {
+      const res = await fetch(
+        `/api/admin/products/by-distributor-code?code=${encodeURIComponent(form.distributorCode.trim())}`,
+      );
+      const match = await res.json();
+      if (match && match.id !== initial?.id) {
+        setDuplicateProduct(match);
+        setLoading(false);
+        setError(`Ya existe un producto con ese código de proveedor: ${match.name}`);
+        return;
+      }
+    }
 
     try {
       if (isEdit) {
@@ -215,6 +231,17 @@ export function ProductForm({ categories, initial }: Props) {
             />
           </div>
         )}
+
+        <div className="col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Código de proveedor <span className="font-normal text-gray-400">(opcional)</span>
+          </label>
+          <input
+            value={form.distributorCode}
+            onChange={(e) => setForm((f) => ({ ...f, distributorCode: e.target.value }))}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Precio de venta (COP)</label>
@@ -378,7 +405,22 @@ export function ProductForm({ categories, initial }: Props) {
         </button>
       </div>
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && (
+        <p className="text-sm text-red-500">
+          {error}
+          {duplicateProduct && (
+            <>
+              {" — "}
+              <a
+                href={`/admin/products/${duplicateProduct.id}/edit`}
+                className="text-blue-600 hover:text-blue-800 underline"
+              >
+                Ir a editar {duplicateProduct.name}
+              </a>
+            </>
+          )}
+        </p>
+      )}
 
       <div className="flex gap-3 pt-2">
         <button
