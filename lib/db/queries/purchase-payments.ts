@@ -99,12 +99,9 @@ export async function createPurchasePayment(
         ? await tx.select({ name: distributors.name }).from(distributors).where(eq(distributors.id, order.distributorId)).limit(1)
         : [null];
 
-      // purchase_payments.amount is in centavos (legacy unit, see CLAUDE.md
-      // "Inconsistencia de unidades monetarias"); cash_movements.amount is in
-      // whole pesos like every other cash source, so it needs converting.
       await recordCashMovement(tx, {
         type: "gasto",
-        amount: Math.round(data.amount / 100),
+        amount: data.amount,
         concept: `Pago a distribuidor${distributor ? ` ${distributor.name}` : ""} — pedido #${purchaseOrderId}`,
         accountId: data.accountId,
         sourceType: "purchase_payment",

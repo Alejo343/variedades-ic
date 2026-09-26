@@ -21,7 +21,7 @@ type Props = {
 };
 
 function formatCOP(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n / 100);
+  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 }
 
 export function PurchaseOrderForm({ distributors, products: allProducts }: Props) {
@@ -301,7 +301,7 @@ export function PurchaseOrderForm({ distributors, products: allProducts }: Props
             min={0}
             value={itemCost}
             onChange={(e) => setItemCost(Number(e.target.value))}
-            placeholder="Costo unit. (centavos)"
+            placeholder="Costo unit. (COP)"
             className="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button

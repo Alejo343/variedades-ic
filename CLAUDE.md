@@ -994,30 +994,52 @@ La idea clave: cada capa tiene una responsabilidad y no invade a las demás.
   las ventas cobradas del día): simplemente omite el movimiento de caja sin
   avisar. No se ha discutido con el usuario qué debería pasar en ese caso
   (¿la empresa le debe al vendedor? ¿se registra como gasto?).
-- Inconsistencia de unidades monetarias entre tablas: `purchase_orders`/
-  `purchase_payments` guardan pesos en centavos (legado desde antes del
-  pivote), mientras que `sales_orders`/`direct_sales`/`seller_sales`/
-  `cash_movements`/`products.purchasePrice`/`products.price` guardan pesos
-  directos. `/admin/reports` y `/admin/purchase-orders` lo compensan con
-  formateadores distintos por sección en vez de normalizar la base de
-  datos — sería mejor resolverlo con una migración de unidades en algún
-  momento, en vez de seguir arrastrando dos convenciones.
-- **Bug real, encontrado en la verificación manual de la portación de
-  cuentas de caja (sesión 2026-09-25), no corregido a petición del
-  usuario**: `confirmSalesOrder` (`lib/db/queries/sales-orders.ts`) pasa
-  `updated.totalPrice` tal cual a `recordCashMovement` — pero
-  `sales_orders.totalPrice` está en centavos (mismo legado que
-  `purchase_orders` de arriba), mientras `cash_movements.amount` espera
-  pesos directos. Cada venta confirmada por WhatsApp infla su ingreso en
-  caja 100x (ej. un pedido de $500 genera un ingreso de $50.000 en vez de
-  $500) — confirmado en vivo con el pedido #3 de prueba ($100 → "+$10.000"
-  en `/admin/cash`). El mismo defecto existía en `createPurchasePayment`
-  (pagos a distribuidores) y sí se corrigió en esa misma sesión
-  (`Math.round(data.amount / 100)` antes de `recordCashMovement`) — aplicar
-  el mismo fix acá es la corrección obvia, pendiente de que el usuario
-  decida qué hacer con los movimientos históricos ya insertados con el
-  monto inflado (2 en los datos de prueba actuales, posiblemente más si
-  hay pedidos de WhatsApp confirmados en datos reales).
+- **Resuelto (sesión 2026-09-25) — unidades monetarias normalizadas a pesos
+  directos en toda la base.** Historial de lo que se pensó que pasaba vs.
+  lo que realmente pasaba, por si ayuda a entender un cambio similar en el
+  futuro:
+  - `purchase_orders.totalCost`, `purchase_order_items.unitCost` y
+    `purchase_payments.amount` **sí** estaban genuinamente en centavos
+    (legado desde antes del pivote) — confirmado con los datos reales antes
+    de tocar nada. Se migraron a pesos directos en una transacción manual
+    (`ROUND(valor / 100.0)` en las tres columnas) más el `purchase_order_items`
+    del pedido de prueba creado el mismo día vía importación de Excel, que
+    por el bug de abajo había quedado en pesos en vez de centavos y hubo
+    que corregir primero para que la migración uniforme no lo dañara. Se
+    quitó el `/100` de todos los `formatCOP` de `/admin/purchase-orders`,
+    `/admin/distributors` y `/admin/reports` (el helper `formatCOPCentavos`
+    de reportes ya no existe, todo usa `formatCOP` sin conversión), y el
+    `Math.round(data.amount / 100)` que se le había agregado a
+    `createPurchasePayment` en la sesión anterior para compensar la
+    inconsistencia se quitó (ya no hace falta).
+  - `sales_orders.totalPrice`/`sales_order_items.unitPrice`, en cambio,
+    **nunca estuvieron en centavos** — `SalesOrderForm.tsx` arma cada item
+    con `unitPrice: product.price` (pesos) sin ninguna conversión, y
+    `lib/db/queries/reports.ts` ya sumaba `salesOrders.totalPrice` crudo
+    junto con `direct_sales`/`seller_sales` (pesos) para el reporte de
+    Ventas — siempre dio el número correcto. El bug real, documentado
+    incorrectamente en la sesión anterior como "`confirmSalesOrder` infla
+    el ingreso en caja 100x", era al revés: `SalesOrderForm.tsx`,
+    `sales-orders/page.tsx` y `sales-orders/[id]/page.tsx` tenían un
+    `formatCOP` que dividía por 100 (copiado del patrón de
+    `purchase-orders` sin ajustar), así que **esas tres pantallas
+    mostraban cada pedido de WhatsApp 100 veces más barato de lo real** —
+    la caja, que recibía el valor crudo sin dividir, era la que mostraba
+    el monto correcto todo este tiempo. Se corrigió quitando el `/100` de
+    esas tres pantallas; no hizo falta ninguna migración de datos porque
+    los valores guardados ya eran correctos.
+  - Como consecuencia de lo anterior, el bug de `createPurchasePayment`
+    generando un gasto en caja 100x inflado (documentado en la sesión
+    anterior) fue real y quedó corregido con la migración de arriba
+    (`amount` ya en pesos, sin necesidad de `Math.round(.../100)`).
+  - Verificado con `npm run test` (62/62) + `npm run lint` + `npm run
+    build` en verde, más flujo manual en navegador real: `/admin/purchase-orders`,
+    el detalle de cada pedido, `/admin/distributors`, `/admin/sales-orders`
+    y `/admin/reports` mostrando montos consistentes entre sí (ej. el
+    pedido de compra creado por importación de Excel mostrando
+    correctamente $22.000 en vez de $220; los pedidos de WhatsApp #1/#3
+    mostrando $50.000/$10.000 en sus propias pantallas en vez de $500/$100,
+    coincidiendo por fin con lo que ya mostraba `/admin/cash`).
 - El reporte de "Utilidad" (`/admin/reports`) usa el `purchasePrice`
   *actual* del producto como costo, no un snapshot histórico del costo al
   momento de cada venta (ese snapshot no se guarda en los items de venta).

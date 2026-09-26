@@ -12,7 +12,7 @@ type Item = {
 };
 
 function formatCOP(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n / 100);
+  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 }
 
 export function SalesOrderForm({ products }: { products: Product[] }) {

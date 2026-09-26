@@ -59,7 +59,7 @@ export function PaymentForm({ orderId, pending, accounts }: Props) {
           max={pending}
           value={amount}
           onChange={(e) => setAmount(Number(e.target.value))}
-          placeholder="Monto (centavos)"
+          placeholder="Monto (COP)"
           className="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <select

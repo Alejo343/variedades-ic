@@ -23,7 +23,7 @@ function formatCOP(n: number) {
     style: "currency",
     currency: "COP",
     maximumFractionDigits: 0,
-  }).format(n / 100);
+  }).format(n);
 }
 
 export default async function SalesOrderDetailPage({

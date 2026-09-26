@@ -12,10 +12,6 @@ function formatCOP(n: number) {
   return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 }
 
-function formatCOPCentavos(n: number) {
-  return formatCOP(n / 100);
-}
-
 function Card({ title, children, note }: { title: string; children: React.ReactNode; note?: string }) {
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -112,7 +108,7 @@ export default async function ReportsPage({
         <Card title="Compras" note="rango seleccionado">
           <div className="grid grid-cols-2 gap-4 mb-3">
             <Stat label="Pedidos" value={String(purchases.totalCount)} />
-            <Stat label="Total" value={formatCOPCentavos(purchases.totalAmount)} />
+            <Stat label="Total" value={formatCOP(purchases.totalAmount)} />
           </div>
           {purchases.byDistributor.length > 0 && (
             <table className="w-full text-xs">
@@ -121,7 +117,7 @@ export default async function ReportsPage({
                   <tr key={r.distributorId ?? "none"}>
                     <td className="py-1 text-gray-600">{r.distributorName ?? "— Sin distribuidor —"}</td>
                     <td className="py-1 text-right text-gray-500">{r.count}</td>
-                    <td className="py-1 text-right text-gray-800">{formatCOPCentavos(r.total)}</td>
+                    <td className="py-1 text-right text-gray-800">{formatCOP(r.total)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -180,7 +176,7 @@ export default async function ReportsPage({
                 {Array.from(payableBalances.entries()).map(([distributorId, pending]) => (
                   <tr key={distributorId}>
                     <td className="py-1 text-gray-600">{distributorMap.get(distributorId) ?? "—"}</td>
-                    <td className="py-1 text-right text-gray-800">{formatCOPCentavos(pending)}</td>
+                    <td className="py-1 text-right text-gray-800">{formatCOP(pending)}</td>
                   </tr>
                 ))}
               </tbody>
