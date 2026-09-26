@@ -35,8 +35,10 @@ export const createDirectSale = defineHandler({
     saleDate: utcTimestamp,
     accountUuid: rowUuid,
     notes,
-    // The income row in cash_movements (only written when the total is > 0).
-    cashMovementUuid: rowUuid,
+    // The income row in cash_movements — required whenever the total is > 0
+    // (a phone that omits it for a paid sale is a bug, not a valid zero-total
+    // sale, so that case is rejected below rather than silently skipped).
+    cashMovementUuid: rowUuid.optional(),
     items: z
       .array(z.object({ uuid: rowUuid, productUuid: rowUuid, quantity: z.number().int().min(1), unitPrice: z.number().int().min(0), movementUuid: rowUuid }))
       .min(1),
@@ -64,6 +66,7 @@ export const createDirectSale = defineHandler({
     }
 
     if (totalAmount > 0) {
+      if (!p.cashMovementUuid) throw new SyncRejection("Falta el movimiento de caja de la venta");
       await tx.execute(sql`
         INSERT INTO cash_movements (uuid, type, amount, concept, movement_date, source_type, source_id, account_id)
         VALUES (${p.cashMovementUuid}, 'ingreso', ${totalAmount}, ${`Venta en local #${saleId}`}, ${fromUtc(p.saleDate)}, 'direct_sale', ${saleId}, ${accountId})`);

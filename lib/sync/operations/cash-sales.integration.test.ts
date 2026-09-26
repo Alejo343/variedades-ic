@@ -73,6 +73,19 @@ describe.skipIf(!url)("caja, ventas en local y ajustes (Postgres real)", async (
     });
   });
 
+  it("total 0 no exige movimiento de caja; total > 0 sin cashMovementUuid se rechaza", async () => {
+    const free = await push("createDirectSale", {
+      uuid: u(), saleDate: "2026-09-21 11:30:00", accountUuid, items: [{ uuid: u(), productUuid, quantity: 1, unitPrice: 0, movementUuid: u() }],
+    });
+    expect(free.status).toBe("applied");
+
+    const paidWithoutCash = await push("createDirectSale", {
+      uuid: u(), saleDate: "2026-09-21 11:31:00", accountUuid, items: [{ uuid: u(), productUuid, quantity: 1, unitPrice: 5000, movementUuid: u() }],
+    });
+    expect(paidWithoutCash.status).toBe("rejected");
+    expect(paidWithoutCash.error).toMatch(/Falta el movimiento de caja/);
+  });
+
   it("una cuenta inexistente rechaza la venta completa sin descontar nada", async () => {
     const before = await stock();
     const saleUuid = u();

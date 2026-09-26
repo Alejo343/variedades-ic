@@ -99,6 +99,20 @@ describe.skipIf(!url)("entregas y liquidaciones (Postgres real)", async () => {
     expect(await q(`SELECT count(*)::int AS n FROM seller_sales WHERE seller_id = $1 AND settlement_id IS NULL`, [sellerId])).toEqual([{ n: 1 }]);
   });
 
+  it("liquidación con saldo 0 no exige movimiento de caja", async () => {
+    // A fresh seller with nothing pending, so the balance is guaranteed 0
+    // regardless of what earlier tests in this file left behind.
+    const emptySeller = await one(`INSERT INTO sellers (name, commission_type, commission_value) VALUES ($1, 'percentage', 1000) RETURNING id, uuid`, [`${tag}-empty`]);
+    const zeroUuid = u();
+    await push("createSettlement", { uuid: zeroUuid, sellerUuid: emptySeller.uuid, periodDate: "2026-09-23" });
+    expect(await one(`SELECT amount_due FROM settlements WHERE uuid = $1`, [zeroUuid])).toEqual({ amount_due: 0 });
+    const r = await push("markSettlementSettled", { settlementUuid: zeroUuid, accountUuid, settledAt: "2026-09-23 09:00:00" });
+    expect(r.status).toBe("applied");
+    expect(await one(`SELECT status FROM settlements WHERE uuid = $1`, [zeroUuid])).toEqual({ status: "liquidada" });
+    await q(`DELETE FROM settlements WHERE seller_id = $1`, [emptySeller.id]);
+    await q(`DELETE FROM sellers WHERE id = $1`, [emptySeller.id]);
+  });
+
   it("marcar liquidada: genera el ingreso en caja por lo que el vendedor entrega, una sola vez", async () => {
     const cashUuid = u();
     const r = await push("markSettlementSettled", { settlementUuid, accountUuid, settledAt: "2026-09-21 09:00:00", cashMovementUuid: cashUuid });

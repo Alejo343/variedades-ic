@@ -82,7 +82,15 @@ export const createSettlement = defineHandler({
 });
 
 export const markSettlementSettled = defineHandler({
-  schema: z.object({ settlementUuid: rowUuid, accountUuid: rowUuid, settledAt: utcTimestamp, cashMovementUuid: rowUuid }),
+  schema: z.object({
+    settlementUuid: rowUuid,
+    accountUuid: rowUuid,
+    settledAt: utcTimestamp,
+    // Required only when amount_due > 0 — same reasoning as createDirectSale's
+    // cashMovementUuid: a settlement that owes the seller nothing generates
+    // no income row, so the phone has nothing to name here.
+    cashMovementUuid: rowUuid.optional(),
+  }),
   async apply(tx, p) {
     const settlementId = await idByUuid(tx, "settlements", p.settlementUuid, "Liquidación");
     const accountId = await idByUuid(tx, "cash_accounts", p.accountUuid, "Cuenta");
@@ -95,6 +103,7 @@ export const markSettlementSettled = defineHandler({
 
     await tx.execute(sql`UPDATE settlements SET status = 'liquidada', settled_at = ${fromUtc(p.settledAt)} WHERE id = ${settlementId}`);
     if (s.amount_due > 0) {
+      if (!p.cashMovementUuid) throw new SyncRejection("Falta el movimiento de caja de la liquidación");
       // Same concept as the panel's markSettlementLiquidada.
       await tx.execute(sql`
         INSERT INTO cash_movements (uuid, type, amount, concept, movement_date, source_type, source_id, account_id)
