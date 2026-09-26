@@ -9,7 +9,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:db": "node --env-file=.env.local node_modules/vitest/vitest.mjs run lib/db"
+    "test:db": "node --env-file=.env.local node_modules/vitest/vitest.mjs run integration"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
