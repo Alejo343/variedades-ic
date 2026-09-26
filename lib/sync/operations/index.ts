@@ -1,4 +1,5 @@
 import type { OperationHandlers } from "../push";
+import { upsertCashAccount, upsertCategory, upsertDistributor, upsertProduct, upsertSeller } from "./catalog";
 import { createSellerLoss, createSellerReturn, createSellerSale } from "./seller";
 
 // Registry of the operations the server knows how to apply (sub-paso 7). A
@@ -8,4 +9,9 @@ export const syncHandlers: OperationHandlers = {
   createSellerSale,
   createSellerReturn,
   createSellerLoss,
+  upsertCategory,
+  upsertProduct,
+  upsertSeller,
+  upsertDistributor,
+  upsertCashAccount,
 };
