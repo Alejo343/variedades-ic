@@ -7,6 +7,9 @@ import Footer from './components/Footer'
 import { getCategoriesWithCount } from '@/lib/db/queries/categories'
 import { getFeaturedProducts, getHeroProduct } from '@/lib/db/queries/products'
 
+// Reads the DB: must render per request, not be frozen at build time.
+export const dynamic = 'force-dynamic'
+
 export default async function Home() {
   const [cats, featuredProds, heroRows] = await Promise.all([
     getCategoriesWithCount(),

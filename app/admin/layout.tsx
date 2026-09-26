@@ -1,6 +1,9 @@
 import { AdminNav } from "./_components/AdminNav";
 import { SignOutButton } from "./_components/SignOutButton";
 
+// Every admin page reads live DB data: render per request, never prerender at build time.
+export const dynamic = "force-dynamic";
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex bg-gray-100">
