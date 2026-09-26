@@ -118,6 +118,14 @@ export const sellerUserUpdateSchema = z
   })
   .refine((d) => d.password !== undefined || d.active !== undefined, "No hay nada que cambiar");
 
+// Sync login from the phone (sub-paso 5). No format rules on the username
+// here — only normalization — so the owner can sign in with their email as is.
+export const syncLoginSchema = z.object({
+  username: z.string().transform(normalizeUsername).pipe(z.string().min(1, "El usuario es requerido").max(100)),
+  password: z.string().min(1, "La contraseña es requerida").max(200),
+  deviceName: z.string().trim().min(1).max(100).optional(),
+});
+
 export const cashAccountSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   type: z.enum(["efectivo", "banco"]).optional().default("efectivo"),
@@ -220,6 +228,7 @@ export type InventoryAdjustmentInput = z.infer<typeof inventoryAdjustmentSchema>
 export type SellerInput = z.infer<typeof sellerSchema>;
 export type SellerUserCreateInput = z.infer<typeof sellerUserCreateSchema>;
 export type SellerUserUpdateInput = z.infer<typeof sellerUserUpdateSchema>;
+export type SyncLoginInput = z.infer<typeof syncLoginSchema>;
 export type CashAccountInput = z.infer<typeof cashAccountSchema>;
 export type CashMovementInput = z.infer<typeof cashMovementSchema>;
 export type DirectSaleItemInput = z.infer<typeof directSaleItemSchema>;

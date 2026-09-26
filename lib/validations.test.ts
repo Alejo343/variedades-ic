@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sellerUserCreateSchema, sellerUserUpdateSchema, toSlug } from "./validations";
+import { sellerUserCreateSchema, sellerUserUpdateSchema, syncLoginSchema, toSlug } from "./validations";
 
 describe("toSlug", () => {
   it("convierte a minúsculas", () => {
@@ -57,5 +57,21 @@ describe("sellerUserUpdateSchema", () => {
   it("rechaza un cambio vacío o una contraseña corta", () => {
     expect(sellerUserUpdateSchema.safeParse({}).success).toBe(false);
     expect(sellerUserUpdateSchema.safeParse({ password: "corta" }).success).toBe(false);
+  });
+});
+
+describe("syncLoginSchema", () => {
+  it("normaliza el usuario y acepta el correo del dueño tal cual", () => {
+    expect(syncLoginSchema.parse({ username: " Dueno+Tienda@Mail.com ", password: "x", deviceName: "Moto G" })).toEqual({
+      username: "dueno+tienda@mail.com",
+      password: "x",
+      deviceName: "Moto G",
+    });
+  });
+
+  it("exige usuario y contraseña; el nombre del celular es opcional", () => {
+    expect(syncLoginSchema.safeParse({ username: "  ", password: "x" }).success).toBe(false);
+    expect(syncLoginSchema.safeParse({ username: "maria", password: "" }).success).toBe(false);
+    expect(syncLoginSchema.parse({ username: "maria", password: "x" }).deviceName).toBeUndefined();
   });
 });
