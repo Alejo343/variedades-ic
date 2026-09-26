@@ -138,8 +138,11 @@ const SPECS: TableSpec[] = [
     select: () => `i.uuid, r.uuid AS "returnUuid", p.uuid AS "productUuid", i.quantity`,
   },
   {
-    table: "seller_losses", alias: "l", from: "seller_losses l JOIN sellers s ON s.id = l.seller_id", sellerFilter: "l.seller_id = $3",
-    select: () => `l.uuid, s.uuid AS "sellerUuid", l.type, ${ts("l.loss_date")} AS "lossDate", l.notes, ${ts("l.created_at")} AS "createdAt"`,
+    table: "seller_losses", alias: "l",
+    from: "seller_losses l JOIN sellers s ON s.id = l.seller_id LEFT JOIN settlements t ON t.id = l.settlement_id",
+    sellerFilter: "l.seller_id = $3",
+    select: () => `l.uuid, s.uuid AS "sellerUuid", l.type, ${ts("l.loss_date")} AS "lossDate", t.uuid AS "settlementUuid", l.notes,
+      ${ts("l.created_at")} AS "createdAt"`,
   },
   {
     table: "seller_loss_items", alias: "i",

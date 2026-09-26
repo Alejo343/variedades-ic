@@ -1,40 +1,50 @@
 import { db } from "../index";
 import { settlements, sellerSales, sellerLosses, sellerLossItems, sellers } from "../schema";
-import { and, eq, desc, sql } from "drizzle-orm";
+import { and, eq, desc, isNull, sql } from "drizzle-orm";
 import { calculateSettlement } from "@/lib/domain/settlement";
 import { canTransitionSettlement, type SettlementStatus } from "@/lib/domain/settlement-status";
 import { recordCashMovement } from "./cash";
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-async function aggregatePeriod(dbOrTx: typeof db | Tx, sellerId: number, periodDate: string) {
+// A settlement charges everything the seller still owes UP TO its date: every
+// sale and loss on or before periodDate that no earlier settlement included.
+// Anything that reached the server late (a phone that synced after the day
+// was settled) lands in the next settlement instead of being lost, and the
+// settlement_id marks (markIncludedInSettlement) keep anything from being
+// charged twice. Shared with the sync push (lib/sync/operations).
+const pendingSales = (sellerId: number, periodDate: string) =>
+  and(eq(sellerSales.sellerId, sellerId), sql`DATE(${sellerSales.saleDate}) <= ${periodDate}`, isNull(sellerSales.settlementId));
+const pendingLosses = (sellerId: number, periodDate: string) =>
+  and(eq(sellerLosses.sellerId, sellerId), sql`DATE(${sellerLosses.lossDate}) <= ${periodDate}`, isNull(sellerLosses.settlementId));
+
+export async function aggregatePeriod(dbOrTx: typeof db | Tx, sellerId: number, periodDate: string) {
   const [salesRow] = await dbOrTx
     .select({
       totalSales: sql<string>`COALESCE(SUM(${sellerSales.totalAmount}), 0)`,
       totalCommission: sql<string>`COALESCE(SUM(${sellerSales.commissionAmount}), 0)`,
     })
     .from(sellerSales)
-    .where(
-      and(
-        eq(sellerSales.sellerId, sellerId),
-        sql`DATE(${sellerSales.saleDate}) = ${periodDate}`,
-        sql`${sellerSales.settlementId} IS NULL`,
-      ),
-    );
+    .where(pendingSales(sellerId, periodDate));
 
   const [lossRow] = await dbOrTx
     .select({
       totalLosses: sql<string>`COALESCE(SUM(${sellerLossItems.quantity} * ${sellerLossItems.unitCost}), 0)`,
     })
     .from(sellerLossItems)
-    .leftJoin(sellerLosses, eq(sellerLossItems.lossId, sellerLosses.id))
-    .where(and(eq(sellerLosses.sellerId, sellerId), sql`DATE(${sellerLosses.lossDate}) = ${periodDate}`));
+    .innerJoin(sellerLosses, eq(sellerLossItems.lossId, sellerLosses.id))
+    .where(pendingLosses(sellerId, periodDate));
 
   return {
     totalSales: Number(salesRow.totalSales),
     totalCommission: Number(salesRow.totalCommission),
     totalLosses: Number(lossRow.totalLosses),
   };
+}
+
+export async function markIncludedInSettlement(tx: Tx, sellerId: number, periodDate: string, settlementId: number) {
+  await tx.update(sellerSales).set({ settlementId }).where(pendingSales(sellerId, periodDate));
+  await tx.update(sellerLosses).set({ settlementId }).where(pendingLosses(sellerId, periodDate));
 }
 
 export async function previewSettlement(sellerId: number, periodDate: string) {
@@ -72,16 +82,7 @@ export async function createSettlement(sellerId: number, periodDate: string): Pr
         })
         .returning();
 
-      await tx
-        .update(sellerSales)
-        .set({ settlementId: settlement.id })
-        .where(
-          and(
-            eq(sellerSales.sellerId, sellerId),
-            sql`DATE(${sellerSales.saleDate}) = ${periodDate}`,
-            sql`${sellerSales.settlementId} IS NULL`,
-          ),
-        );
+      await markIncludedInSettlement(tx, sellerId, periodDate, settlement.id);
 
       return { ok: true, settlement };
     });

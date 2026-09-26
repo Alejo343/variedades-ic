@@ -162,6 +162,13 @@
       "when": 1790402009583,
       "tag": "0022_sync_applied_operations",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1790403284420,
+      "tag": "0023_seller_losses_settlement",
+      "breakpoints": true
     }
   ]
 }

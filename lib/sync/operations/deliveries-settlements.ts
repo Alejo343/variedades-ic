@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { z } from "zod";
+import { aggregatePeriod, markIncludedInSettlement } from "@/lib/db/queries/settlements";
 import { calculateSettlement } from "@/lib/domain/settlement";
 import { canTransitionSettlement, type SettlementStatus } from "@/lib/domain/settlement-status";
 import { defineHandler, SyncRejection } from "../push";
@@ -7,8 +8,8 @@ import { changePrincipalStock, fromUtc, idByUuid, recordSellerMovement, rowUuid,
 
 // Seller deliveries and settlements from the owner's phone (sub-paso 7,
 // parte 3c). Settlement totals are always computed by the server from its own
-// data (same aggregation as the panel's createSettlement) — the phone's local
-// preview is replaced on the next pull.
+// data, with the panel's own aggregation (everything pending up to the date) —
+// the phone's local preview is replaced on the next pull.
 
 export const createSellerDelivery = defineHandler({
   schema: z.object({
@@ -68,30 +69,15 @@ export const createSettlement = defineHandler({
     const existing = await tx.execute(sql`SELECT id FROM settlements WHERE seller_id = ${sellerId} AND period_date = ${p.periodDate}`);
     if (existing.rows.length) throw new SyncRejection("Ya existe una liquidación para este vendedor en esta fecha");
 
-    // Same aggregation as the panel (lib/db/queries/settlements.ts#aggregatePeriod).
-    const sales = await tx.execute(sql`
-      SELECT COALESCE(SUM(total_amount), 0) AS total_sales, COALESCE(SUM(commission_amount), 0) AS total_commission
-      FROM seller_sales WHERE seller_id = ${sellerId} AND DATE(sale_date) = ${p.periodDate} AND settlement_id IS NULL`);
-    const losses = await tx.execute(sql`
-      SELECT COALESCE(SUM(i.quantity * i.unit_cost), 0) AS total_losses
-      FROM seller_loss_items i JOIN seller_losses l ON l.id = i.loss_id
-      WHERE l.seller_id = ${sellerId} AND DATE(l.loss_date) = ${p.periodDate}`);
-    const salesRow = sales.rows[0] as { total_sales: string; total_commission: string };
-    const totals = {
-      totalSales: Number(salesRow.total_sales),
-      totalCommission: Number(salesRow.total_commission),
-      totalLosses: Number((losses.rows[0] as { total_losses: string }).total_losses),
-    };
+    // Exactly the panel's rule (everything pending up to periodDate), shared code.
+    const totals = await aggregatePeriod(tx, sellerId, p.periodDate);
     const { amountDue } = calculateSettlement(totals);
 
     const inserted = await tx.execute(sql`
       INSERT INTO settlements (uuid, seller_id, period_date, total_sales, total_commission, total_losses, amount_due)
       VALUES (${p.uuid}, ${sellerId}, ${p.periodDate}, ${totals.totalSales}, ${totals.totalCommission}, ${totals.totalLosses}, ${amountDue})
       RETURNING id`);
-    const settlementId = (inserted.rows[0] as { id: number }).id;
-    await tx.execute(sql`
-      UPDATE seller_sales SET settlement_id = ${settlementId}
-      WHERE seller_id = ${sellerId} AND DATE(sale_date) = ${p.periodDate} AND settlement_id IS NULL`);
+    await markIncludedInSettlement(tx, sellerId, p.periodDate, (inserted.rows[0] as { id: number }).id);
   },
 });
 

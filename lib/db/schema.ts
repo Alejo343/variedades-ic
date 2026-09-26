@@ -323,6 +323,10 @@ export const sellerLosses = pgTable("seller_losses", {
   sellerId: integer("seller_id").notNull().references(() => sellers.id),
   type: varchar("type", { length: 10 }).notNull(),
   lossDate: timestamp("loss_date").defaultNow().notNull(),
+  // Set by the settlement that charged this loss (same as seller_sales), so a
+  // settlement can include every pending loss up to its date without counting
+  // one twice.
+  settlementId: integer("settlement_id").references(() => settlements.id),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
