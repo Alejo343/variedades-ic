@@ -30,12 +30,16 @@ export async function idByUuid(tx: Tx, table: UuidTable, uuid: string, label: st
 // operation already happened offline (see CLAUDE.md, "Fase 10").
 export async function changePrincipalStock(
   tx: Tx,
-  m: { uuid: string; productId: number; type: string; quantityDelta: number; sourceType: string; sourceId: number; occurredAt: string; unitCost?: number | null },
+  m: {
+    uuid: string; productId: number; type: string; quantityDelta: number; sourceType: string; sourceId: number | null;
+    occurredAt: string; unitCost?: number | null; reason?: string | null;
+  },
 ) {
   await tx.execute(sql`UPDATE products SET stock = stock + ${m.quantityDelta}, updated_at = now() WHERE id = ${m.productId}`);
   await tx.execute(sql`
-    INSERT INTO inventory_movements (uuid, product_id, owner_type, type, quantity_delta, unit_cost, source_type, source_id, created_at)
-    VALUES (${m.uuid}, ${m.productId}, 'principal', ${m.type}, ${m.quantityDelta}, ${m.unitCost ?? null}, ${m.sourceType}, ${m.sourceId}, ${fromUtc(m.occurredAt)})`);
+    INSERT INTO inventory_movements (uuid, product_id, owner_type, type, quantity_delta, unit_cost, reason, source_type, source_id, created_at)
+    VALUES (${m.uuid}, ${m.productId}, 'principal', ${m.type}, ${m.quantityDelta}, ${m.unitCost ?? null}, ${m.reason ?? null},
+            ${m.sourceType}, ${m.sourceId}, ${fromUtc(m.occurredAt)})`);
 }
 
 // Seller-ledger row (consigned inventory); never touches products.stock and
