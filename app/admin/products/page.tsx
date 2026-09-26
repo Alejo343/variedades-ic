@@ -53,7 +53,7 @@ export default async function ProductsPage() {
                 <td className="px-4 py-3 text-gray-800">{formatCOP(p.price)}</td>
                 <td
                   className={`px-4 py-3 font-medium ${
-                    p.stock === 0
+                    p.stock <= 0
                       ? "text-red-600"
                       : p.minStock > 0 && p.stock <= p.minStock
                         ? "text-orange-600"
@@ -61,6 +61,7 @@ export default async function ProductsPage() {
                   }`}
                 >
                   {p.stock}
+                  {p.stock < 0 && <span className="ml-1 text-xs font-normal">(negativo)</span>}
                 </td>
                 <td className="px-4 py-3">
                   <span

@@ -2,8 +2,9 @@ import { getAllCategories } from "@/lib/db/queries/categories";
 import { getAllProducts } from "@/lib/db/queries/products";
 import { getAllPurchaseOrders } from "@/lib/db/queries/purchase-orders";
 import { getAllSalesOrders } from "@/lib/db/queries/sales-orders";
-import { getLowStock, getOutOfStock } from "@/lib/db/queries/inventory";
+import { getLowStock, getNegativeStock, getOutOfStock } from "@/lib/db/queries/inventory";
 import { getCashBalance } from "@/lib/db/queries/cash";
+import Link from "next/link";
 
 function formatCOP(amount: number) {
   return new Intl.NumberFormat("es-CO", {
@@ -14,13 +15,14 @@ function formatCOP(amount: number) {
 }
 
 export default async function AdminDashboard() {
-  const [categories, products, purchaseOrders, salesOrders, lowStock, outOfStock, cashBalance] = await Promise.all([
+  const [categories, products, purchaseOrders, salesOrders, lowStock, outOfStock, negativeStock, cashBalance] = await Promise.all([
     getAllCategories(),
     getAllProducts(),
     getAllPurchaseOrders(),
     getAllSalesOrders(),
     getLowStock(),
     getOutOfStock(),
+    getNegativeStock(),
     getCashBalance(),
   ]);
 
@@ -46,6 +48,11 @@ export default async function AdminDashboard() {
         <StatCard label="Agotados" value={outOfStock.length} color="text-red-600" />
         <StatCard label="Compras pendientes" value={pendingPurchases} color="text-blue-600" />
       </div>
+      {negativeStock.length > 0 && (
+        <div className="mb-4">
+          <NegativeStockCard products={negativeStock} />
+        </div>
+      )}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard label="Ventas sin entregar" value={pendingSales} color="text-amber-600" />
         <StatCard
@@ -54,6 +61,35 @@ export default async function AdminDashboard() {
           color={cashBalance >= 0 ? "text-green-600" : "text-red-600"}
         />
       </div>
+    </div>
+  );
+}
+
+// Only rendered when there is at least one (see the check in the caller) —
+// lists the affected products directly, not just a count, since the owner's
+// next step is always "go fix these" (a manual adjustment in /admin/inventory
+// or a correction to the sync data that caused it).
+function NegativeStockCard({ products }: { products: { id: number; name: string; stock: number }[] }) {
+  return (
+    <div className="bg-red-50 border border-red-200 rounded-xl p-5">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-semibold text-red-700">
+          Stock negativo ({products.length}) — revisar y ajustar
+        </p>
+        <Link href="/admin/inventory" className="text-xs text-red-700 hover:underline">
+          Ir a Inventario
+        </Link>
+      </div>
+      <ul className="flex flex-col gap-1">
+        {products.map((p) => (
+          <li key={p.id} className="flex items-center justify-between text-sm">
+            <Link href={`/admin/products/${p.id}/edit`} className="text-gray-700 hover:underline">
+              {p.name}
+            </Link>
+            <span className="font-medium text-red-600">{p.stock}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

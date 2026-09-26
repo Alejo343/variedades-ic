@@ -107,6 +107,17 @@ export function getOutOfStock() {
     .where(and(eq(products.active, true), eq(products.stock, 0)));
 }
 
+// Stock only goes negative through the mobile sync (a seller phone accepts a
+// sale offline even when it would overdraw — see variedades-ic-mobile's
+// CLAUDE.md, "Fase 10"): the panel surfaces it so the owner corrects it with
+// a manual adjustment instead of discovering it by accident.
+export function getNegativeStock() {
+  return db
+    .select({ id: products.id, name: products.name, stock: products.stock })
+    .from(products)
+    .where(and(eq(products.active, true), sql`${products.stock} < 0`));
+}
+
 export async function generateProductSku(categoryName?: string | null): Promise<string> {
   const result = await db.execute<{ nextval: string }>(
     sql`SELECT nextval(${productSkuSeq.seqName}::regclass) AS nextval`,
