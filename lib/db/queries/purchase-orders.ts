@@ -1,7 +1,7 @@
 import { db } from "../index";
 import { purchaseOrders, purchaseOrderItems, distributors, products } from "../schema";
 import { eq, desc } from "drizzle-orm";
-import type { PurchaseOrderInput, PurchaseOrderItemInput } from "@/lib/validations";
+import type { PurchaseOrderInput, PurchaseOrderCreateInput } from "@/lib/validations";
 import { canTransitionPurchaseOrder, type PurchaseOrderStatus } from "@/lib/domain/order-status";
 import { recordPrincipalMovement } from "./inventory";
 
@@ -64,19 +64,30 @@ export async function getPurchaseOrderById(id: number) {
   return { ...order, items };
 }
 
-export function createPurchaseOrder(data: PurchaseOrderInput) {
-  return db.insert(purchaseOrders).values({
-    distributorId: data.distributorId ?? null,
-    status: data.status ?? "pendiente",
-    purchaseType: data.purchaseType ?? "contado",
-    expectedDate: data.expectedDate ?? null,
-    totalCost: data.totalCost ?? null,
-    notes: data.notes,
-  }).returning();
-}
+// totalCost is never trusted from the client — computed here from the items
+// actually inserted, in the same transaction, matching variedades-ic-mobile's
+// model (see CLAUDE.md "Total del pedido de compra").
+export function createPurchaseOrder(data: PurchaseOrderCreateInput) {
+  return db.transaction(async (tx) => {
+    const [order] = await tx
+      .insert(purchaseOrders)
+      .values({
+        distributorId: data.distributorId ?? null,
+        status: data.status ?? "pendiente",
+        purchaseType: data.purchaseType ?? "contado",
+        expectedDate: data.expectedDate ?? null,
+        notes: data.notes,
+      })
+      .returning();
 
-export function addPurchaseOrderItem(data: PurchaseOrderItemInput) {
-  return db.insert(purchaseOrderItems).values(data).returning();
+    let totalCost = 0;
+    for (const item of data.items) {
+      totalCost += item.quantity * item.unitCost;
+      await tx.insert(purchaseOrderItems).values({ orderId: order.id, ...item });
+    }
+
+    return tx.update(purchaseOrders).set({ totalCost }).where(eq(purchaseOrders.id, order.id)).returning();
+  });
 }
 
 export function updatePurchaseOrder(id: number, data: Partial<PurchaseOrderInput>) {

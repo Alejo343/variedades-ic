@@ -36,20 +36,27 @@ export const distributorSchema = z.object({
   active: z.boolean().optional().default(true),
 });
 
+// totalCost is never client-supplied — createPurchaseOrder computes it from
+// items in the same transaction (lib/db/queries/purchase-orders.ts),
+// matching the model already validated in variedades-ic-mobile. This schema
+// covers editing/transitioning an existing order and creation's header
+// fields; it never accepts totalCost.
 export const purchaseOrderSchema = z.object({
   distributorId: z.number().int().nullable().optional(),
   status: z.enum(["pendiente", "en_viaje", "recibido", "cancelado"]).optional(),
   purchaseType: z.enum(["contado", "credito"]).optional(),
   expectedDate: z.string().nullable().optional(),
-  totalCost: z.number().int().min(0).nullable().optional(),
   notes: z.string().optional(),
 });
 
-export const purchaseOrderItemSchema = z.object({
-  orderId: z.number().int(),
+export const purchaseOrderNewItemSchema = z.object({
   productId: z.number().int(),
   quantity: z.number().int().min(1),
   unitCost: z.number().int().min(0),
+});
+
+export const purchaseOrderCreateSchema = purchaseOrderSchema.extend({
+  items: z.array(purchaseOrderNewItemSchema).min(1, "Debe incluir al menos un producto"),
 });
 
 export const salesOrderSchema = z.object({
@@ -178,7 +185,8 @@ export type CategoryInput = z.infer<typeof categorySchema>;
 export type ProductInput = z.infer<typeof productSchema>;
 export type DistributorInput = z.infer<typeof distributorSchema>;
 export type PurchaseOrderInput = z.infer<typeof purchaseOrderSchema>;
-export type PurchaseOrderItemInput = z.infer<typeof purchaseOrderItemSchema>;
+export type PurchaseOrderNewItemInput = z.infer<typeof purchaseOrderNewItemSchema>;
+export type PurchaseOrderCreateInput = z.infer<typeof purchaseOrderCreateSchema>;
 export type SalesOrderInput = z.infer<typeof salesOrderSchema>;
 export type SalesOrderItemInput = z.infer<typeof salesOrderItemSchema>;
 export type InventoryAdjustmentInput = z.infer<typeof inventoryAdjustmentSchema>;

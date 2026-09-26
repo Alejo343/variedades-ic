@@ -831,6 +831,28 @@ COLUMN ... SET NOT NULL` en ambas tablas) y `purchaseOrderItemSchema`/
 paso se corrigió un bug real en las 3 pantallas de pedidos de WhatsApp
 (dividían por 100 al mostrar el total, sin que los datos estuvieran mal).
 
+**Follow-up — `purchase_orders.totalCost` deja de ser client-supplied**
+(sesión 2026-09-26, misma auditoría de schema contra el móvil): antes,
+`PurchaseOrderForm.tsx` calculaba el total en el cliente y lo mandaba tal
+cual en `POST /api/admin/purchase-orders`, y luego agregaba cada item con
+llamadas sueltas (`{addItem: {...}}`) sin manejo de error por request — si
+alguna fallaba a mitad de camino, el pedido quedaba con un `totalCost` que
+ya no coincidía con sus items reales. El usuario eligió que la web adoptara
+el cálculo automático del móvil: ahora `createPurchaseOrder`
+(`lib/db/queries/purchase-orders.ts`) recibe la cabecera **y** el array
+completo de items en un solo `POST`, y en una única transacción inserta la
+cabecera, inserta cada item, y calcula `totalCost` sumando lo que
+realmente se insertó — nunca confía en un valor que venga del cliente.
+`purchaseOrderSchema` perdió el campo `totalCost` (ya no se puede fijar ni
+siquiera vía el PUT genérico); se agregó `purchaseOrderCreateSchema`
+(cabecera + `items`) para la creación. Se eliminó `addPurchaseOrderItem` y
+la rama `addItem` de la API — ya no hacían falta, nada más los usaba. La
+importación de Excel (que arma el carrito en memoria antes de enviarlo)
+no necesitó ningún cambio. Verificado con `npm run test` (62/62) +
+`npm run lint` + `npm run build` en verde, más creación real en navegador
+(carrito manual y vía Excel) confirmando en la BD que `total_cost` coincide
+exactamente con la suma de los items insertados.
+
 **Follow-up — `type` de pérdida de vendedor a nivel de cabecera** (sesión
 2026-09-26, siguiendo la auditoría de schema contra el móvil): estaba en
 `seller_loss_items` (por línea), el móvil ya lo tenía en `seller_losses`

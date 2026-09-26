@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getAllPurchaseOrders, createPurchaseOrder, addPurchaseOrderItem } from "@/lib/db/queries/purchase-orders";
-import { purchaseOrderSchema, purchaseOrderItemSchema } from "@/lib/validations";
+import { getAllPurchaseOrders, createPurchaseOrder } from "@/lib/db/queries/purchase-orders";
+import { purchaseOrderCreateSchema } from "@/lib/validations";
 
 export async function GET() {
   const session = await auth();
@@ -16,17 +16,8 @@ export async function POST(req: Request) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const body = await req.json();
+  const parsed = purchaseOrderCreateSchema.safeParse(body);
 
-  if (body.addItem) {
-    const parsed = purchaseOrderItemSchema.safeParse(body.addItem);
-    if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-    }
-    const [item] = await addPurchaseOrderItem(parsed.data);
-    return NextResponse.json(item, { status: 201 });
-  }
-
-  const parsed = purchaseOrderSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }

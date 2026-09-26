@@ -147,36 +147,19 @@ export function PurchaseOrderForm({ distributors, products: allProducts }: Props
         distributorId: form.distributorId ? Number(form.distributorId) : null,
         purchaseType: form.purchaseType,
         expectedDate: form.expectedDate || null,
-        totalCost: total || null,
         notes: form.notes || undefined,
+        items: items.map((i) => ({ productId: i.productId, quantity: i.quantity, unitCost: i.unitCost })),
       }),
     });
+
+    setLoading(false);
 
     if (!orderRes.ok) {
       const data = await orderRes.json();
       setError(data.error?.formErrors?.[0] ?? "Error al crear el pedido");
-      setLoading(false);
       return;
     }
 
-    const order = await orderRes.json();
-
-    for (const item of items) {
-      await fetch("/api/admin/purchase-orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          addItem: {
-            orderId: order.id,
-            productId: item.productId,
-            quantity: item.quantity,
-            unitCost: item.unitCost || null,
-          },
-        }),
-      });
-    }
-
-    setLoading(false);
     router.push("/admin/purchase-orders");
     router.refresh();
   }
