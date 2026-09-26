@@ -1108,3 +1108,95 @@ npm run test:watch  # Vitest en modo watch
 `lib/validations.ts`). La verificación previa a dar algo por terminado es
 `npm run test` + `npm run lint` + `npm run build` en verde, más una pasada
 manual en `npm run dev` para los flujos que tocan la BD o la UI.
+
+## Despliegue a producción (VPS)
+
+Sitio en producción: **https://icvariedades.com** (y `www.`), desplegado el
+2026-09-25. Acceso al servidor: `ssh mivps` (Ubuntu 24.04, usuario root). El
+mismo VPS aloja otros proyectos — no tocar sus vhosts ni procesos PM2.
+
+**Cómo está montado:**
+
+- Código en `/var/www/variedades-ic`, clonado desde
+  `github.com/Alejo343/variedades-ic` (repo público). El servidor despliega
+  lo que esté en `origin/master` — hay que hacer push antes de desplegar.
+- App: PM2, proceso `variedades-ic` (`npm start -- -p 3008`), guardado con
+  `pm2 save` para arrancar con el sistema. Los puertos 3000–3007 los usan
+  otros proyectos.
+- Servidor web: **OpenLiteSpeed** (no nginx/apache). Vhost `variedades-ic`
+  en `/usr/local/lsws/conf/vhosts/variedades-ic/vhconf.conf`, registrado en
+  `httpd_config.conf` y mapeado en los listeners `Default` (:80) y
+  `Defaultssl` (:443). Hace proxy a `127.0.0.1:3008`, redirige HTTP→HTTPS,
+  y tiene un contexto `/uploads/` que OLS sirve directo desde
+  `public/uploads/` — necesario porque `next start` no sirve archivos
+  agregados a `public/` después del build (las imágenes subidas desde el
+  admin no se verían). Tras editar la config: `/usr/local/lsws/bin/lswsctrl restart`.
+- BD: PostgreSQL **16** en el VPS (en local es 18), base y rol
+  `variedades_ic` con contraseña propia. Producción arrancó **vacía**, sin
+  los datos de prueba locales (solo las cuentas de caja que siembra la
+  migración `0014`).
+- Variables: `/var/www/variedades-ic/.env.local` en el servidor (permisos
+  600, no versionado): `DATABASE_URL` y `NEXTAUTH_SECRET` propios de
+  producción, `NEXTAUTH_URL=https://icvariedades.com`, `AUTH_TRUST_HOST`;
+  `ADMIN_EMAIL`/`ADMIN_PASSWORD_HASH`/`WHATSAPP_NUMBER` copiados del
+  `.env.local` local (la contraseña del admin es por ahora la misma de
+  prueba — pendiente cambiarla por una definitiva).
+- SSL: Let's Encrypt vía `certbot --webroot -w /var/www/variedades-ic`
+  (vence 2026-12-25, renovación automática con `certbot.timer`). Se agregó
+  `/etc/letsencrypt/renewal-hooks/deploy/reload-openlitespeed.sh` para
+  reiniciar OLS tras cada renovación (antes no existía; aplica a todos los
+  sitios del VPS).
+
+**Redesplegar (en este orden):**
+
+```bash
+# local: tests + lint + build en verde, luego
+git push origin master
+
+# en el VPS
+ssh mivps
+cd /var/www/variedades-ic
+git pull
+export $(grep ^DATABASE_URL= .env.local) && npx drizzle-kit migrate   # ANTES del build
+npm ci && npm run build
+pm2 restart variedades-ic
+```
+
+Las migraciones van **antes** del build: si falta una tabla, el build falla
+al prerenderizar páginas que consultan la BD.
+
+**Lección del primer despliegue:** en `next start` las páginas sin API
+dinámica se prerenderizan en el build y quedan congeladas con los datos de
+ese momento — en `npm run dev` no se nota. La home (`app/page.tsx`) y todo
+`/admin` (`app/admin/layout.tsx`) llevan `export const dynamic =
+"force-dynamic"` por eso. Cualquier página nueva que lea la BD fuera de
+`/admin` y sin `searchParams`/params dinámicos necesita lo mismo. Para
+revisarlo: tras `npm run build`, `.next/prerender-manifest.json` solo debe
+listar rutas sin datos (`/_not-found`, `/favicon.ico`, etc.).
+
+## Sincronización con variedades-ic-mobile + roles (lado servidor)
+
+En construcción (desde la sesión 2026-09-25). El plan maestro, con las
+decisiones tomadas con el usuario y la tabla completa de sub-pasos, vive en
+el `CLAUDE.md` del repo móvil (sección "Fase 10 — Sincronización con el
+servidor + roles") — no se duplica aquí para que no se desincronicen. En
+resumen: el móvil sigue offline-first y sincroniza contra esta web vía
+endpoints nuevos `/api/sync/*` (login con token de dispositivo, pull por
+versión, push de operaciones idempotentes); hay dos roles (`owner` ve todo;
+`seller` solo su inventario, ventas, devoluciones y pérdidas); la base de
+producción arranca vacía; y las ventas que llegan por sync se aceptan aunque
+dejen el stock negativo (con alerta en el panel).
+
+Lo que cambia en este repo (sub-pasos marcados "web" en el plan maestro):
+
+- Columna `uuid` en todas las tablas que se sincronizan — la sync nunca usa
+  los `id` numéricos, que pasan a ser locales a cada base.
+- `sync_version` (trigger + secuencia) y `sync_tombstones` para responder
+  "qué cambió desde X".
+  Hecho en `0020_sync_version.sql` (triggers escritos a mano al final del
+  archivo); test contra Postgres real con `npm run test:db`.
+- Tablas `users` (reemplaza el admin único de `ADMIN_EMAIL`, que queda como
+  semilla del dueño) y `device_sessions`.
+- Rutas `/api/sync/login`, `/api/sync/pull`, `/api/sync/push` y subida de
+  fotos con token, aparte de `/api/admin/*` (esas siguen siendo del panel con
+  sesión de NextAuth).

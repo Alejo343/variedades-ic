@@ -1,10 +1,42 @@
-import { pgTable, serial, varchar, text, integer, boolean, timestamp, date, check, pgSequence, unique } from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, text, integer, boolean, timestamp, date, check, pgSequence, unique, uuid, bigint, index } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+
+// Sync identity of the row, shared with variedades-ic-mobile (see that repo's
+// CLAUDE.md, "Fase 10"): generated wherever the row is born — the phone or
+// here — and the only id sync ever uses; the serial `id` stays local to each
+// database. Not on sales_orders/sales_order_items (web-only, never synced).
+const syncUuid = () => uuid("uuid").defaultRandom().notNull().unique();
+
+// "What changed since X" for the mobile sync pull. Never written by app code:
+// the sync_bump_version trigger (drizzle/0020, hand-written) stamps it from
+// syncVersionSeq on every insert/update, holding an advisory lock so versions
+// commit in increasing order. The 0 default is only a placeholder the trigger
+// always overwrites.
+const syncVersion = () => bigint("sync_version", { mode: "number" }).default(0).notNull();
+
+export const syncVersionSeq = pgSequence("sync_version_seq", { startWith: 1, increment: 1 });
+
+// Rows physically deleted from a synced table (today only product_images,
+// replaced when a gallery is edited), so a pull can replay the delete —
+// written only by the sync_record_tombstone trigger.
+export const syncTombstones = pgTable(
+  "sync_tombstones",
+  {
+    id: serial("id").primaryKey(),
+    tableName: varchar("table_name", { length: 50 }).notNull(),
+    uuid: uuid("uuid").notNull(),
+    syncVersion: bigint("sync_version", { mode: "number" }).notNull(),
+    deletedAt: timestamp("deleted_at").defaultNow().notNull(),
+  },
+  (table) => [index("sync_tombstones_version_idx").on(table.syncVersion)],
+);
 
 export const productSkuSeq = pgSequence("product_sku_seq", { startWith: 1, increment: 1 });
 
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
+  uuid: syncUuid(),
+  syncVersion: syncVersion(),
   name: varchar("name", { length: 100 }).notNull(),
   slug: varchar("slug", { length: 100 }).notNull().unique(),
   description: text("description"),
@@ -16,6 +48,8 @@ export const categories = pgTable("categories", {
 
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
+  uuid: syncUuid(),
+  syncVersion: syncVersion(),
   name: varchar("name", { length: 200 }).notNull(),
   slug: varchar("slug", { length: 200 }).notNull().unique(),
   description: text("description"),
@@ -39,6 +73,8 @@ export const products = pgTable("products", {
 
 export const productImages = pgTable("product_images", {
   id: serial("id").primaryKey(),
+  uuid: syncUuid(),
+  syncVersion: syncVersion(),
   productId: integer("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
   url: varchar("url", { length: 500 }).notNull(),
   alt: varchar("alt", { length: 200 }),
@@ -48,6 +84,8 @@ export const productImages = pgTable("product_images", {
 
 export const distributors = pgTable("distributors", {
   id: serial("id").primaryKey(),
+  uuid: syncUuid(),
+  syncVersion: syncVersion(),
   name: varchar("name", { length: 200 }).notNull(),
   city: varchar("city", { length: 100 }),
   phone: varchar("phone", { length: 50 }),
@@ -58,6 +96,8 @@ export const distributors = pgTable("distributors", {
 
 export const purchaseOrders = pgTable("purchase_orders", {
   id: serial("id").primaryKey(),
+  uuid: syncUuid(),
+  syncVersion: syncVersion(),
   distributorId: integer("distributor_id").references(() => distributors.id),
   status: varchar("status", { length: 20 }).default("pendiente").notNull(),
   purchaseType: varchar("purchase_type", { length: 10 }).default("contado").notNull(),
@@ -72,6 +112,8 @@ export const purchaseOrders = pgTable("purchase_orders", {
 
 export const purchaseOrderItems = pgTable("purchase_order_items", {
   id: serial("id").primaryKey(),
+  uuid: syncUuid(),
+  syncVersion: syncVersion(),
   orderId: integer("order_id").notNull().references(() => purchaseOrders.id, { onDelete: "cascade" }),
   productId: integer("product_id").notNull().references(() => products.id),
   quantity: integer("quantity").notNull(),
@@ -102,6 +144,8 @@ export const inventoryMovements = pgTable(
   "inventory_movements",
   {
     id: serial("id").primaryKey(),
+    uuid: syncUuid(),
+    syncVersion: syncVersion(),
     productId: integer("product_id").notNull().references(() => products.id),
     ownerType: varchar("owner_type", { length: 10 }).notNull(),
     sellerId: integer("seller_id"),
@@ -118,6 +162,8 @@ export const inventoryMovements = pgTable(
 
 export const sellers = pgTable("sellers", {
   id: serial("id").primaryKey(),
+  uuid: syncUuid(),
+  syncVersion: syncVersion(),
   name: varchar("name", { length: 200 }).notNull(),
   phone: varchar("phone", { length: 50 }),
   city: varchar("city", { length: 100 }),
@@ -133,6 +179,8 @@ export const sellers = pgTable("sellers", {
 // balance (SUM of its own movements) reflects real money, not just a tag.
 export const cashAccounts = pgTable("cash_accounts", {
   id: serial("id").primaryKey(),
+  uuid: syncUuid(),
+  syncVersion: syncVersion(),
   name: varchar("name", { length: 100 }).notNull(),
   type: varchar("type", { length: 15 }).default("efectivo").notNull(),
   active: boolean("active").default(true).notNull(),
@@ -144,6 +192,8 @@ export const cashMovements = pgTable(
   "cash_movements",
   {
     id: serial("id").primaryKey(),
+    uuid: syncUuid(),
+    syncVersion: syncVersion(),
     type: varchar("type", { length: 10 }).notNull(),
     amount: integer("amount").notNull(),
     concept: varchar("concept", { length: 200 }).notNull(),
@@ -159,6 +209,8 @@ export const cashMovements = pgTable(
 
 export const directSales = pgTable("direct_sales", {
   id: serial("id").primaryKey(),
+  uuid: syncUuid(),
+  syncVersion: syncVersion(),
   saleDate: timestamp("sale_date").defaultNow().notNull(),
   totalAmount: integer("total_amount").default(0).notNull(),
   accountId: integer("account_id").notNull().references(() => cashAccounts.id),
@@ -170,6 +222,8 @@ export const directSaleItems = pgTable(
   "direct_sale_items",
   {
     id: serial("id").primaryKey(),
+    uuid: syncUuid(),
+    syncVersion: syncVersion(),
     saleId: integer("sale_id").notNull().references(() => directSales.id, { onDelete: "cascade" }),
     productId: integer("product_id").notNull().references(() => products.id),
     quantity: integer("quantity").notNull(),
@@ -184,6 +238,8 @@ export const directSaleItems = pgTable(
 
 export const sellerDeliveries = pgTable("seller_deliveries", {
   id: serial("id").primaryKey(),
+  uuid: syncUuid(),
+  syncVersion: syncVersion(),
   sellerId: integer("seller_id").notNull().references(() => sellers.id),
   deliveryDate: timestamp("delivery_date").defaultNow().notNull(),
   notes: text("notes"),
@@ -194,6 +250,8 @@ export const sellerDeliveryItems = pgTable(
   "seller_delivery_items",
   {
     id: serial("id").primaryKey(),
+    uuid: syncUuid(),
+    syncVersion: syncVersion(),
     deliveryId: integer("delivery_id").notNull().references(() => sellerDeliveries.id, { onDelete: "cascade" }),
     productId: integer("product_id").notNull().references(() => products.id),
     quantity: integer("quantity").notNull(),
@@ -204,6 +262,8 @@ export const sellerDeliveryItems = pgTable(
 
 export const sellerSales = pgTable("seller_sales", {
   id: serial("id").primaryKey(),
+  uuid: syncUuid(),
+  syncVersion: syncVersion(),
   sellerId: integer("seller_id").notNull().references(() => sellers.id),
   saleDate: timestamp("sale_date").defaultNow().notNull(),
   totalAmount: integer("total_amount").default(0).notNull(),
@@ -217,6 +277,8 @@ export const sellerSaleItems = pgTable(
   "seller_sale_items",
   {
     id: serial("id").primaryKey(),
+    uuid: syncUuid(),
+    syncVersion: syncVersion(),
     saleId: integer("sale_id").notNull().references(() => sellerSales.id, { onDelete: "cascade" }),
     productId: integer("product_id").notNull().references(() => products.id),
     quantity: integer("quantity").notNull(),
@@ -231,6 +293,8 @@ export const sellerSaleItems = pgTable(
 
 export const sellerReturns = pgTable("seller_returns", {
   id: serial("id").primaryKey(),
+  uuid: syncUuid(),
+  syncVersion: syncVersion(),
   sellerId: integer("seller_id").notNull().references(() => sellers.id),
   returnDate: timestamp("return_date").defaultNow().notNull(),
   notes: text("notes"),
@@ -241,6 +305,8 @@ export const sellerReturnItems = pgTable(
   "seller_return_items",
   {
     id: serial("id").primaryKey(),
+    uuid: syncUuid(),
+    syncVersion: syncVersion(),
     returnId: integer("return_id").notNull().references(() => sellerReturns.id, { onDelete: "cascade" }),
     productId: integer("product_id").notNull().references(() => products.id),
     quantity: integer("quantity").notNull(),
@@ -252,6 +318,8 @@ export const sellerReturnItems = pgTable(
 // incident, matching the model already validated in variedades-ic-mobile.
 export const sellerLosses = pgTable("seller_losses", {
   id: serial("id").primaryKey(),
+  uuid: syncUuid(),
+  syncVersion: syncVersion(),
   sellerId: integer("seller_id").notNull().references(() => sellers.id),
   type: varchar("type", { length: 10 }).notNull(),
   lossDate: timestamp("loss_date").defaultNow().notNull(),
@@ -263,6 +331,8 @@ export const sellerLossItems = pgTable(
   "seller_loss_items",
   {
     id: serial("id").primaryKey(),
+    uuid: syncUuid(),
+    syncVersion: syncVersion(),
     lossId: integer("loss_id").notNull().references(() => sellerLosses.id, { onDelete: "cascade" }),
     productId: integer("product_id").notNull().references(() => products.id),
     quantity: integer("quantity").notNull(),
@@ -275,6 +345,8 @@ export const settlements = pgTable(
   "settlements",
   {
     id: serial("id").primaryKey(),
+    uuid: syncUuid(),
+    syncVersion: syncVersion(),
     sellerId: integer("seller_id").notNull().references(() => sellers.id),
     periodDate: date("period_date").notNull(),
     totalSales: integer("total_sales").notNull(),
@@ -292,6 +364,8 @@ export const purchasePayments = pgTable(
   "purchase_payments",
   {
     id: serial("id").primaryKey(),
+    uuid: syncUuid(),
+    syncVersion: syncVersion(),
     purchaseOrderId: integer("purchase_order_id").notNull().references(() => purchaseOrders.id, { onDelete: "cascade" }),
     amount: integer("amount").notNull(),
     paidAt: timestamp("paid_at").defaultNow().notNull(),

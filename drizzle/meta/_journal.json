@@ -134,6 +134,20 @@
       "when": 1790388903976,
       "tag": "0018_material_yellow_claw",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790397804205,
+      "tag": "0019_mature_vertigo",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790398687603,
+      "tag": "0020_sync_version",
+      "breakpoints": true
     }
   ]
 }
