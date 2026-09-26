@@ -2,11 +2,11 @@ import type { OperationHandlers } from "../push";
 import { createSellerDelivery, createSettlement, markSettlementSettled } from "./deliveries-settlements";
 import { createCashMovement, createDirectSale, createInventoryAdjustment } from "./cash-sales";
 import { upsertCashAccount, upsertCategory, upsertDistributor, upsertProduct, upsertSeller } from "./catalog";
+import { createPurchaseOrder, createPurchasePayment, transitionPurchaseOrder } from "./purchases";
 import { createSellerLoss, createSellerReturn, createSellerSale } from "./seller";
 
-// Registry of the operations the server knows how to apply (sub-paso 7). A
-// type in SYNC_OPERATION_TYPES without a handler here is rejected as
-// "todavía no está disponible". Owner operations arrive in parte 3.
+// Registry of the operations the server knows how to apply (sub-paso 7) —
+// one handler per type in SYNC_OPERATION_TYPES (checked by a test).
 export const syncHandlers: OperationHandlers = {
   createSellerSale,
   createSellerReturn,
@@ -22,4 +22,7 @@ export const syncHandlers: OperationHandlers = {
   createSellerDelivery,
   createSettlement,
   markSettlementSettled,
+  createPurchaseOrder,
+  transitionPurchaseOrder,
+  createPurchasePayment,
 };
