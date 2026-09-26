@@ -49,7 +49,7 @@ export const purchaseOrderItemSchema = z.object({
   orderId: z.number().int(),
   productId: z.number().int(),
   quantity: z.number().int().min(1),
-  unitCost: z.number().int().min(0).nullable().optional(),
+  unitCost: z.number().int().min(0),
 });
 
 export const salesOrderSchema = z.object({
@@ -118,7 +118,7 @@ export const accountSelectionSchema = z.object({
 export const sellerDeliveryItemSchema = z.object({
   productId: z.number().int(),
   quantity: z.number().int().min(1),
-  unitCost: z.number().int().min(0).nullable().optional(),
+  unitCost: z.number().int().min(0),
 });
 
 export const sellerDeliverySchema = z.object({

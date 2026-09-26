@@ -75,7 +75,7 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   orderId: integer("order_id").notNull().references(() => purchaseOrders.id, { onDelete: "cascade" }),
   productId: integer("product_id").notNull().references(() => products.id),
   quantity: integer("quantity").notNull(),
-  unitCost: integer("unit_cost"),
+  unitCost: integer("unit_cost").notNull(),
 });
 
 export const salesOrders = pgTable("sales_orders", {
@@ -197,7 +197,7 @@ export const sellerDeliveryItems = pgTable(
     deliveryId: integer("delivery_id").notNull().references(() => sellerDeliveries.id, { onDelete: "cascade" }),
     productId: integer("product_id").notNull().references(() => products.id),
     quantity: integer("quantity").notNull(),
-    unitCost: integer("unit_cost"),
+    unitCost: integer("unit_cost").notNull(),
   },
   (table) => [check("delivery_quantity_positive", sql`${table.quantity} > 0`)],
 );

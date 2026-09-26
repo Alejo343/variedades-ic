@@ -120,6 +120,13 @@
       "when": 1790311098822,
       "tag": "0016_blue_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1790383116073,
+      "tag": "0017_tearful_bloodaxe",
+      "breakpoints": true
     }
   ]
 }

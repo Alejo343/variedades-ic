@@ -806,6 +806,24 @@ duplicado (comparación case-insensitive) sin bloquearse a sí mismo al
 editar, e importación de un `.xlsx` de prueba con una fila existente, una
 nueva y una inválida (fila "TOTAL") resuelta exactamente como se esperaba.
 
+**Follow-up — `unitCost` endurecido a `NOT NULL`** (misma sesión, tras
+auditar el schema contra el del móvil para preparar la unificación de
+datos): `purchase_order_items.unitCost` y `seller_delivery_items.unitCost`
+eran nullable en la web, `NOT NULL` en el móvil. Se verificaron los datos
+reales antes de decidir: `purchase_order_items` ya no tenía ninguna fila
+vacía (el formulario nunca deja pasar un pedido sin costo); las 5 filas de
+`seller_delivery_items` en `NULL` eran un artefacto de que esa columna se
+había restaurado hoy mismo sin backfill, no una posibilidad real del
+formulario (`DeliveryForm.tsx` siempre manda un número, mínimo 0). Se
+concluyó que el comportamiento real de la UI en ambos casos ya coincidía
+con lo que exige el móvil, así que se endureció la web para igualarlo (más
+barato que relajar el móvil, porque no cambia ningún comportamiento
+visible): migración `0017` (backfill de las filas legado a `0` + `ALTER
+COLUMN ... SET NOT NULL` en ambas tablas) y `purchaseOrderItemSchema`/
+`sellerDeliveryItemSchema` en `lib/validations.ts` dejaron de aceptar
+`unitCost` nulo. Verificado con `npm run test` (62/62) + `npm run lint` +
+`npm run build` en verde.
+
 **Nota de sesión**: no se tenía la contraseña del admin (`ADMIN_EMAIL` sí,
 solo el hash bcrypt en `.env.local`, no el texto plano) para hacer la
 verificación en navegador. A petición del usuario se generó un hash nuevo
