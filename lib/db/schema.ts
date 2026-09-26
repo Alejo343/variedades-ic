@@ -376,6 +376,43 @@ export const purchasePayments = pgTable(
   (table) => [check("purchase_payment_amount_positive", sql`${table.amount} > 0`)],
 );
 
+// Panel + mobile logins (see lib/domain/users.ts for the roles). Not synced to
+// the phone as a table — the app gets its own user in the login response.
+// The CHECKs make the role rules hold in the database itself: a seller is
+// always tied to exactly one sellers row, an owner never is, and a sellers
+// row has at most one login.
+export const users = pgTable(
+  "users",
+  {
+    id: serial("id").primaryKey(),
+    username: varchar("username", { length: 100 }).notNull().unique(),
+    name: varchar("name", { length: 200 }).notNull(),
+    passwordHash: text("password_hash").notNull(),
+    role: varchar("role", { length: 10 }).notNull(),
+    sellerId: integer("seller_id").references(() => sellers.id).unique(),
+    active: boolean("active").default(true).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    check("users_role_valid", sql`${table.role} IN ('owner', 'seller')`),
+    check("users_seller_iff_role_seller", sql`(${table.role} = 'seller') = (${table.sellerId} IS NOT NULL)`),
+  ],
+);
+
+// One row per phone signed in through the sync login. Only the SHA-256 of the
+// token is stored, so a database leak doesn't hand out working tokens.
+// Revoking (revokedAt) kills that phone's sync without touching the others.
+export const deviceSessions = pgTable("device_sessions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  deviceName: varchar("device_name", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+  revokedAt: timestamp("revoked_at"),
+});
+
 export type Category = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
 export type Product = typeof products.$inferSelect;
@@ -424,3 +461,7 @@ export type Settlement = typeof settlements.$inferSelect;
 export type NewSettlement = typeof settlements.$inferInsert;
 export type PurchasePayment = typeof purchasePayments.$inferSelect;
 export type NewPurchasePayment = typeof purchasePayments.$inferInsert;
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+export type DeviceSession = typeof deviceSessions.$inferSelect;
+export type NewDeviceSession = typeof deviceSessions.$inferInsert;

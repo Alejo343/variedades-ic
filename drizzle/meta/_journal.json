@@ -148,6 +148,13 @@
       "when": 1790398687603,
       "tag": "0020_sync_version",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790399029708,
+      "tag": "0021_users_roles",
+      "breakpoints": true
     }
   ]
 }
