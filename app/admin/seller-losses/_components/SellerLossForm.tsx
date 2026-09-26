@@ -7,10 +7,10 @@ type InventoryItem = { productId: number; productName: string | null; productPur
 
 type LossType = "perdida" | "dano" | "robo";
 
-type Row = { productId: number | ""; quantity: number; type: LossType; unitCost: number };
+type Row = { productId: number | ""; quantity: number; unitCost: number };
 
 function emptyRow(): Row {
-  return { productId: "", quantity: 1, type: "perdida", unitCost: 0 };
+  return { productId: "", quantity: 1, unitCost: 0 };
 }
 
 const TYPE_LABELS: Record<LossType, string> = {
@@ -22,6 +22,7 @@ const TYPE_LABELS: Record<LossType, string> = {
 export function SellerLossForm({ sellerId, inventory }: { sellerId: number; inventory: InventoryItem[] }) {
   const router = useRouter();
   const [rows, setRows] = useState<Row[]>([emptyRow()]);
+  const [type, setType] = useState<LossType>("perdida");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -50,7 +51,7 @@ export function SellerLossForm({ sellerId, inventory }: { sellerId: number; inve
 
     const items = rows
       .filter((r) => r.productId !== "")
-      .map((r) => ({ productId: r.productId as number, quantity: r.quantity, type: r.type, unitCost: r.unitCost }));
+      .map((r) => ({ productId: r.productId as number, quantity: r.quantity, unitCost: r.unitCost }));
 
     if (items.length === 0) {
       setLoading(false);
@@ -61,7 +62,7 @@ export function SellerLossForm({ sellerId, inventory }: { sellerId: number; inve
     const res = await fetch("/api/admin/seller-losses", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sellerId, items, notes }),
+      body: JSON.stringify({ sellerId, type, items, notes }),
     });
 
     setLoading(false);
@@ -83,6 +84,21 @@ export function SellerLossForm({ sellerId, inventory }: { sellerId: number; inve
       onSubmit={handleSubmit}
       className="bg-white rounded-xl shadow-sm p-6 max-w-3xl flex flex-col gap-4"
     >
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+        <select
+          value={type}
+          onChange={(e) => setType(e.target.value as LossType)}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          {(Object.keys(TYPE_LABELS) as LossType[]).map((t) => (
+            <option key={t} value={t}>
+              {TYPE_LABELS[t]}
+            </option>
+          ))}
+        </select>
+      </div>
+
       {inventory.length === 0 ? (
         <p className="text-sm text-gray-400">Este vendedor no tiene inventario asignado.</p>
       ) : (
@@ -93,7 +109,7 @@ export function SellerLossForm({ sellerId, inventory }: { sellerId: number; inve
                 value={row.productId}
                 onChange={(e) => handleProductChange(idx, e.target.value ? Number(e.target.value) : "")}
                 required
-                className="col-span-4 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="col-span-5 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Producto...</option>
                 {inventory.map((i) => (
@@ -111,24 +127,13 @@ export function SellerLossForm({ sellerId, inventory }: { sellerId: number; inve
                 required
                 className="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <select
-                value={row.type}
-                onChange={(e) => updateRow(idx, { type: e.target.value as LossType })}
-                className="col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {(Object.keys(TYPE_LABELS) as LossType[]).map((t) => (
-                  <option key={t} value={t}>
-                    {TYPE_LABELS[t]}
-                  </option>
-                ))}
-              </select>
               <input
                 type="number"
                 min={0}
                 value={row.unitCost}
                 onChange={(e) => updateRow(idx, { unitCost: Number(e.target.value) })}
                 placeholder="Costo unit."
-                className="col-span-3 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="col-span-4 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <button
                 type="button"

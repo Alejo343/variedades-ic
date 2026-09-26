@@ -824,6 +824,29 @@ COLUMN ... SET NOT NULL` en ambas tablas) y `purchaseOrderItemSchema`/
 `unitCost` nulo. Verificado con `npm run test` (62/62) + `npm run lint` +
 `npm run build` en verde.
 
+**Follow-up — normalización de unidades de dinero en compras** (sesión
+2026-09-25): ver la nota extensa más abajo en "Riesgos abiertos" —
+`purchase_orders.totalCost`, `purchase_order_items.unitCost` y
+`purchase_payments.amount` se migraron de centavos a pesos directos, y de
+paso se corrigió un bug real en las 3 pantallas de pedidos de WhatsApp
+(dividían por 100 al mostrar el total, sin que los datos estuvieran mal).
+
+**Follow-up — `type` de pérdida de vendedor a nivel de cabecera** (sesión
+2026-09-26, siguiendo la auditoría de schema contra el móvil): estaba en
+`seller_loss_items` (por línea), el móvil ya lo tenía en `seller_losses`
+(por reporte completo). El usuario decidió que la web adoptara el modelo
+del móvil, y como los 2 registros existentes eran de prueba, se eliminaron
+en vez de escribir una migración de datos (cada reporte ya tenía un solo
+tipo, así que tampoco había conflicto real que resolver). `sellerLosses`
+gana `type`; `sellerLossItems` lo pierde. `sellerLossSchema` (no
+`sellerLossItemSchema`) valida el campo ahora. `SellerLossForm.tsx`: el
+selector de tipo pasó de estar por fila a un solo selector arriba del
+carrito. `/admin/seller-losses` gana una columna "Tipo" (antes no se podía
+mostrar un tipo único por fila con el modelo viejo). Verificado con
+`npm run test` (62/62) + `npm run lint` + `npm run build` en verde, más
+registro real en navegador (Daño, 1 unidad) confirmando en la BD que
+`type` quedó en `seller_losses` y ya no en `seller_loss_items`.
+
 **Nota de sesión**: no se tenía la contraseña del admin (`ADMIN_EMAIL` sí,
 solo el hash bcrypt en `.env.local`, no el texto plano) para hacer la
 verificación en navegador. A petición del usuario se generó un hash nuevo

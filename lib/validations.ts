@@ -153,12 +153,12 @@ export const sellerReturnSchema = z.object({
 export const sellerLossItemSchema = z.object({
   productId: z.number().int(),
   quantity: z.number().int().min(1),
-  type: z.enum(["perdida", "dano", "robo"]),
   unitCost: z.number().int().min(0),
 });
 
 export const sellerLossSchema = z.object({
   sellerId: z.number().int(),
+  type: z.enum(["perdida", "dano", "robo"]),
   items: z.array(sellerLossItemSchema).min(1, "Debe incluir al menos un producto"),
   notes: z.string().optional(),
 });

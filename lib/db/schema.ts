@@ -248,9 +248,12 @@ export const sellerReturnItems = pgTable(
   (table) => [check("return_quantity_positive", sql`${table.quantity} > 0`)],
 );
 
+// type lives on the header (perdida/dano/robo) — one loss report is a single
+// incident, matching the model already validated in variedades-ic-mobile.
 export const sellerLosses = pgTable("seller_losses", {
   id: serial("id").primaryKey(),
   sellerId: integer("seller_id").notNull().references(() => sellers.id),
+  type: varchar("type", { length: 10 }).notNull(),
   lossDate: timestamp("loss_date").defaultNow().notNull(),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -263,7 +266,6 @@ export const sellerLossItems = pgTable(
     lossId: integer("loss_id").notNull().references(() => sellerLosses.id, { onDelete: "cascade" }),
     productId: integer("product_id").notNull().references(() => products.id),
     quantity: integer("quantity").notNull(),
-    type: varchar("type", { length: 10 }).notNull(),
     unitCost: integer("unit_cost").notNull(),
   },
   (table) => [check("loss_quantity_positive", sql`${table.quantity} > 0`)],

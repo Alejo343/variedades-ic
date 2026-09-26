@@ -15,6 +15,7 @@ export function getAllSellerLosses() {
       id: sellerLosses.id,
       sellerId: sellerLosses.sellerId,
       sellerName: sellers.name,
+      type: sellerLosses.type,
       lossDate: sellerLosses.lossDate,
       notes: sellerLosses.notes,
     })
@@ -34,7 +35,7 @@ export async function createSellerLoss(data: SellerLossInput): Promise<CreateSel
 
       const [sellerLoss] = await tx
         .insert(sellerLosses)
-        .values({ sellerId: data.sellerId, notes: data.notes ?? null })
+        .values({ sellerId: data.sellerId, type: data.type, notes: data.notes ?? null })
         .returning();
 
       for (const item of data.items) {
@@ -42,7 +43,7 @@ export async function createSellerLoss(data: SellerLossInput): Promise<CreateSel
           productId: item.productId,
           ownerType: "seller",
           sellerId: data.sellerId,
-          type: item.type,
+          type: data.type,
           quantityDelta: -item.quantity,
           unitCost: item.unitCost,
           sourceType: "seller_loss",
@@ -53,7 +54,6 @@ export async function createSellerLoss(data: SellerLossInput): Promise<CreateSel
           lossId: sellerLoss.id,
           productId: item.productId,
           quantity: item.quantity,
-          type: item.type,
           unitCost: item.unitCost,
         });
       }
