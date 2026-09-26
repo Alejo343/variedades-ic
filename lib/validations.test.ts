@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sellerUserCreateSchema, sellerUserUpdateSchema, syncLoginSchema, toSlug } from "./validations";
+import { sellerUserCreateSchema, sellerUserUpdateSchema, syncLoginSchema, syncPushSchema, toSlug } from "./validations";
 
 describe("toSlug", () => {
   it("convierte a minúsculas", () => {
@@ -73,5 +73,20 @@ describe("syncLoginSchema", () => {
     expect(syncLoginSchema.safeParse({ username: "  ", password: "x" }).success).toBe(false);
     expect(syncLoginSchema.safeParse({ username: "maria", password: "" }).success).toBe(false);
     expect(syncLoginSchema.parse({ username: "maria", password: "x" }).deviceName).toBeUndefined();
+  });
+});
+
+describe("syncPushSchema", () => {
+  const op = { id: "3f2a9c1e-7b4d-4e1a-9c2f-8d6b5a4e3f21", type: "createSellerSale", payload: { any: "thing" } };
+
+  it("acepta un lote de operaciones con id uuid y payload libre", () => {
+    expect(syncPushSchema.parse({ operations: [op] })).toEqual({ operations: [op] });
+  });
+
+  it("rechaza lotes vacíos, de más de 100, ids que no son uuid o ids repetidos", () => {
+    expect(syncPushSchema.safeParse({ operations: [] }).success).toBe(false);
+    expect(syncPushSchema.safeParse({ operations: Array.from({ length: 101 }, (_, i) => ({ ...op, id: `3f2a9c1e-7b4d-4e1a-9c2f-${String(i).padStart(12, "0")}` })) }).success).toBe(false);
+    expect(syncPushSchema.safeParse({ operations: [{ ...op, id: "7" }] }).success).toBe(false);
+    expect(syncPushSchema.safeParse({ operations: [op, op] }).success).toBe(false);
   });
 });

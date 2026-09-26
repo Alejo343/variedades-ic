@@ -413,6 +413,20 @@ export const deviceSessions = pgTable("device_sessions", {
   revokedAt: timestamp("revoked_at"),
 });
 
+// Every operation pushed by a phone, applied or rejected, keyed by the id the
+// phone generated (sub-paso 7). Makes push idempotent: a retried operation
+// (e.g. the response was lost) gets its first result back instead of being
+// applied twice. Unexpected server errors are NOT recorded, so they retry.
+export const syncAppliedOperations = pgTable("sync_applied_operations", {
+  opId: uuid("op_id").primaryKey(),
+  deviceSessionId: integer("device_session_id").notNull().references(() => deviceSessions.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  type: varchar("type", { length: 40 }).notNull(),
+  status: varchar("status", { length: 10 }).notNull(),
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [check("sync_applied_operations_status_valid", sql`${table.status} IN ('applied', 'rejected')`)]);
+
 export type Category = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
 export type Product = typeof products.$inferSelect;

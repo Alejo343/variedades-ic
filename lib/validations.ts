@@ -126,6 +126,17 @@ export const syncLoginSchema = z.object({
   deviceName: z.string().trim().min(1).max(100).optional(),
 });
 
+// A batch of operations pushed by a phone (sub-paso 7). Each payload is
+// validated later by its own handler (lib/sync/operations); here only the
+// envelope. Ids are generated on the phone and make the push idempotent.
+export const syncPushSchema = z.object({
+  operations: z
+    .array(z.object({ id: z.uuid(), type: z.string().min(1).max(40), payload: z.unknown() }))
+    .min(1)
+    .max(100)
+    .refine((ops) => new Set(ops.map((o) => o.id)).size === ops.length, "Operaciones con id repetido en el mismo lote"),
+});
+
 export const cashAccountSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   type: z.enum(["efectivo", "banco"]).optional().default("efectivo"),
@@ -229,6 +240,7 @@ export type SellerInput = z.infer<typeof sellerSchema>;
 export type SellerUserCreateInput = z.infer<typeof sellerUserCreateSchema>;
 export type SellerUserUpdateInput = z.infer<typeof sellerUserUpdateSchema>;
 export type SyncLoginInput = z.infer<typeof syncLoginSchema>;
+export type SyncPushInput = z.infer<typeof syncPushSchema>;
 export type CashAccountInput = z.infer<typeof cashAccountSchema>;
 export type CashMovementInput = z.infer<typeof cashMovementSchema>;
 export type DirectSaleItemInput = z.infer<typeof directSaleItemSchema>;
