@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeUsername } from "@/lib/domain/users";
 
 export const categorySchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
@@ -90,6 +91,32 @@ export const sellerSchema = z.object({
   active: z.boolean().optional().default(true),
   notes: z.string().optional(),
 });
+
+// App login of a seller (sub-paso 4 of the mobile sync). The username is
+// typed on a phone keyboard, so it's normalized and limited to plain ASCII.
+const usernameField = z
+  .string()
+  .transform(normalizeUsername)
+  .pipe(
+    z
+      .string()
+      .min(3, "El usuario debe tener al menos 3 caracteres")
+      .max(100)
+      .regex(/^[a-z0-9._@-]+$/, "Solo letras sin tildes, números y . _ @ -"),
+  );
+const passwordField = z.string().min(8, "La contraseña debe tener al menos 8 caracteres").max(200);
+
+export const sellerUserCreateSchema = z.object({
+  username: usernameField,
+  password: passwordField,
+});
+
+export const sellerUserUpdateSchema = z
+  .object({
+    password: passwordField.optional(),
+    active: z.boolean().optional(),
+  })
+  .refine((d) => d.password !== undefined || d.active !== undefined, "No hay nada que cambiar");
 
 export const cashAccountSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
@@ -191,6 +218,8 @@ export type SalesOrderInput = z.infer<typeof salesOrderSchema>;
 export type SalesOrderItemInput = z.infer<typeof salesOrderItemSchema>;
 export type InventoryAdjustmentInput = z.infer<typeof inventoryAdjustmentSchema>;
 export type SellerInput = z.infer<typeof sellerSchema>;
+export type SellerUserCreateInput = z.infer<typeof sellerUserCreateSchema>;
+export type SellerUserUpdateInput = z.infer<typeof sellerUserUpdateSchema>;
 export type CashAccountInput = z.infer<typeof cashAccountSchema>;
 export type CashMovementInput = z.infer<typeof cashMovementSchema>;
 export type DirectSaleItemInput = z.infer<typeof directSaleItemSchema>;

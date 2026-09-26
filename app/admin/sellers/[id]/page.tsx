@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSellerById } from "@/lib/db/queries/sellers";
 import { getSellerInventory } from "@/lib/db/queries/seller-inventory";
+import { getDeviceSessions, getUserBySellerId } from "@/lib/db/queries/users";
+import { SellerAccessCard } from "../_components/SellerAccessCard";
 
 function formatCommission(type: string, value: number) {
   return type === "percentage" ? `${(value / 100).toFixed(2)}%` : `$${value.toLocaleString("es-CO")}/u`;
@@ -13,12 +15,15 @@ export default async function SellerDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [[seller], inventory] = await Promise.all([
+  const [[seller], inventory, [user]] = await Promise.all([
     getSellerById(Number(id)),
     getSellerInventory(Number(id)),
+    getUserBySellerId(Number(id)),
   ]);
 
   if (!seller) notFound();
+
+  const sessions = user ? await getDeviceSessions(user.id) : [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -37,6 +42,18 @@ export default async function SellerDetailPage({
           Editar
         </Link>
       </div>
+
+      <SellerAccessCard
+        sellerId={seller.id}
+        user={user ? { username: user.username, active: user.active } : null}
+        sessions={sessions.map((s) => ({
+          id: s.id,
+          deviceName: s.deviceName,
+          createdAt: s.createdAt.toISOString(),
+          lastSeenAt: s.lastSeenAt.toISOString(),
+          revokedAt: s.revokedAt?.toISOString() ?? null,
+        }))}
+      />
 
       <div className="bg-white rounded-xl shadow-sm p-5">
         <h2 className="text-sm font-semibold text-gray-700 mb-3">
