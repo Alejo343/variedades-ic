@@ -1,4 +1,5 @@
 import type { OperationHandlers } from "../push";
+import { createSellerDelivery, createSettlement, markSettlementSettled } from "./deliveries-settlements";
 import { createCashMovement, createDirectSale, createInventoryAdjustment } from "./cash-sales";
 import { upsertCashAccount, upsertCategory, upsertDistributor, upsertProduct, upsertSeller } from "./catalog";
 import { createSellerLoss, createSellerReturn, createSellerSale } from "./seller";
@@ -18,4 +19,7 @@ export const syncHandlers: OperationHandlers = {
   createCashMovement,
   createDirectSale,
   createInventoryAdjustment,
+  createSellerDelivery,
+  createSettlement,
+  markSettlementSettled,
 };

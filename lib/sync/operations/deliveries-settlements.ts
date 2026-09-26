@@ -1,0 +1,119 @@
+import { sql } from "drizzle-orm";
+import { z } from "zod";
+import { calculateSettlement } from "@/lib/domain/settlement";
+import { canTransitionSettlement, type SettlementStatus } from "@/lib/domain/settlement-status";
+import { defineHandler, SyncRejection } from "../push";
+import { changePrincipalStock, fromUtc, idByUuid, recordSellerMovement, rowUuid, utcTimestamp } from "./shared";
+
+// Seller deliveries and settlements from the owner's phone (sub-paso 7,
+// parte 3c). Settlement totals are always computed by the server from its own
+// data (same aggregation as the panel's createSettlement) — the phone's local
+// preview is replaced on the next pull.
+
+export const createSellerDelivery = defineHandler({
+  schema: z.object({
+    uuid: rowUuid,
+    sellerUuid: rowUuid,
+    deliveryDate: utcTimestamp,
+    notes: z.string().max(2000).nullish(),
+    items: z
+      .array(
+        z.object({
+          uuid: rowUuid,
+          productUuid: rowUuid,
+          quantity: z.number().int().min(1),
+          unitCost: z.number().int().min(0),
+          principalMovementUuid: rowUuid,
+          sellerMovementUuid: rowUuid,
+        }),
+      )
+      .min(1),
+  }),
+  async apply(tx, p) {
+    const sellerId = await idByUuid(tx, "sellers", p.sellerUuid, "Vendedor");
+    const productIds = [];
+    for (const item of p.items) productIds.push(await idByUuid(tx, "products", item.productUuid, "Producto"));
+
+    const inserted = await tx.execute(sql`
+      INSERT INTO seller_deliveries (uuid, seller_id, delivery_date, notes)
+      VALUES (${p.uuid}, ${sellerId}, ${fromUtc(p.deliveryDate)}, ${p.notes ?? null})
+      RETURNING id`);
+    const deliveryId = (inserted.rows[0] as { id: number }).id;
+
+    for (const [i, item] of p.items.entries()) {
+      await tx.execute(sql`
+        INSERT INTO seller_delivery_items (uuid, delivery_id, product_id, quantity, unit_cost)
+        VALUES (${item.uuid}, ${deliveryId}, ${productIds[i]}, ${item.quantity}, ${item.unitCost})`);
+      // Two rows of the same ledger: out of the principal, into the seller.
+      await changePrincipalStock(tx, {
+        uuid: item.principalMovementUuid, productId: productIds[i], type: "entrega_vendedor", quantityDelta: -item.quantity,
+        unitCost: item.unitCost, sourceType: "seller_delivery", sourceId: deliveryId, occurredAt: p.deliveryDate,
+      });
+      await recordSellerMovement(tx, {
+        uuid: item.sellerMovementUuid, productId: productIds[i], sellerId, type: "entrega_vendedor", quantityDelta: item.quantity,
+        unitCost: item.unitCost, sourceType: "seller_delivery", sourceId: deliveryId, occurredAt: p.deliveryDate,
+      });
+    }
+  },
+});
+
+export const createSettlement = defineHandler({
+  schema: z.object({
+    uuid: rowUuid,
+    sellerUuid: rowUuid,
+    periodDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha con formato inválido"),
+  }),
+  async apply(tx, p) {
+    const sellerId = await idByUuid(tx, "sellers", p.sellerUuid, "Vendedor");
+    const existing = await tx.execute(sql`SELECT id FROM settlements WHERE seller_id = ${sellerId} AND period_date = ${p.periodDate}`);
+    if (existing.rows.length) throw new SyncRejection("Ya existe una liquidación para este vendedor en esta fecha");
+
+    // Same aggregation as the panel (lib/db/queries/settlements.ts#aggregatePeriod).
+    const sales = await tx.execute(sql`
+      SELECT COALESCE(SUM(total_amount), 0) AS total_sales, COALESCE(SUM(commission_amount), 0) AS total_commission
+      FROM seller_sales WHERE seller_id = ${sellerId} AND DATE(sale_date) = ${p.periodDate} AND settlement_id IS NULL`);
+    const losses = await tx.execute(sql`
+      SELECT COALESCE(SUM(i.quantity * i.unit_cost), 0) AS total_losses
+      FROM seller_loss_items i JOIN seller_losses l ON l.id = i.loss_id
+      WHERE l.seller_id = ${sellerId} AND DATE(l.loss_date) = ${p.periodDate}`);
+    const salesRow = sales.rows[0] as { total_sales: string; total_commission: string };
+    const totals = {
+      totalSales: Number(salesRow.total_sales),
+      totalCommission: Number(salesRow.total_commission),
+      totalLosses: Number((losses.rows[0] as { total_losses: string }).total_losses),
+    };
+    const { amountDue } = calculateSettlement(totals);
+
+    const inserted = await tx.execute(sql`
+      INSERT INTO settlements (uuid, seller_id, period_date, total_sales, total_commission, total_losses, amount_due)
+      VALUES (${p.uuid}, ${sellerId}, ${p.periodDate}, ${totals.totalSales}, ${totals.totalCommission}, ${totals.totalLosses}, ${amountDue})
+      RETURNING id`);
+    const settlementId = (inserted.rows[0] as { id: number }).id;
+    await tx.execute(sql`
+      UPDATE seller_sales SET settlement_id = ${settlementId}
+      WHERE seller_id = ${sellerId} AND DATE(sale_date) = ${p.periodDate} AND settlement_id IS NULL`);
+  },
+});
+
+export const markSettlementSettled = defineHandler({
+  schema: z.object({ settlementUuid: rowUuid, accountUuid: rowUuid, settledAt: utcTimestamp, cashMovementUuid: rowUuid }),
+  async apply(tx, p) {
+    const settlementId = await idByUuid(tx, "settlements", p.settlementUuid, "Liquidación");
+    const accountId = await idByUuid(tx, "cash_accounts", p.accountUuid, "Cuenta");
+    const current = await tx.execute(sql`
+      SELECT status, seller_id, amount_due, to_char(period_date, 'YYYY-MM-DD') AS period_date FROM settlements WHERE id = ${settlementId} FOR UPDATE`);
+    const s = current.rows[0] as { status: SettlementStatus; seller_id: number; amount_due: number; period_date: string };
+    if (!canTransitionSettlement(s.status, "liquidada")) {
+      throw new SyncRejection(`No se puede liquidar una liquidación en estado '${s.status}'`);
+    }
+
+    await tx.execute(sql`UPDATE settlements SET status = 'liquidada', settled_at = ${fromUtc(p.settledAt)} WHERE id = ${settlementId}`);
+    if (s.amount_due > 0) {
+      // Same concept as the panel's markSettlementLiquidada.
+      await tx.execute(sql`
+        INSERT INTO cash_movements (uuid, type, amount, concept, movement_date, source_type, source_id, account_id)
+        VALUES (${p.cashMovementUuid}, 'ingreso', ${s.amount_due}, ${`Liquidación vendedor #${s.seller_id} — ${s.period_date}`},
+                ${fromUtc(p.settledAt)}, 'settlement', ${settlementId}, ${accountId})`);
+    }
+  },
+});
