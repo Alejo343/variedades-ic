@@ -1174,6 +1174,30 @@ ese momento — en `npm run dev` no se nota. La home (`app/page.tsx`) y todo
 revisarlo: tras `npm run build`, `.next/prerender-manifest.json` solo debe
 listar rutas sin datos (`/_not-found`, `/favicon.ico`, etc.).
 
+**Bug real encontrado al desplegar la Fase 10 (sesión 2026-10-01-ish),
+afecta a cualquier secreto con `$` en `.env.local`**: `@next/env` (el
+cargador de variables de entorno de Next.js, tanto en `next build` como en
+`next start`) expande `$NOMBRE`/`${NOMBRE}` dentro de los valores como si
+fueran referencias a otra variable — igual que `dotenv-expand`. Un hash de
+bcrypt como `$2b$12$Zx00…/y` se lee como tres referencias
+(`$2b`, `$12`, `$Zx00…LfJG`), las tres indefinidas, que se reemplazan por
+texto vacío — solo sobrevive el `/y` final. El archivo en disco queda
+intacto (se ve perfecto con `cat`), el bug es silencioso: `ownerSeedFromEnv`
+siembra igual (sin validar longitud) una fila con `password_hash` de 2
+caracteres, y el login falla con el mismo mensaje genérico de siempre
+("email o contraseña incorrecto"), indistinguible de una contraseña mal
+escrita. Pasó justo en el despliegue de la Fase 10 al rotar
+`ADMIN_PASSWORD_HASH` del VPS y reiniciar — no había pasado en local porque
+esa fila ya existía de una sesión anterior y nunca se reinsertó tras el
+cambio. **Corrección**: escapar cada `$` del valor como `\$` en
+`.env.local` (`\$2b\$12\$Zx00…`) — Next.js lo deja literal así. Si el bug ya
+sembró una fila rota, escapar el archivo no la corrige sola (`ownerSeedFromEnv`
+no resiembra si ya existe un dueño) — hace falta un `UPDATE users SET
+password_hash = '<hash correcto>' WHERE username = '<email>'` a mano.
+**Cualquier secreto futuro que pueda contener `$` (otro hash, una
+contraseña generada al azar, etc.) debe escaparse igual al escribirlo en
+`.env.local`, en el VPS y en local.**
+
 ## Sincronización con variedades-ic-mobile + roles (lado servidor)
 
 En construcción (desde la sesión 2026-09-25). El plan maestro, con las
