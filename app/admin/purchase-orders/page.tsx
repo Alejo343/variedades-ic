@@ -1,111 +1,97 @@
 import Link from "next/link";
+import { Plus, ShoppingCart } from "lucide-react";
 import { getAllPurchaseOrders } from "@/lib/db/queries/purchase-orders";
+import { Badge, ButtonLink, EmptyState, FilterTabs, Page, PageHeader, StatusBadge } from "../_components/ui";
+import { formatCOP, formatDate } from "../_lib/format";
 
-const STATUS_STYLES: Record<string, string> = {
-  pendiente: "bg-yellow-100 text-yellow-700",
-  en_viaje: "bg-blue-100 text-blue-700",
-  recibido: "bg-green-100 text-green-700",
-  cancelado: "bg-gray-100 text-gray-500",
-};
+const STATUSES = [
+  ["pendiente", "Pendientes"],
+  ["en_viaje", "En viaje"],
+  ["recibido", "Recibidos"],
+  ["cancelado", "Cancelados"],
+] as const;
 
-const STATUS_LABELS: Record<string, string> = {
-  pendiente: "Pendiente",
-  en_viaje: "En viaje",
-  recibido: "Recibido",
-  cancelado: "Cancelado",
-};
-
-function formatCOP(n: number) {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    maximumFractionDigits: 0,
-  }).format(n);
-}
-
-export default async function PurchaseOrdersPage() {
+export default async function PurchaseOrdersPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+  const { status = "" } = await searchParams;
   const orders = await getAllPurchaseOrders();
+  const rows = status ? orders.filter((o) => o.status === status) : orders;
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Pedidos de compra</h1>
-        <Link
-          href="/admin/purchase-orders/new"
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
-        >
-          + Nuevo pedido
-        </Link>
-      </div>
+    <Page>
+      <PageHeader
+        eyebrow="Compras"
+        title="Pedidos de compra"
+        description="Mercancía pedida a distribuidores: pendiente → en viaje → recibido (suma al stock)."
+        actions={
+          <ButtonLink href="/admin/purchase-orders/new" variant="primary" icon={Plus}>
+            Nuevo pedido
+          </ButtonLink>
+        }
+      />
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">#</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Distribuidor</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Estado</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Tipo</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">F. esperada</th>
-              <th className="text-right px-5 py-3 font-medium text-gray-600">Total</th>
-              <th className="px-5 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {orders.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-5 py-8 text-center text-gray-400">
-                  No hay pedidos de compra registrados
-                </td>
-              </tr>
-            )}
-            {orders.map((o) => (
-              <tr key={o.id} className="hover:bg-gray-50 transition">
-                <td className="px-5 py-3 text-gray-500">#{o.id}</td>
-                <td className="px-5 py-3 font-medium text-gray-800">
-                  {o.distributorName ?? "—"}
-                </td>
-                <td className="px-5 py-3">
-                  <span
-                    className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                      STATUS_STYLES[o.status] ?? "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {STATUS_LABELS[o.status] ?? o.status}
-                  </span>
-                </td>
-                <td className="px-5 py-3">
-                  <span
-                    className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                      o.purchaseType === "credito"
-                        ? "bg-purple-100 text-purple-700"
-                        : "bg-gray-100 text-gray-600"
-                    }`}
-                  >
-                    {o.purchaseType === "credito" ? "Crédito" : "Contado"}
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-gray-600">
-                  {o.expectedDate
-                    ? new Date(o.expectedDate).toLocaleDateString("es-CO")
-                    : "—"}
-                </td>
-                <td className="px-5 py-3 text-right text-gray-700">
-                  {o.totalCost ? formatCOP(o.totalCost) : "—"}
-                </td>
-                <td className="px-5 py-3 text-right">
-                  <Link
-                    href={`/admin/purchase-orders/${o.id}`}
-                    className="text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    Ver
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="adm-card overflow-hidden">
+        <div className="p-4 border-b border-[var(--adm-line)]">
+          <FilterTabs
+            basePath="/admin/purchase-orders"
+            param="status"
+            current={status}
+            options={[
+              { value: "", label: "Todos", count: orders.length },
+              ...STATUSES.map(([value, label]) => ({ value, label, count: orders.filter((o) => o.status === value).length })),
+            ]}
+          />
+        </div>
+        {rows.length === 0 ? (
+          <EmptyState icon={ShoppingCart} title="No hay pedidos de compra" />
+        ) : (
+          <div className="adm-table-wrap">
+            <table className="adm-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Distribuidor</th>
+                  <th>Estado</th>
+                  <th>Pago</th>
+                  <th>Fecha esperada</th>
+                  <th className="t-right">Total</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((o) => (
+                  <tr key={o.id}>
+                    <td className="num text-[var(--adm-ink-3)]">#{o.id}</td>
+                    <td>
+                      <Link href={`/admin/purchase-orders/${o.id}`} className="t-strong hover:underline underline-offset-4">
+                        {o.distributorName ?? "Sin distribuidor"}
+                      </Link>
+                    </td>
+                    <td>
+                      <StatusBadge kind="purchase" status={o.status} />
+                    </td>
+                    <td>
+                      {o.purchaseType === "credito" ? (
+                        <Badge tone="violet" plain>
+                          Crédito
+                        </Badge>
+                      ) : (
+                        <Badge plain>Contado</Badge>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap">{formatDate(o.expectedDate)}</td>
+                    <td className="t-right num t-strong">{o.totalCost ? formatCOP(o.totalCost) : "—"}</td>
+                    <td className="t-right">
+                      <Link href={`/admin/purchase-orders/${o.id}`} className="adm-link text-[13px]">
+                        Ver
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-    </div>
+    </Page>
   );
 }

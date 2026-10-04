@@ -1,10 +1,11 @@
+import { Page, PageHeader } from "../../_components/ui";
 import { CategoryForm } from "../_components/CategoryForm";
 
 export default function NewCategoryPage() {
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Nueva categoría</h1>
+    <Page>
+      <PageHeader back={{ href: "/admin/categories", label: "Categorías" }} title="Nueva categoría" />
       <CategoryForm />
-    </div>
+    </Page>
   );
 }

@@ -41,6 +41,23 @@ Single-page marketing site for **IC Variedades** (a Colombian store selling tech
 
 All animations respect `prefers-reduced-motion`.
 
+### Panel admin — sistema de diseño (rediseño 2026-10-03)
+
+- Estilos en `app/globals.css`, sección "ADMIN PANEL", todo bajo la clase `.adm`
+  (tokens `--adm-*`, clases `adm-card`, `adm-btn(-primary|-brand|-ok|-danger|-ghost)`,
+  `adm-input`, `adm-label`, `adm-table`, `adm-badge-*`, `adm-alert-*`, `adm-seg`).
+  Dentro de `.adm` la paleta gray/blue de Tailwind está remapeada.
+- Fuentes del admin (en `app/admin/layout.tsx`): Bricolage Grotesque (títulos) e
+  IBM Plex Mono (cifras, clase `num`).
+- Componentes compartidos: `app/admin/_components/ui.tsx` (`Page`, `PageHeader`,
+  `Card`, `Stat`, `Badge`, `StatusBadge`, `EmptyState`, `FilterTabs`,
+  `StatusTimeline`…), `Cart.tsx` (buscador de productos con teclado/SKU + ticket,
+  usado por todos los formularios de items), `SellerOperationForm.tsx` (venta /
+  devolución / pérdida de vendedor), `AdminShell.tsx` (sidebar, menú móvil,
+  "Nuevo", buscador Ctrl+K) y `SalesChart.tsx`.
+- Navegación en `app/admin/_lib/nav.ts`; formateo de dinero/fechas en
+  `app/admin/_lib/format.ts` (no redefinir `formatCOP` por página).
+
 ### Next.js version note
 
 This project uses Next.js **16** (see `package.json`). APIs and conventions may differ from your training data — consult `node_modules/next/dist/docs/` for the authoritative reference before writing Next.js-specific code.

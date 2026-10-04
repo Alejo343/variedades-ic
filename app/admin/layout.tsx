@@ -1,30 +1,38 @@
+import { Bricolage_Grotesque, IBM_Plex_Mono } from "next/font/google";
 import { auth } from "@/lib/auth";
-import { AdminNav } from "./_components/AdminNav";
-import { SignOutButton } from "./_components/SignOutButton";
+import { AdminShell } from "./_components/AdminShell";
 
 // Every admin page reads live DB data: render per request, never prerender at build time.
 export const dynamic = "force-dynamic";
 
+const display = Bricolage_Grotesque({
+  variable: "--font-adm-display",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const mono = IBM_Plex_Mono({
+  variable: "--font-adm-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  display: "swap",
+});
+
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const fonts = `${display.variable} ${mono.variable}`;
+
   // Without a session the proxy only lets /admin/login through: render it bare, no nav.
   const session = await auth();
-  if (!session) return <>{children}</>;
+  if (!session) return <div className={fonts}>{children}</div>;
+
+  const user = {
+    name: session.user?.name ?? "Administrador",
+    email: session.user?.email ?? "",
+  };
 
   return (
-    <div className="min-h-screen flex bg-gray-100">
-      <aside className="w-56 bg-white shadow-sm flex flex-col shrink-0">
-        <div className="px-6 py-5 border-b border-gray-100">
-          <span className="font-bold text-gray-800 text-base">IC Variedades</span>
-          <p className="text-xs text-gray-400 mt-0.5">Panel Admin</p>
-        </div>
-        <AdminNav />
-        <div className="px-3 py-4 border-t border-gray-100">
-          <SignOutButton />
-        </div>
-      </aside>
-      <main className="flex-1 p-8 overflow-y-auto min-h-screen">
-        {children}
-      </main>
+    <div className={fonts}>
+      <AdminShell user={user}>{children}</AdminShell>
     </div>
   );
 }

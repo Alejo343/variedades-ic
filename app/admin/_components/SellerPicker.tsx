@@ -1,29 +1,47 @@
-"use client";
+import Link from "next/link";
+import { ChevronRight, Users } from "lucide-react";
+import { EmptyState } from "./ui";
 
-import { useRouter } from "next/navigation";
+type Seller = { id: number; name: string; city?: string | null };
 
-type Seller = { id: number; name: string };
-
+/** Step 1 of every per-seller flow: pick the seller (links to `${basePath}?sellerId=`). */
 export function SellerPicker({ sellers, basePath }: { sellers: Seller[]; basePath: string }) {
-  const router = useRouter();
-
+  if (sellers.length === 0) {
+    return (
+      <div className="adm-card">
+        <EmptyState icon={Users} title="No hay vendedores activos" description="Crea un vendedor primero desde la sección Vendedores." />
+      </div>
+    );
+  }
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6 max-w-md">
-      <label className="block text-sm font-medium text-gray-700 mb-1">Vendedor</label>
-      <select
-        defaultValue=""
-        onChange={(e) => {
-          if (e.target.value) router.push(`${basePath}?sellerId=${e.target.value}`);
-        }}
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-      >
-        <option value="">Selecciona un vendedor...</option>
-        {sellers.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-          </option>
-        ))}
-      </select>
+    <div>
+      <p className="adm-eyebrow mb-3">Elige el vendedor</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+        {sellers.map((s) => {
+          const initials = s.name
+            .split(/\s+/)
+            .map((w) => w[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase();
+          return (
+            <Link
+              key={s.id}
+              href={`${basePath}?sellerId=${s.id}`}
+              className="adm-card group flex items-center gap-3 p-4 transition hover:shadow-md hover:border-[var(--adm-line-strong)]"
+            >
+              <span className="w-10 h-10 rounded-full grid place-items-center bg-[#16171b] text-white text-[13px] font-semibold shrink-0">
+                {initials}
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block font-medium truncate">{s.name}</span>
+                {s.city && <span className="block text-[12.5px] text-[var(--adm-ink-3)]">{s.city}</span>}
+              </span>
+              <ChevronRight size={18} className="text-[var(--adm-ink-3)] group-hover:translate-x-0.5 transition" />
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -42,7 +42,7 @@ export function LiquidateButton({ id, accounts }: { id: number; accounts: Accoun
         <select
           value={accountId}
           onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : "")}
-          className="border border-gray-300 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="adm-input h-8 text-[13px] w-36"
         >
           <option value="">Cuenta...</option>
           {accounts.map((a) => (
@@ -55,12 +55,12 @@ export function LiquidateButton({ id, accounts }: { id: number; accounts: Accoun
           type="button"
           onClick={handleClick}
           disabled={loading}
-          className="text-blue-600 hover:text-blue-800 font-medium text-sm disabled:opacity-60"
+          className="adm-btn adm-btn-ok adm-btn-sm"
         >
-          {loading ? "Liquidando..." : "Liquidar"}
+          {loading ? "Liquidando…" : "Liquidar"}
         </button>
       </div>
-      {error && <span className="text-xs text-red-500">{error}</span>}
+      {error && <span className="text-xs text-[var(--adm-danger)]">{error}</span>}
     </div>
   );
 }

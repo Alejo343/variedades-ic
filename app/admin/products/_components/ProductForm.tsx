@@ -4,7 +4,9 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { toSlug } from "@/lib/validations";
+import { ImagePlus, X } from "lucide-react";
 import type { Category, Product, ProductImage } from "@/lib/db/schema";
+import { formatCOP } from "../../_lib/format";
 
 type ExistingImg = { kind: "existing"; id: number; url: string; alt: string };
 type NewImg = { kind: "new"; url: string; alt: string };
@@ -183,261 +185,300 @@ export function ProductForm({ categories, initial }: Props) {
     }
   }
 
+  const margin = form.price > 0 && form.purchasePrice > 0 ? Math.round(((form.price - form.purchasePrice) / form.price) * 100) : null;
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="bg-white rounded-xl shadow-sm p-6 max-w-2xl flex flex-col gap-5"
-    >
-      <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-          <input
-            value={form.name}
-            onChange={(e) => handleNameChange(e.target.value)}
-            required
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Slug</label>
-          <input
-            value={form.slug}
-            onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
-            required
-            pattern="[a-z0-9-]+"
-            title="Solo letras minúsculas, números y guiones"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-          <textarea
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            rows={3}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        {isEdit && (
-          <div className="col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">SKU</label>
-            <input
-              value={initial!.sku}
-              disabled
-              className="w-full border border-gray-200 bg-gray-50 text-gray-500 rounded-lg px-3 py-2 text-sm"
+    <form onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 items-start">
+      <div className="flex flex-col gap-4 min-w-0">
+        <section className="adm-card p-6 flex flex-col gap-4">
+          <h2 className="adm-card-title">Información</h2>
+          <div>
+            <label className="adm-label">Nombre</label>
+            <input value={form.name} onChange={(e) => handleNameChange(e.target.value)} required className="adm-input h-11 text-[15px]" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="adm-label">Slug (URL pública)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-[var(--adm-ink-3)]">/productos/</span>
+                <input
+                  value={form.slug}
+                  onChange={(e) => setForm((f) => ({ ...f, slug: e.target.value }))}
+                  required
+                  pattern="[a-z0-9-]+"
+                  title="Solo letras minúsculas, números y guiones"
+                  className="adm-input num pl-[84px] text-[13px]"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="adm-label">Categoría</label>
+              <select
+                value={form.categoryId ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value ? Number(e.target.value) : null }))}
+                className="adm-input"
+              >
+                <option value="">Sin categoría</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="adm-label">Descripción</label>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              rows={4}
+              className="adm-input"
             />
           </div>
-        )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="adm-label">SKU</label>
+              <input
+                value={isEdit ? initial!.sku : "Se genera al guardar"}
+                disabled
+                className="adm-input num text-[13px]"
+              />
+            </div>
+            <div>
+              <label className="adm-label">Código de proveedor</label>
+              <input
+                value={form.distributorCode}
+                onChange={(e) => setForm((f) => ({ ...f, distributorCode: e.target.value }))}
+                placeholder="Opcional"
+                className="adm-input num"
+              />
+            </div>
+          </div>
+        </section>
 
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Código de proveedor <span className="font-normal text-gray-400">(opcional)</span>
-          </label>
-          <input
-            value={form.distributorCode}
-            onChange={(e) => setForm((f) => ({ ...f, distributorCode: e.target.value }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+        <section className="adm-card p-6 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h2 className="adm-card-title">Precios</h2>
+            {margin !== null && (
+              <span className={`adm-badge adm-badge-plain ${margin < 0 ? "adm-badge-danger" : margin < 15 ? "adm-badge-warn" : "adm-badge-ok"}`}>
+                Margen {margin}% · {formatCOP(form.price - form.purchasePrice)} por unidad
+              </span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <MoneyInput
+              label="Precio de venta"
+              value={form.price}
+              onChange={(price) => setForm((f) => ({ ...f, price }))}
+              required
+            />
+            <MoneyInput
+              label="Precio de compra (costo)"
+              value={form.purchasePrice}
+              onChange={(purchasePrice) => setForm((f) => ({ ...f, purchasePrice }))}
+            />
+          </div>
+        </section>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Precio de venta (COP)</label>
-          <input
-            type="number"
-            min={0}
-            value={form.price}
-            onChange={(e) => setForm((f) => ({ ...f, price: Number(e.target.value) }))}
-            required
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+        <section className="adm-card p-6 flex flex-col gap-4">
+          <h2 className="adm-card-title">Inventario y garantía</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="adm-label">Stock</label>
+              <input
+                type="number"
+                min={0}
+                value={form.stock}
+                onChange={(e) => setForm((f) => ({ ...f, stock: Number(e.target.value) }))}
+                className="adm-input num"
+              />
+            </div>
+            <div>
+              <label className="adm-label">Stock mínimo</label>
+              <input
+                type="number"
+                min={0}
+                value={form.minStock}
+                onChange={(e) => setForm((f) => ({ ...f, minStock: Number(e.target.value) }))}
+                className="adm-input num"
+              />
+              <p className="adm-hint">Alerta cuando el stock llegue a este número.</p>
+            </div>
+            <div>
+              <label className="adm-label">Garantía (meses)</label>
+              <input
+                type="number"
+                min={0}
+                value={form.warrantyMonths ?? ""}
+                onChange={(e) => setForm((f) => ({ ...f, warrantyMonths: e.target.value ? Number(e.target.value) : null }))}
+                placeholder="Sin garantía"
+                className="adm-input num"
+              />
+            </div>
+          </div>
+          {isEdit && (
+            <p className="adm-hint !mt-0">
+              Para corregir existencias tras un conteo, usa un ajuste en Inventario: queda registrado en el historial.
+            </p>
+          )}
+        </section>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Precio de compra (COP)</label>
-          <input
-            type="number"
-            min={0}
-            value={form.purchasePrice}
-            onChange={(e) => setForm((f) => ({ ...f, purchasePrice: Number(e.target.value) }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Stock</label>
-          <input
-            type="number"
-            min={0}
-            value={form.stock}
-            onChange={(e) => setForm((f) => ({ ...f, stock: Number(e.target.value) }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Stock mínimo</label>
-          <input
-            type="number"
-            min={0}
-            value={form.minStock}
-            onChange={(e) => setForm((f) => ({ ...f, minStock: Number(e.target.value) }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Garantía (meses) <span className="font-normal text-gray-400">(opcional)</span>
-          </label>
-          <input
-            type="number"
-            min={0}
-            value={form.warrantyMonths ?? ""}
-            onChange={(e) =>
-              setForm((f) => ({
-                ...f,
-                warrantyMonths: e.target.value ? Number(e.target.value) : null,
-              }))
-            }
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
-          <select
-            value={form.categoryId ?? ""}
-            onChange={(e) =>
-              setForm((f) => ({
-                ...f,
-                categoryId: e.target.value ? Number(e.target.value) : null,
-              }))
-            }
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Sin categoría</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Texto WhatsApp{" "}
-            <span className="font-normal text-gray-400">(opcional)</span>
-          </label>
-          <input
-            value={form.whatsappText}
-            onChange={(e) => setForm((f) => ({ ...f, whatsappText: e.target.value }))}
-            placeholder="Hola, quiero pedir..."
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+        <section className="adm-card p-6 flex flex-col gap-3">
+          <h2 className="adm-card-title">WhatsApp</h2>
+          <div>
+            <label className="adm-label">Mensaje predefinido</label>
+            <input
+              value={form.whatsappText}
+              onChange={(e) => setForm((f) => ({ ...f, whatsappText: e.target.value }))}
+              placeholder="Hola, quiero pedir…"
+              className="adm-input"
+            />
+            <p className="adm-hint">Texto que se abre en WhatsApp cuando el cliente pulsa “Pedir” en el catálogo.</p>
+          </div>
+        </section>
       </div>
 
-      <div className="flex items-center gap-6">
-        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={form.featured}
-            onChange={(e) => setForm((f) => ({ ...f, featured: e.target.checked }))}
-            className="w-4 h-4 accent-blue-600"
-          />
-          Destacado
-        </label>
-        <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={form.active}
-            onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
-            className="w-4 h-4 accent-blue-600"
-          />
-          Activo
-        </label>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Imágenes</label>
-        {imgs.length > 0 && (
-          <div className="flex flex-wrap gap-3 mb-3">
+      <div className="flex flex-col gap-4 xl:sticky xl:top-24">
+        <section className="adm-card p-5 flex flex-col gap-3">
+          <h2 className="adm-card-title">Imágenes</h2>
+          <div className="grid grid-cols-3 gap-2">
             {imgs.map((img, i) => (
               <div
                 key={i}
-                className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200 bg-gray-50"
+                className={`relative aspect-square rounded-xl overflow-hidden border bg-[#f0ede6] group ${
+                  i === 0 ? "col-span-3 aspect-[4/3] border-[var(--adm-line-strong)]" : "border-[var(--adm-line)]"
+                }`}
               >
-                <Image src={img.url} alt={img.alt} fill sizes="96px" className="object-cover" />
+                <Image src={img.url} alt={img.alt} fill sizes={i === 0 ? "320px" : "100px"} className="object-cover" />
                 {i === 0 && (
-                  <span className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] text-center py-0.5">
-                    Principal
-                  </span>
+                  <span className="absolute left-2 top-2 adm-badge adm-badge-plain bg-white/90 text-[var(--adm-ink)]">Principal</span>
                 )}
                 <button
                   type="button"
                   onClick={() => removeImg(i)}
-                  className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs leading-none hover:bg-red-600"
+                  className="absolute top-1.5 right-1.5 w-7 h-7 grid place-items-center rounded-lg bg-white/90 text-[var(--adm-ink-2)] hover:text-[var(--adm-danger)] opacity-0 group-hover:opacity-100 focus:opacity-100 transition shadow-sm"
+                  aria-label="Quitar imagen"
                 >
-                  ×
+                  <X size={15} />
                 </button>
               </div>
             ))}
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className={`rounded-xl border-2 border-dashed border-[var(--adm-line-strong)] grid place-items-center text-[var(--adm-ink-3)] hover:border-[var(--adm-brand)] hover:text-[var(--adm-brand)] transition disabled:opacity-60 ${
+                imgs.length === 0 ? "col-span-3 aspect-[4/3]" : "aspect-square"
+              }`}
+            >
+              <span className="flex flex-col items-center gap-1.5 text-[12.5px] font-medium">
+                <ImagePlus size={imgs.length === 0 ? 26 : 18} />
+                {uploading ? "Subiendo…" : imgs.length === 0 ? "Agregar imagen" : "Agregar"}
+              </span>
+            </button>
           </div>
+          <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleUpload} className="hidden" />
+          <p className="adm-hint !mt-0">JPG, PNG o WebP hasta 10 MB. La primera es la principal.</p>
+        </section>
+
+        <section className="adm-card p-5 flex flex-col gap-1">
+          <h2 className="adm-card-title mb-2">Visibilidad</h2>
+          <Toggle
+            checked={form.active}
+            onChange={(active) => setForm((f) => ({ ...f, active }))}
+            label="Activo"
+            hint="Visible en el catálogo y disponible para vender"
+          />
+          <Toggle
+            checked={form.featured}
+            onChange={(featured) => setForm((f) => ({ ...f, featured }))}
+            label="Destacado"
+            hint="Aparece en la página principal"
+          />
+        </section>
+
+        {error && (
+          <p className="adm-alert adm-alert-danger">
+            <span>
+              {error}
+              {duplicateProduct && (
+                <>
+                  {" — "}
+                  <a href={`/admin/products/${duplicateProduct.id}/edit`} className="underline font-medium">
+                    Ir a editar {duplicateProduct.name}
+                  </a>
+                </>
+              )}
+            </span>
+          </p>
         )}
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          onChange={handleUpload}
-          className="hidden"
-        />
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          disabled={uploading}
-          className="border border-gray-300 text-sm text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition disabled:opacity-60"
-        >
-          {uploading ? "Subiendo..." : "+ Agregar imagen"}
-        </button>
-      </div>
 
-      {error && (
-        <p className="text-sm text-red-500">
-          {error}
-          {duplicateProduct && (
-            <>
-              {" — "}
-              <a
-                href={`/admin/products/${duplicateProduct.id}/edit`}
-                className="text-blue-600 hover:text-blue-800 underline"
-              >
-                Ir a editar {duplicateProduct.name}
-              </a>
-            </>
-          )}
-        </p>
-      )}
-
-      <div className="flex gap-3 pt-2">
-        <button
-          type="submit"
-          disabled={loading || uploading}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition disabled:opacity-60"
-        >
-          {loading ? "Guardando..." : isEdit ? "Guardar cambios" : "Crear producto"}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.push("/admin/products")}
-          className="text-sm text-gray-600 hover:text-gray-800 px-3 py-2"
-        >
-          Cancelar
-        </button>
+        <div className="flex gap-2">
+          <button type="submit" disabled={loading || uploading} className="adm-btn adm-btn-primary adm-btn-lg flex-1">
+            {loading ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear producto"}
+          </button>
+          <button type="button" onClick={() => router.push("/admin/products")} className="adm-btn adm-btn-lg">
+            Cancelar
+          </button>
+        </div>
       </div>
     </form>
+  );
+}
+
+function MoneyInput({
+  label,
+  value,
+  onChange,
+  required,
+}: {
+  label: string;
+  value: number;
+  onChange: (n: number) => void;
+  required?: boolean;
+}) {
+  return (
+    <div>
+      <label className="adm-label">{label}</label>
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--adm-ink-3)] text-sm">$</span>
+        <input
+          type="number"
+          min={0}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          required={required}
+          className="adm-input num pl-7 h-11 text-[15px]"
+        />
+      </div>
+      <p className="adm-hint num">{formatCOP(value)}</p>
+    </div>
+  );
+}
+
+function Toggle({
+  checked,
+  onChange,
+  label,
+  hint,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+  hint?: string;
+}) {
+  return (
+    <label className="flex items-center justify-between gap-3 py-2 cursor-pointer select-none">
+      <span>
+        <span className="block text-[14px] font-medium">{label}</span>
+        {hint && <span className="block text-[12px] text-[var(--adm-ink-3)]">{hint}</span>}
+      </span>
+      <span className="relative shrink-0">
+        <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
+        <span className="block w-10 h-6 rounded-full bg-[#d7d1c4] peer-checked:bg-[var(--adm-ok)] transition peer-focus-visible:ring-4 peer-focus-visible:ring-[rgba(3,105,161,.2)]" />
+        <span className="absolute left-0.5 top-0.5 w-5 h-5 rounded-full bg-white shadow transition peer-checked:translate-x-4" />
+      </span>
+    </label>
   );
 }

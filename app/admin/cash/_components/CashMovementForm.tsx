@@ -42,60 +42,64 @@ export function CashMovementForm({ accounts }: { accounts: CashAccount[] }) {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="bg-white rounded-xl shadow-sm p-5 flex flex-col gap-3"
-    >
-      <h2 className="text-sm font-semibold text-gray-700">Registrar movimiento</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-        <select
-          value={type}
-          onChange={(e) => setType(e.target.value as "ingreso" | "gasto")}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="gasto">Gasto</option>
-          <option value="ingreso">Ingreso</option>
-        </select>
+    <form onSubmit={handleSubmit} className="adm-card p-5 flex flex-col gap-4">
+      <div>
+        <h2 className="adm-card-title">Registrar movimiento</h2>
+        <p className="adm-card-desc">Ingresos o gastos sueltos (arriendo, servicios, aportes…)</p>
+      </div>
+      <div className="adm-seg w-full [&>*]:flex-1 [&>*]:justify-center">
+        <button type="button" data-active={type === "gasto"} onClick={() => setType("gasto")}>
+          Gasto
+        </button>
+        <button type="button" data-active={type === "ingreso"} onClick={() => setType("ingreso")}>
+          Ingreso
+        </button>
+      </div>
+      <div>
+        <label className="adm-label">Monto</label>
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--adm-ink-3)] text-sm">$</span>
+          <input
+            type="number"
+            min={1}
+            value={amount || ""}
+            onChange={(e) => setAmount(Number(e.target.value))}
+            placeholder="0"
+            required
+            className="adm-input num pl-7 text-[16px] h-11"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="adm-label">Cuenta</label>
         <select
           value={accountId}
           onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : "")}
           required
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="adm-input"
         >
-          <option value="">Cuenta...</option>
+          <option value="">Selecciona…</option>
           {accounts.map((a) => (
             <option key={a.id} value={a.id}>
               {a.name}
             </option>
           ))}
         </select>
-        <input
-          type="number"
-          min={1}
-          value={amount}
-          onChange={(e) => setAmount(Number(e.target.value))}
-          placeholder="Monto (COP)"
-          required
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      </div>
+      <div>
+        <label className="adm-label">Concepto</label>
         <input
           value={concept}
           onChange={(e) => setConcept(e.target.value)}
-          placeholder="Concepto"
+          placeholder={type === "gasto" ? "Ej. Pago de arriendo" : "Ej. Aporte de capital"}
           required
-          className="sm:col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="adm-input"
         />
       </div>
-      {error && <p className="text-sm text-red-500">{error}</p>}
-      <div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition disabled:opacity-60"
-        >
-          {loading ? "Guardando..." : "Registrar"}
-        </button>
-      </div>
+      {error && <p className="adm-alert adm-alert-danger">{error}</p>}
+      <button type="submit" disabled={loading} className={`adm-btn ${type === "gasto" ? "adm-btn-primary" : "adm-btn-ok"}`}>
+        {loading ? "Guardando…" : type === "gasto" ? "Registrar gasto" : "Registrar ingreso"}
+      </button>
     </form>
   );
 }

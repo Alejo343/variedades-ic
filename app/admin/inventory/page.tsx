@@ -1,109 +1,173 @@
+import Link from "next/link";
+import { AlertTriangle, Boxes, CircleDollarSign, PackageX, Tag } from "lucide-react";
 import { getAllProducts } from "@/lib/db/queries/products";
-import { getLowStock, getOutOfStock, getRecentMovements } from "@/lib/db/queries/inventory";
+import { getLowStock, getNegativeStock, getOutOfStock, getRecentMovements } from "@/lib/db/queries/inventory";
+import { getInventorySummary } from "@/lib/db/queries/reports";
 import { AdjustmentForm } from "./_components/AdjustmentForm";
+import { Badge, Card, FilterTabs, Page, PageHeader, Stat } from "../_components/ui";
+import { MOVEMENT_LABELS, formatCOP, formatDateTime, formatNumber } from "../_lib/format";
 
-const MOVEMENT_LABELS: Record<string, string> = {
-  compra: "Compra",
-  venta: "Venta",
-  entrega_vendedor: "Entrega a vendedor",
-  devolucion: "Devolución",
-  ajuste: "Ajuste",
-  perdida: "Pérdida",
-  dano: "Daño",
-  robo: "Robo",
-};
+const TYPE_FILTERS = [
+  ["compra", "Compras"],
+  ["venta", "Ventas"],
+  ["entrega_vendedor", "Entregas"],
+  ["devolucion", "Devoluciones"],
+  ["ajuste", "Ajustes"],
+] as const;
 
-export default async function InventoryPage() {
-  const [lowStock, outOfStock, movements, products] = await Promise.all([
+export default async function InventoryPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
+  const { type = "" } = await searchParams;
+  const [lowStock, outOfStock, negativeStock, movements, products, summary] = await Promise.all([
     getLowStock(),
     getOutOfStock(),
-    getRecentMovements(50),
+    getNegativeStock(),
+    getRecentMovements(100),
     getAllProducts(),
+    getInventorySummary(),
   ]);
 
   const activeProducts = products.filter((p) => p.active);
+  const valueAtPrice = activeProducts.reduce((s, p) => s + Math.max(p.stock, 0) * p.price, 0);
+  const rows = type ? movements.filter((m) => m.type === type) : movements;
 
   return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-bold text-gray-800">Inventario</h1>
+    <Page>
+      <PageHeader
+        eyebrow="Catálogo"
+        title="Inventario"
+        description="Existencias del inventario principal y el historial de cada movimiento de stock."
+      />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-orange-600 mb-3">
-            Stock mínimo ({lowStock.length})
-          </h2>
-          {lowStock.length === 0 ? (
-            <p className="text-sm text-gray-400">Sin alertas.</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {lowStock.map((p) => (
-                <li key={p.id} className="flex justify-between text-sm">
-                  <span className="text-gray-700">{p.name}</span>
-                  <span className="text-orange-600 font-medium">
-                    {p.stock} / mín. {p.minStock}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-red-600 mb-3">
-            Agotados ({outOfStock.length})
-          </h2>
-          {outOfStock.length === 0 ? (
-            <p className="text-sm text-gray-400">Sin productos agotados.</p>
-          ) : (
-            <ul className="flex flex-col gap-2">
-              {outOfStock.map((p) => (
-                <li key={p.id} className="text-sm text-gray-700">
-                  {p.name}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <Stat label="Unidades en bodega" value={formatNumber(summary.totalUnits)} hint={`${summary.activeProducts} productos activos`} icon={Boxes} tone="info" />
+        <Stat label="Valor a costo" value={formatCOP(summary.totalValue)} icon={CircleDollarSign} tone="violet" />
+        <Stat label="Valor a precio de venta" value={formatCOP(valueAtPrice)} hint={`Margen potencial ${formatCOP(valueAtPrice - summary.totalValue)}`} icon={Tag} tone="ok" />
+        <Stat
+          label="Requieren atención"
+          value={lowStock.length + outOfStock.length + negativeStock.length}
+          valueTone={lowStock.length + outOfStock.length + negativeStock.length > 0 ? "warn" : "neutral"}
+          hint={`${outOfStock.length} agotados · ${lowStock.length} bajo mínimo`}
+          icon={AlertTriangle}
+          tone="warn"
+        />
       </div>
 
-      <AdjustmentForm products={activeProducts.map((p) => ({ id: p.id, name: p.name }))} />
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 items-start">
+        <div className="flex flex-col gap-4 min-w-0">
+          {negativeStock.length > 0 && (
+            <div className="adm-alert adm-alert-danger">
+              <AlertTriangle />
+              <div>
+                <p className="font-semibold">Stock negativo en {negativeStock.length} productos</p>
+                <p className="mt-0.5">
+                  Llegaron ventas del móvil que superaron las existencias. Haz un conteo y corrígelo con un ajuste:{" "}
+                  {negativeStock.map((p, i) => (
+                    <span key={p.id}>
+                      {i > 0 && ", "}
+                      <strong>{p.name}</strong> ({p.stock})
+                    </span>
+                  ))}
+                </p>
+              </div>
+            </div>
+          )}
 
-      <div className="bg-white rounded-xl shadow-sm p-5 overflow-x-auto">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">Movimientos recientes</h2>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-gray-500 border-b border-gray-100">
-              <th className="pb-2 font-medium">Fecha</th>
-              <th className="pb-2 font-medium">Producto</th>
-              <th className="pb-2 font-medium">Tipo</th>
-              <th className="pb-2 font-medium">Cantidad</th>
-              <th className="pb-2 font-medium">Motivo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {movements.map((m) => (
-              <tr key={m.id} className="border-b border-gray-50">
-                <td className="py-2 text-gray-500">
-                  {new Date(m.createdAt).toLocaleString("es-CO")}
-                </td>
-                <td className="py-2 text-gray-700">{m.productName ?? `#${m.productId}`}</td>
-                <td className="py-2 text-gray-700">{MOVEMENT_LABELS[m.type] ?? m.type}</td>
-                <td className={`py-2 font-medium ${m.quantityDelta > 0 ? "text-green-600" : "text-red-600"}`}>
-                  {m.quantityDelta > 0 ? `+${m.quantityDelta}` : m.quantityDelta}
-                </td>
-                <td className="py-2 text-gray-500">{m.reason ?? "-"}</td>
-              </tr>
-            ))}
-            {movements.length === 0 && (
-              <tr>
-                <td colSpan={5} className="py-4 text-center text-gray-400">
-                  Sin movimientos todavía.
-                </td>
-              </tr>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card title="Bajo el mínimo" description={`${lowStock.length} productos`} flush>
+              {lowStock.length === 0 ? (
+                <p className="px-5 py-6 text-sm text-[var(--adm-ink-3)]">Sin alertas.</p>
+              ) : (
+                <ul className="divide-y divide-[#f0ede6] max-h-64 overflow-y-auto">
+                  {lowStock.map((p) => (
+                    <li key={p.id}>
+                      <Link href={`/admin/products/${p.id}/edit`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-[var(--adm-surface-2)]">
+                        <AlertTriangle size={15} className="text-[var(--adm-warn)] shrink-0" />
+                        <span className="flex-1 text-[13.5px] truncate">{p.name}</span>
+                        <span className="num text-[13px] font-semibold text-[var(--adm-warn)]">{p.stock}</span>
+                        <span className="num text-[12px] text-[var(--adm-ink-3)]">/ {p.minStock}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+            <Card title="Agotados" description={`${outOfStock.length} productos`} flush>
+              {outOfStock.length === 0 ? (
+                <p className="px-5 py-6 text-sm text-[var(--adm-ink-3)]">Sin productos agotados.</p>
+              ) : (
+                <ul className="divide-y divide-[#f0ede6] max-h-64 overflow-y-auto">
+                  {outOfStock.map((p) => (
+                    <li key={p.id}>
+                      <Link href={`/admin/products/${p.id}/edit`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-[var(--adm-surface-2)]">
+                        <PackageX size={15} className="text-[var(--adm-danger)] shrink-0" />
+                        <span className="flex-1 text-[13.5px] truncate">{p.name}</span>
+                        <Badge tone="danger" plain>
+                          0
+                        </Badge>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+
+          <Card title="Historial de movimientos" description="Últimos 100 movimientos del ledger (inventario principal y de vendedores)" flush>
+            <div className="p-4 border-b border-[var(--adm-line)]">
+              <FilterTabs
+                basePath="/admin/inventory"
+                param="type"
+                current={type}
+                options={[{ value: "", label: "Todos" }, ...TYPE_FILTERS.map(([value, label]) => ({ value, label }))]}
+              />
+            </div>
+            {rows.length === 0 ? (
+              <p className="px-5 py-10 text-center text-sm text-[var(--adm-ink-3)]">Sin movimientos.</p>
+            ) : (
+              <div className="adm-table-wrap">
+                <table className="adm-table">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Producto</th>
+                      <th>Tipo</th>
+                      <th>Inventario</th>
+                      <th className="t-right">Cantidad</th>
+                      <th>Motivo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((m) => (
+                      <tr key={m.id}>
+                        <td className="whitespace-nowrap">{formatDateTime(m.createdAt)}</td>
+                        <td className="t-strong min-w-[200px]">{m.productName ?? `#${m.productId}`}</td>
+                        <td>{MOVEMENT_LABELS[m.type] ?? m.type}</td>
+                        <td>
+                          <Badge plain tone={m.ownerType === "seller" ? "violet" : "neutral"}>
+                            {m.ownerType === "seller" ? "Vendedor" : "Principal"}
+                          </Badge>
+                        </td>
+                        <td
+                          className={`t-right num font-semibold ${
+                            m.quantityDelta > 0 ? "text-[var(--adm-ok)]" : "text-[var(--adm-danger)]"
+                          }`}
+                        >
+                          {m.quantityDelta > 0 ? `+${m.quantityDelta}` : m.quantityDelta}
+                        </td>
+                        <td className="max-w-[240px] truncate">{m.reason ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
-          </tbody>
-        </table>
+          </Card>
+        </div>
+
+        <div className="xl:sticky xl:top-24">
+          <AdjustmentForm products={activeProducts.map((p) => ({ id: p.id, name: p.name }))} />
+        </div>
       </div>
-    </div>
+    </Page>
   );
 }

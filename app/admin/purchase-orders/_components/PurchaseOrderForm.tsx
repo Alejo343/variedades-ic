@@ -3,16 +3,21 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
+import { FileSpreadsheet } from "lucide-react";
 import type { Distributor } from "@/lib/db/schema";
 import { parseImportSheet, resolveImportRows } from "@/lib/domain/purchase-import";
+import { CartLines, PosLayout, ProductSearch, addToCart, cartTotal, cartUnits, type CartLine, type CartProduct } from "../../_components/Cart";
+import { formatCOP } from "../../_lib/format";
 
-type SimpleProduct = { id: number; name: string; price: number; sku: string; slug: string; active: boolean };
-
-type Item = {
-  productId: number;
-  productName: string;
-  quantity: number;
-  unitCost: number;
+type SimpleProduct = {
+  id: number;
+  name: string;
+  price: number;
+  purchasePrice: number | null;
+  sku: string;
+  slug: string;
+  active: boolean;
+  imageUrl: string | null;
 };
 
 type Props = {
@@ -20,14 +25,9 @@ type Props = {
   products: SimpleProduct[];
 };
 
-function formatCOP(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
-}
-
 export function PurchaseOrderForm({ distributors, products: allProducts }: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-  const activeProducts = allProducts.filter((p) => p.active);
 
   const [form, setForm] = useState({
     distributorId: "" as string | number,
@@ -35,47 +35,29 @@ export function PurchaseOrderForm({ distributors, products: allProducts }: Props
     expectedDate: "",
     notes: "",
   });
-  const [items, setItems] = useState<Item[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState("");
-  const [itemQty, setItemQty] = useState(1);
-  const [itemCost, setItemCost] = useState(0);
+  const [lines, setLines] = useState<CartLine[]>([]);
+  // Products created on the fly by the Excel import (not in the server-provided list yet).
+  const [createdProducts, setCreatedProducts] = useState<CartProduct[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [importing, setImporting] = useState(false);
   const [importSummary, setImportSummary] = useState("");
   const [importSkipped, setImportSkipped] = useState<{ rowNumber: number; reason: string }[]>([]);
 
-  function addItem() {
-    if (!selectedProduct) return;
-    const product = activeProducts.find((p) => p.id === Number(selectedProduct));
-    if (!product) return;
-    if (items.some((i) => i.productId === product.id)) {
-      setError("Ese producto ya está en la lista");
-      return;
-    }
-    setItems((prev) => [
-      ...prev,
-      { productId: product.id, productName: product.name, quantity: itemQty, unitCost: itemCost },
-    ]);
-    setSelectedProduct("");
-    setItemQty(1);
-    setItemCost(0);
-    setError("");
-  }
+  const cartProducts: CartProduct[] = [
+    ...allProducts
+      .filter((p) => p.active)
+      .map((p) => ({ id: p.id, name: p.name, sku: p.sku, unitValue: p.purchasePrice ?? 0, imageUrl: p.imageUrl })),
+    ...createdProducts,
+  ];
 
-  function removeItem(productId: number) {
-    setItems((prev) => prev.filter((i) => i.productId !== productId));
-  }
-
-  function mergeItem(item: Item) {
-    setItems((prev) => {
-      const existing = prev.find((i) => i.productId === item.productId);
+  function mergeLine(line: CartLine) {
+    setLines((prev) => {
+      const existing = prev.find((l) => l.productId === line.productId);
       if (existing) {
-        return prev.map((i) =>
-          i.productId === item.productId ? { ...i, quantity: i.quantity + item.quantity } : i,
-        );
+        return prev.map((l) => (l.productId === line.productId ? { ...l, quantity: l.quantity + line.quantity } : l));
       }
-      return [...prev, item];
+      return [...prev, line];
     });
   }
 
@@ -102,7 +84,7 @@ export function PurchaseOrderForm({ distributors, products: allProducts }: Props
       let created = 0;
       for (const row of resolved) {
         if (row.kind === "existing") {
-          mergeItem({ productId: row.productId, productName: row.name, quantity: row.quantity, unitCost: row.unitCost });
+          mergeLine({ productId: row.productId, quantity: row.quantity, unitValue: row.unitCost });
         } else {
           const res = await fetch("/api/admin/products", {
             method: "POST",
@@ -115,7 +97,8 @@ export function PurchaseOrderForm({ distributors, products: allProducts }: Props
           }
           const product = await res.json();
           created += 1;
-          mergeItem({ productId: product.id, productName: row.name, quantity: row.quantity, unitCost: row.unitCost });
+          setCreatedProducts((prev) => [...prev, { id: product.id, name: row.name, sku: product.sku, unitValue: row.unitCost }]);
+          mergeLine({ productId: product.id, quantity: row.quantity, unitValue: row.unitCost });
         }
       }
 
@@ -129,11 +112,11 @@ export function PurchaseOrderForm({ distributors, products: allProducts }: Props
     }
   }
 
-  const total = items.reduce((sum, i) => sum + i.quantity * i.unitCost, 0);
+  const total = cartTotal(lines);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (items.length === 0) {
+    if (lines.length === 0) {
       setError("Agrega al menos un producto al pedido");
       return;
     }
@@ -148,7 +131,7 @@ export function PurchaseOrderForm({ distributors, products: allProducts }: Props
         purchaseType: form.purchaseType,
         expectedDate: form.expectedDate || null,
         notes: form.notes || undefined,
-        items: items.map((i) => ({ productId: i.productId, quantity: i.quantity, unitCost: i.unitCost })),
+        items: lines.map((l) => ({ productId: l.productId, quantity: l.quantity, unitCost: l.unitValue })),
       }),
     });
 
@@ -165,206 +148,128 @@ export function PurchaseOrderForm({ distributors, products: allProducts }: Props
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-6 max-w-2xl">
-      <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col gap-4">
-        <h2 className="font-semibold text-gray-700">Datos del pedido</h2>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Distribuidor</label>
-          <select
-            value={form.distributorId}
-            onChange={(e) => setForm((f) => ({ ...f, distributorId: e.target.value }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">— Sin distribuidor —</option>
-            {distributors.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name}{d.city ? ` (${d.city})` : ""}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de compra</label>
-          <select
-            value={form.purchaseType}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, purchaseType: e.target.value as "contado" | "credito" }))
-            }
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="contado">Contado</option>
-            <option value="credito">Crédito</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Fecha esperada de recogida
-          </label>
-          <input
-            type="date"
-            value={form.expectedDate}
-            onChange={(e) => setForm((f) => ({ ...f, expectedDate: e.target.value }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
-          <textarea
-            value={form.notes}
-            onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-            rows={2}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-gray-700">Productos</h2>
-          <div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleImport}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={importing}
-              className="border border-gray-300 text-sm text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-50 transition disabled:opacity-60"
-            >
-              {importing ? "Importando..." : "Importar desde Excel"}
-            </button>
-          </div>
-        </div>
-
-        {importSummary && <p className="text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">{importSummary}</p>}
-        {importSkipped.length > 0 && (
-          <div className="text-sm text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
-            <p className="font-medium">{importSkipped.length} fila(s) omitida(s):</p>
-            <ul className="list-disc list-inside">
-              {importSkipped.map((s) => (
-                <li key={s.rowNumber}>
-                  Fila {s.rowNumber}: {s.reason}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <div className="flex gap-2 flex-wrap">
-          <select
-            value={selectedProduct}
-            onChange={(e) => setSelectedProduct(e.target.value)}
-            className="flex-1 min-w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">— Seleccionar producto —</option>
-            {activeProducts.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            min={1}
-            value={itemQty}
-            onChange={(e) => setItemQty(Number(e.target.value))}
-            placeholder="Cantidad"
-            className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="number"
-            min={0}
-            value={itemCost}
-            onChange={(e) => setItemCost(Number(e.target.value))}
-            placeholder="Costo unit. (COP)"
-            className="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            type="button"
-            onClick={addItem}
-            className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-4 py-2 rounded-lg transition"
-          >
-            + Agregar
-          </button>
-        </div>
-
-        {items.length > 0 && (
-          <table className="w-full text-sm mt-1">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="text-left px-3 py-2 font-medium text-gray-600">Producto</th>
-                <th className="text-right px-3 py-2 font-medium text-gray-600">Cant.</th>
-                <th className="text-right px-3 py-2 font-medium text-gray-600">Costo unit.</th>
-                <th className="text-right px-3 py-2 font-medium text-gray-600">Subtotal</th>
-                <th className="px-3 py-2" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {items.map((item) => (
-                <tr key={item.productId}>
-                  <td className="px-3 py-2 text-gray-800">{item.productName}</td>
-                  <td className="px-3 py-2 text-right text-gray-700">{item.quantity}</td>
-                  <td className="px-3 py-2 text-right text-gray-700">
-                    {item.unitCost ? formatCOP(item.unitCost) : "—"}
-                  </td>
-                  <td className="px-3 py-2 text-right text-gray-700">
-                    {item.unitCost ? formatCOP(item.quantity * item.unitCost) : "—"}
-                  </td>
-                  <td className="px-3 py-2 text-right">
+    <form onSubmit={handleSubmit}>
+      <PosLayout
+        finder={
+          <div className="flex flex-col gap-6">
+            <div>
+              <h2 className="adm-card-title mb-3">Datos del pedido</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="adm-label">Distribuidor</label>
+                  <select
+                    value={form.distributorId}
+                    onChange={(e) => setForm((f) => ({ ...f, distributorId: e.target.value }))}
+                    className="adm-input"
+                  >
+                    <option value="">— Sin distribuidor —</option>
+                    {distributors.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                        {d.city ? ` (${d.city})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="adm-label">Tipo de compra</label>
+                  <div className="adm-seg w-full [&>*]:flex-1 [&>*]:justify-center">
                     <button
                       type="button"
-                      onClick={() => removeItem(item.productId)}
-                      className="text-red-500 hover:text-red-700 text-xs"
+                      data-active={form.purchaseType === "contado"}
+                      onClick={() => setForm((f) => ({ ...f, purchaseType: "contado" }))}
                     >
-                      Quitar
+                      Contado
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            {total > 0 && (
-              <tfoot>
-                <tr className="border-t border-gray-200">
-                  <td colSpan={3} className="px-3 py-2 text-right font-semibold text-gray-700">
-                    Total
-                  </td>
-                  <td className="px-3 py-2 text-right font-bold text-gray-800">
-                    {formatCOP(total)}
-                  </td>
-                  <td />
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        )}
-      </div>
+                    <button
+                      type="button"
+                      data-active={form.purchaseType === "credito"}
+                      onClick={() => setForm((f) => ({ ...f, purchaseType: "credito" }))}
+                    >
+                      Crédito
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="adm-label">Fecha esperada de recogida</label>
+                  <input
+                    type="date"
+                    value={form.expectedDate}
+                    onChange={(e) => setForm((f) => ({ ...f, expectedDate: e.target.value }))}
+                    className="adm-input"
+                  />
+                </div>
+              </div>
+            </div>
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+            <div className="pt-5 border-t border-[var(--adm-line)]">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <h2 className="adm-card-title">Productos</h2>
+                <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleImport} className="hidden" />
+                <button type="button" onClick={() => fileRef.current?.click()} disabled={importing} className="adm-btn adm-btn-sm">
+                  <FileSpreadsheet />
+                  {importing ? "Importando…" : "Importar desde Excel"}
+                </button>
+              </div>
 
-      <div className="flex gap-3">
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition disabled:opacity-60"
-        >
-          {loading ? "Guardando..." : "Crear pedido"}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.push("/admin/purchase-orders")}
-          className="text-sm text-gray-600 hover:text-gray-800 px-3 py-2"
-        >
-          Cancelar
-        </button>
-      </div>
+              {importSummary && <p className="adm-alert adm-alert-ok mb-3">{importSummary}</p>}
+              {importSkipped.length > 0 && (
+                <div className="adm-alert adm-alert-warn mb-3 flex-col !gap-1">
+                  <p className="font-medium">{importSkipped.length} fila(s) omitida(s):</p>
+                  <ul className="list-disc list-inside">
+                    {importSkipped.map((s) => (
+                      <li key={s.rowNumber}>
+                        Fila {s.rowNumber}: {s.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <ProductSearch products={cartProducts} lines={lines} onPick={(p) => setLines((ls) => addToCart(ls, p))} valueLabel="Costo" />
+            </div>
+          </div>
+        }
+        ticket={
+          <>
+            <div className="adm-card-head">
+              <div>
+                <h2 className="adm-card-title">Pedido</h2>
+                <p className="adm-card-desc">
+                  {lines.length} productos · {cartUnits(lines)} unidades
+                </p>
+              </div>
+              {lines.length > 0 && (
+                <button type="button" onClick={() => setLines([])} className="adm-btn adm-btn-ghost adm-btn-sm">
+                  Vaciar
+                </button>
+              )}
+            </div>
+            <div className="p-5 flex flex-col gap-4">
+              <CartLines products={cartProducts} lines={lines} onChange={setLines} valueLabel="Costo unitario" />
+              <div className="pt-4 border-t border-[var(--adm-line)]">
+                <label className="adm-label">Notas</label>
+                <textarea
+                  value={form.notes}
+                  onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                  rows={2}
+                  className="adm-input"
+                />
+              </div>
+              {error && <p className="adm-alert adm-alert-danger">{error}</p>}
+            </div>
+            <div className="mt-auto p-5 border-t border-[var(--adm-line)] bg-[var(--adm-surface-2)] rounded-b-[14px]">
+              <div className="flex items-end justify-between mb-4">
+                <span className="adm-eyebrow">Total del pedido</span>
+                <span className="num text-[28px] font-semibold leading-none">{formatCOP(total)}</span>
+              </div>
+              <button type="submit" disabled={loading} className="adm-btn adm-btn-primary adm-btn-lg w-full">
+                {loading ? "Guardando…" : "Crear pedido"}
+              </button>
+            </div>
+          </>
+        }
+      />
     </form>
   );
 }

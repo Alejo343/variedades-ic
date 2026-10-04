@@ -1,134 +1,105 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import { MessageCircle } from "lucide-react";
 import { getSalesOrderById } from "@/lib/db/queries/sales-orders";
 import { getActiveCashAccounts } from "@/lib/db/queries/cash-accounts";
 import { SalesStatusActions } from "../_components/SalesStatusActions";
+import { Card, DefinitionList, Page, PageHeader, StatusBadge, StatusTimeline } from "../../_components/ui";
+import { formatCOP, formatDateTime } from "../../_lib/format";
 
-const STATUS_STYLES: Record<string, string> = {
-  pendiente: "bg-yellow-100 text-yellow-700",
-  confirmado: "bg-blue-100 text-blue-700",
-  entregado: "bg-green-100 text-green-700",
-  cancelado: "bg-gray-100 text-gray-500",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  pendiente: "Pendiente",
-  confirmado: "Confirmado",
-  entregado: "Entregado",
-  cancelado: "Cancelado",
-};
-
-function formatCOP(n: number) {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    maximumFractionDigits: 0,
-  }).format(n);
-}
-
-export default async function SalesOrderDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function SalesOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [order, accounts] = await Promise.all([getSalesOrderById(Number(id)), getActiveCashAccounts()]);
 
   if (!order) notFound();
 
-  const total = order.items.reduce(
-    (sum, i) => sum + i.quantity * (i.unitPrice ?? 0),
-    0
-  );
+  const total = order.items.reduce((sum, i) => sum + i.quantity * (i.unitPrice ?? 0), 0);
+  const waPhone = order.customerPhone.replace(/\D/g, "");
+  const waLink = `https://wa.me/${waPhone.length === 10 ? `57${waPhone}` : waPhone}`;
 
   return (
-    <div className="max-w-2xl flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <Link
-            href="/admin/sales-orders"
-            className="text-sm text-blue-600 hover:text-blue-800"
-          >
-            ← Pedidos de clientes
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-800 mt-1">
-            Pedido #{order.id}
-          </h1>
-        </div>
-        <span
-          className={`px-3 py-1 rounded-full text-sm font-medium ${
-            STATUS_STYLES[order.status] ?? "bg-gray-100 text-gray-500"
-          }`}
-        >
-          {STATUS_LABELS[order.status] ?? order.status}
-        </span>
-      </div>
+    <Page>
+      <PageHeader
+        back={{ href: "/admin/sales-orders", label: "Pedidos por WhatsApp" }}
+        eyebrow={`Pedido #${order.id}`}
+        title={order.customerName}
+        actions={
+          <>
+            <a href={waLink} target="_blank" rel="noopener noreferrer" className="adm-btn">
+              <MessageCircle />
+              Escribir por WhatsApp
+            </a>
+            <StatusBadge kind="sales" status={order.status} />
+          </>
+        }
+      />
 
-      <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col gap-3 text-sm">
-        <Row label="Cliente" value={order.customerName} />
-        <Row label="Teléfono" value={order.customerPhone} />
-        {order.deliveryNote && <Row label="Entrega" value={order.deliveryNote} />}
-        {order.notes && <Row label="Notas" value={order.notes} />}
-        <Row
-          label="Fecha"
-          value={new Date(order.createdAt).toLocaleDateString("es-CO")}
+      <div className="adm-card p-5">
+        <StatusTimeline
+          current={order.status}
+          steps={[
+            { value: "pendiente", label: "Pendiente" },
+            { value: "confirmado", label: "Confirmado" },
+            { value: "entregado", label: "Entregado" },
+          ]}
         />
+        {(order.status === "pendiente" || order.status === "confirmado") && (
+          <div className="mt-5 pt-5 border-t border-[var(--adm-line)]">
+            {order.status === "pendiente" && (
+              <p className="text-[13px] text-[var(--adm-ink-2)] mb-3">
+                Al confirmar se descuenta el stock y el total entra como ingreso en la cuenta elegida.
+              </p>
+            )}
+            <SalesStatusActions orderId={order.id} status={order.status} accounts={accounts} />
+          </div>
+        )}
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 font-semibold text-gray-700">
-          Productos
-        </div>
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Producto</th>
-              <th className="text-right px-5 py-3 font-medium text-gray-600">Cantidad</th>
-              <th className="text-right px-5 py-3 font-medium text-gray-600">Precio unit.</th>
-              <th className="text-right px-5 py-3 font-medium text-gray-600">Subtotal</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {order.items.map((item) => (
-              <tr key={item.id}>
-                <td className="px-5 py-3 text-gray-800">{item.productName}</td>
-                <td className="px-5 py-3 text-right text-gray-700">{item.quantity}</td>
-                <td className="px-5 py-3 text-right text-gray-700">
-                  {item.unitPrice ? formatCOP(item.unitPrice) : "—"}
-                </td>
-                <td className="px-5 py-3 text-right text-gray-700">
-                  {item.unitPrice
-                    ? formatCOP(item.quantity * item.unitPrice)
-                    : "—"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-          {total > 0 && (
-            <tfoot>
-              <tr className="border-t border-gray-200">
-                <td colSpan={3} className="px-5 py-3 text-right font-semibold text-gray-700">
-                  Total
-                </td>
-                <td className="px-5 py-3 text-right font-bold text-gray-800">
-                  {formatCOP(total)}
-                </td>
-              </tr>
-            </tfoot>
-          )}
-        </table>
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 items-start">
+        <Card title="Productos" flush>
+          <div className="adm-table-wrap">
+            <table className="adm-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th className="t-right">Cantidad</th>
+                  <th className="t-right">Precio unit.</th>
+                  <th className="t-right">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {order.items.map((item) => (
+                  <tr key={item.id}>
+                    <td className="t-strong">{item.productName}</td>
+                    <td className="t-right num">{item.quantity}</td>
+                    <td className="t-right num">{item.unitPrice ? formatCOP(item.unitPrice) : "—"}</td>
+                    <td className="t-right num">{item.unitPrice ? formatCOP(item.quantity * item.unitPrice) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan={3} className="t-right">
+                    Total
+                  </td>
+                  <td className="t-right num text-[15px]">{formatCOP(total)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </Card>
+
+        <Card title="Cliente">
+          <DefinitionList
+            items={[
+              { label: "Nombre", value: order.customerName },
+              { label: "Teléfono", value: <span className="num">{order.customerPhone}</span> },
+              { label: "Fecha", value: formatDateTime(order.createdAt) },
+              ...(order.deliveryNote ? [{ label: "Entrega", value: order.deliveryNote }] : []),
+              ...(order.notes ? [{ label: "Notas", value: order.notes }] : []),
+            ]}
+          />
+        </Card>
       </div>
-
-      <SalesStatusActions orderId={order.id} status={order.status} accounts={accounts} />
-    </div>
-  );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex gap-4">
-      <span className="w-28 text-gray-500 shrink-0">{label}</span>
-      <span className="text-gray-800">{value}</span>
-    </div>
+    </Page>
   );
 }

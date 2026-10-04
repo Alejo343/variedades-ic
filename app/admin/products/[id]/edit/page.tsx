@@ -1,3 +1,4 @@
+import { Page, PageHeader } from "../../../_components/ui";
 import { notFound } from "next/navigation";
 import { getProductById } from "@/lib/db/queries/products";
 import { getActiveCategories } from "@/lib/db/queries/categories";
@@ -17,9 +18,9 @@ export default async function EditProductPage({
   if (!product) notFound();
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Editar producto</h1>
+    <Page>
+      <PageHeader back={{ href: "/admin/products", label: "Productos" }} eyebrow="Editar producto" title={product.name} />
       <ProductForm categories={categories} initial={product} />
-    </div>
+    </Page>
   );
 }

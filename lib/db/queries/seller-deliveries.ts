@@ -1,6 +1,6 @@
 import { db } from "../index";
 import { sellerDeliveries, sellerDeliveryItems, inventoryMovements, products, sellers } from "../schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import type { SellerDeliveryInput } from "@/lib/validations";
 import { recordPrincipalMovement } from "./inventory";
 
@@ -16,6 +16,8 @@ export function getAllSellerDeliveries() {
       sellerName: sellers.name,
       deliveryDate: sellerDeliveries.deliveryDate,
       notes: sellerDeliveries.notes,
+      units: sql<number>`(SELECT COALESCE(SUM(${sellerDeliveryItems.quantity}), 0)::int FROM ${sellerDeliveryItems} WHERE ${sellerDeliveryItems.deliveryId} = ${sellerDeliveries.id})`,
+      totalCost: sql<number>`(SELECT COALESCE(SUM(${sellerDeliveryItems.quantity} * ${sellerDeliveryItems.unitCost}), 0)::int FROM ${sellerDeliveryItems} WHERE ${sellerDeliveryItems.deliveryId} = ${sellerDeliveries.id})`,
     })
     .from(sellerDeliveries)
     .leftJoin(sellers, eq(sellerDeliveries.sellerId, sellers.id))

@@ -1,10 +1,11 @@
+import { Page, PageHeader } from "../../../_components/ui";
 import { CashAccountForm } from "../_components/CashAccountForm";
 
 export default function NewCashAccountPage() {
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Nueva cuenta de caja</h1>
+    <Page>
+      <PageHeader back={{ href: "/admin/cash/accounts", label: "Cuentas de caja" }} title="Nueva cuenta de caja" />
       <CashAccountForm />
-    </div>
+    </Page>
   );
 }

@@ -54,22 +54,22 @@ export function CategoryForm({ initial }: { initial?: Category }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white rounded-xl shadow-sm p-6 max-w-lg flex flex-col gap-4"
+      className="adm-card p-6 max-w-2xl flex flex-col gap-5"
     >
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="adm-label">
           Nombre
         </label>
         <input
           value={form.name}
           onChange={(e) => handleNameChange(e.target.value)}
           required
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="adm-input"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="adm-label">
           Slug
         </label>
         <input
@@ -78,24 +78,24 @@ export function CategoryForm({ initial }: { initial?: Category }) {
           required
           pattern="[a-z0-9-]+"
           title="Solo letras minúsculas, números y guiones"
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="adm-input"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="adm-label">
           Descripción
         </label>
         <textarea
           value={form.description}
           onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
           rows={3}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="adm-input"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="adm-label">
           Color
         </label>
         <div className="flex items-center gap-3">
@@ -109,30 +109,30 @@ export function CategoryForm({ initial }: { initial?: Category }) {
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+      <label className="flex items-center gap-2.5 text-sm text-[var(--adm-ink)] cursor-pointer select-none">
         <input
           type="checkbox"
           checked={form.active}
           onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
-          className="w-4 h-4 accent-blue-600"
+          className="adm-check"
         />
         Activa
       </label>
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="adm-alert adm-alert-danger">{error}</p>}
 
       <div className="flex gap-3 pt-2">
         <button
           type="submit"
           disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition disabled:opacity-60"
+          className="adm-btn adm-btn-primary"
         >
           {loading ? "Guardando..." : isEdit ? "Guardar cambios" : "Crear categoría"}
         </button>
         <button
           type="button"
           onClick={() => router.push("/admin/categories")}
-          className="text-sm text-gray-600 hover:text-gray-800 px-3 py-2"
+          className="adm-btn adm-btn-ghost"
         >
           Cancelar
         </button>

@@ -7,12 +7,12 @@ type Account = { id: number; name: string };
 
 const NEXT_STATUS: Record<string, { label: string; status: string; style: string }[]> = {
   pendiente: [
-    { label: "Confirmar pedido", status: "confirmado", style: "bg-blue-600 hover:bg-blue-700 text-white" },
-    { label: "Cancelar", status: "cancelado", style: "bg-red-100 hover:bg-red-200 text-red-700" },
+    { label: "Confirmar pedido", status: "confirmado", style: "adm-btn-brand" },
+    { label: "Cancelar", status: "cancelado", style: "adm-btn-danger" },
   ],
   confirmado: [
-    { label: "Marcar entregado", status: "entregado", style: "bg-green-600 hover:bg-green-700 text-white" },
-    { label: "Cancelar", status: "cancelado", style: "bg-red-100 hover:bg-red-200 text-red-700" },
+    { label: "Marcar entregado", status: "entregado", style: "adm-btn-ok" },
+    { label: "Cancelar", status: "cancelado", style: "adm-btn-danger" },
   ],
 };
 
@@ -34,6 +34,7 @@ export function SalesStatusActions({
   if (!actions) return null;
 
   async function changeStatus(newStatus: string) {
+    if (newStatus === "cancelado" && !confirm("¿Cancelar este pedido?")) return;
     if (newStatus === "confirmado" && accountId === "") {
       setError("Selecciona la cuenta para el ingreso");
       return;
@@ -67,7 +68,7 @@ export function SalesStatusActions({
         <select
           value={accountId}
           onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : "")}
-          className="w-56 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="adm-input sm:w-64"
         >
           <option value="">Cuenta para el ingreso...</option>
           {accounts.map((a) => (
@@ -83,12 +84,12 @@ export function SalesStatusActions({
             key={a.status}
             onClick={() => changeStatus(a.status)}
             disabled={loading || (a.status === "confirmado" && accountId === "")}
-            className={`text-sm font-medium px-4 py-2 rounded-lg transition disabled:opacity-60 ${a.style}`}
+            className={`adm-btn ${a.style}`}
           >
             {a.label}
           </button>
         ))}
-        {error && <p className="text-sm text-red-500 w-full">{error}</p>}
+        {error && <p className="adm-alert adm-alert-danger w-full">{error}</p>}
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { Page, PageHeader } from "../../../_components/ui";
 import { notFound } from "next/navigation";
 import { getCategoryById } from "@/lib/db/queries/categories";
 import { CategoryForm } from "../../_components/CategoryForm";
@@ -12,9 +13,9 @@ export default async function EditCategoryPage({
   if (!category) notFound();
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Editar categoría</h1>
+    <Page>
+      <PageHeader back={{ href: "/admin/categories", label: "Categorías" }} eyebrow="Editar categoría" title={category.name} />
       <CategoryForm initial={category} />
-    </div>
+    </Page>
   );
 }

@@ -1,3 +1,4 @@
+import { Page, PageHeader } from "../../_components/ui";
 import { getActiveCategories } from "@/lib/db/queries/categories";
 import { ProductForm } from "../_components/ProductForm";
 
@@ -5,9 +6,9 @@ export default async function NewProductPage() {
   const categories = await getActiveCategories();
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Nuevo producto</h1>
+    <Page>
+      <PageHeader back={{ href: "/admin/products", label: "Productos" }} title="Nuevo producto" />
       <ProductForm categories={categories} />
-    </div>
+    </Page>
   );
 }

@@ -1,78 +1,104 @@
 import Link from "next/link";
+import { Plus, ReceiptText } from "lucide-react";
 import { getAllSettlements } from "@/lib/db/queries/settlements";
 import { getActiveCashAccounts } from "@/lib/db/queries/cash-accounts";
 import { LiquidateButton } from "./_components/LiquidateButton";
+import { ButtonLink, EmptyState, FilterTabs, Page, PageHeader, Stat, StatusBadge } from "../_components/ui";
+import { formatCOP, formatPlainDate } from "../_lib/format";
 
-function formatCOP(amount: number) {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(amount);
-}
-
-export default async function SettlementsPage() {
+export default async function SettlementsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
+  const { status = "" } = await searchParams;
   const [settlements, accounts] = await Promise.all([getAllSettlements(), getActiveCashAccounts()]);
 
+  const pending = settlements.filter((s) => s.status === "pendiente");
+  const rows = status ? settlements.filter((s) => s.status === status) : settlements;
+  const pendingTotal = pending.reduce((t, s) => t + s.amountDue, 0);
+
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Liquidaciones</h1>
-        <Link
-          href="/admin/settlements/new"
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
-        >
-          + Nueva liquidación
-        </Link>
+    <Page>
+      <PageHeader
+        eyebrow="Vendedores"
+        title="Liquidaciones"
+        description="Cierre de cuentas con cada vendedor: ventas − comisión + pérdidas = lo que debe entregar."
+        actions={
+          <ButtonLink href="/admin/settlements/new" variant="primary" icon={Plus}>
+            Nueva liquidación
+          </ButtonLink>
+        }
+      />
+
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <Stat
+          label="Por cobrar"
+          value={formatCOP(pendingTotal)}
+          valueTone={pendingTotal > 0 ? "warn" : "neutral"}
+          hint={`${pending.length} liquidaciones pendientes`}
+          icon={ReceiptText}
+          tone="warn"
+        />
+        <Stat
+          label="Liquidado (histórico)"
+          value={formatCOP(settlements.filter((s) => s.status === "liquidada").reduce((t, s) => t + s.amountDue, 0))}
+          tone="ok"
+        />
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Fecha</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Vendedor</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Ventas</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Comisión</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Pérdidas</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">A entregar</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Estado</th>
-              <th className="px-5 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {settlements.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-5 py-8 text-center text-gray-400">
-                  No hay liquidaciones registradas
-                </td>
-              </tr>
-            )}
-            {settlements.map((s) => (
-              <tr key={s.id} className="hover:bg-gray-50 transition">
-                <td className="px-5 py-3 text-gray-600">{s.periodDate}</td>
-                <td className="px-5 py-3 font-medium text-gray-800">{s.sellerName ?? "—"}</td>
-                <td className="px-5 py-3 text-gray-600">{formatCOP(s.totalSales)}</td>
-                <td className="px-5 py-3 text-gray-600">{formatCOP(s.totalCommission)}</td>
-                <td className="px-5 py-3 text-gray-600">{formatCOP(s.totalLosses)}</td>
-                <td className="px-5 py-3 font-medium text-gray-800">{formatCOP(s.amountDue)}</td>
-                <td className="px-5 py-3">
-                  <span
-                    className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                      s.status === "liquidada" ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
-                    }`}
-                  >
-                    {s.status === "liquidada" ? "Liquidada" : "Pendiente"}
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-right">
-                  {s.status === "pendiente" && <LiquidateButton id={s.id} accounts={accounts} />}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="adm-card overflow-hidden">
+        <div className="p-4 border-b border-[var(--adm-line)]">
+          <FilterTabs
+            basePath="/admin/settlements"
+            param="status"
+            current={status}
+            options={[
+              { value: "", label: "Todas", count: settlements.length },
+              { value: "pendiente", label: "Pendientes", count: pending.length },
+              { value: "liquidada", label: "Liquidadas", count: settlements.length - pending.length },
+            ]}
+          />
+        </div>
+        {rows.length === 0 ? (
+          <EmptyState icon={ReceiptText} title="No hay liquidaciones" />
+        ) : (
+          <div className="adm-table-wrap">
+            <table className="adm-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Vendedor</th>
+                  <th className="t-right">Ventas</th>
+                  <th className="t-right">Comisión</th>
+                  <th className="t-right">Pérdidas</th>
+                  <th className="t-right">A entregar</th>
+                  <th>Estado</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((s) => (
+                  <tr key={s.id}>
+                    <td className="whitespace-nowrap">{formatPlainDate(s.periodDate)}</td>
+                    <td className="t-strong">
+                      <Link href={`/admin/sellers/${s.sellerId}`} className="hover:underline underline-offset-4">
+                        {s.sellerName ?? "—"}
+                      </Link>
+                    </td>
+                    <td className="t-right num">{formatCOP(s.totalSales)}</td>
+                    <td className="t-right num">−{formatCOP(s.totalCommission)}</td>
+                    <td className="t-right num">+{formatCOP(s.totalLosses)}</td>
+                    <td className="t-right num t-strong">{formatCOP(s.amountDue)}</td>
+                    <td>
+                      <StatusBadge kind="settlement" status={s.status} />
+                    </td>
+                    <td className="t-right">
+                      {s.status === "pendiente" && <LiquidateButton id={s.id} accounts={accounts} />}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-    </div>
+    </Page>
   );
 }

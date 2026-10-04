@@ -1,12 +1,11 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getActiveSellers, getSellerById } from "@/lib/db/queries/sellers";
 import { previewSettlement } from "@/lib/db/queries/settlements";
 import { SellerPicker } from "@/app/admin/_components/SellerPicker";
 import { SettlementPreview } from "../_components/SettlementPreview";
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
+import { Page, PageHeader } from "../../_components/ui";
+import { todayInBogota } from "../../_lib/format";
 
 export default async function NewSettlementPage({
   searchParams,
@@ -14,18 +13,19 @@ export default async function NewSettlementPage({
   searchParams: Promise<{ sellerId?: string; date?: string }>;
 }) {
   const { sellerId, date } = await searchParams;
+  const back = { href: "/admin/settlements", label: "Liquidaciones" };
 
   if (!sellerId) {
     const sellers = await getActiveSellers();
     return (
-      <div>
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">Nueva liquidación</h1>
+      <Page>
+        <PageHeader back={back} title="Nueva liquidación" description="Cierra las cuentas de un vendedor hasta una fecha." />
         <SellerPicker sellers={sellers} basePath="/admin/settlements/new" />
-      </div>
+      </Page>
     );
   }
 
-  const periodDate = date ?? todayISO();
+  const periodDate = date ?? todayInBogota();
   const [[seller], preview] = await Promise.all([
     getSellerById(Number(sellerId)),
     previewSettlement(Number(sellerId), periodDate),
@@ -34,10 +34,18 @@ export default async function NewSettlementPage({
   if (!seller) notFound();
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-1">Nueva liquidación</h1>
-      <p className="text-sm text-gray-500 mb-6">{seller.name}</p>
+    <Page>
+      <PageHeader
+        back={back}
+        eyebrow="Nueva liquidación"
+        title={seller.name}
+        actions={
+          <Link href="/admin/settlements/new" className="adm-btn adm-btn-ghost">
+            Cambiar vendedor
+          </Link>
+        }
+      />
       <SettlementPreview sellerId={seller.id} periodDate={periodDate} preview={preview} />
-    </div>
+    </Page>
   );
 }

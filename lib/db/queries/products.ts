@@ -84,6 +84,8 @@ export function getAllProducts() {
       createdAt: products.createdAt,
       categoryId: products.categoryId,
       categoryName: categories.name,
+      categoryColor: categories.color,
+      imageUrl: sql<string | null>`(SELECT ${productImages.url} FROM ${productImages} WHERE ${productImages.productId} = ${products.id} ORDER BY ${productImages.isPrimary} DESC, ${productImages.displayOrder} ASC LIMIT 1)`,
     })
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))

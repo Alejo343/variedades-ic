@@ -1,3 +1,4 @@
+import { Page, PageHeader } from "../../../../_components/ui";
 import { notFound } from "next/navigation";
 import { getCashAccountById } from "@/lib/db/queries/cash-accounts";
 import { CashAccountForm } from "../../_components/CashAccountForm";
@@ -13,9 +14,9 @@ export default async function EditCashAccountPage({
   if (!account) notFound();
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Editar cuenta de caja</h1>
+    <Page>
+      <PageHeader back={{ href: "/admin/cash/accounts", label: "Cuentas de caja" }} eyebrow="Editar cuenta de caja" title={account.name} />
       <CashAccountForm initial={account} />
-    </div>
+    </Page>
   );
 }

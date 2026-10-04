@@ -2,58 +2,79 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { CalendarRange, Printer } from "lucide-react";
+import { shiftDate, todayInBogota } from "../../_lib/format";
+
+function presets() {
+  const today = todayInBogota();
+  const monthStart = `${today.slice(0, 8)}01`;
+  const prevMonthEnd = shiftDate(monthStart, -1);
+  const prevMonthStart = `${prevMonthEnd.slice(0, 8)}01`;
+  return [
+    { label: "Hoy", from: today, to: today },
+    { label: "7 días", from: shiftDate(today, -6), to: today },
+    { label: "30 días", from: shiftDate(today, -29), to: today },
+    { label: "Este mes", from: monthStart, to: today },
+    { label: "Mes pasado", from: prevMonthStart, to: prevMonthEnd },
+    { label: "Todo", from: "", to: "" },
+  ];
+}
 
 export function DateRangeFilter({ from, to }: { from?: string; to?: string }) {
   const router = useRouter();
   const [fromDate, setFromDate] = useState(from ?? "");
   const [toDate, setToDate] = useState(to ?? "");
 
-  function apply() {
+  function go(f: string, t: string) {
+    setFromDate(f);
+    setToDate(t);
     const params = new URLSearchParams();
-    if (fromDate) params.set("from", fromDate);
-    if (toDate) params.set("to", toDate);
-    router.push(`/admin/reports${params.toString() ? `?${params.toString()}` : ""}`);
+    if (f) params.set("from", f);
+    if (t) params.set("to", t);
+    const q = params.toString();
+    router.push(`/admin/reports${q ? `?${q}` : ""}`, { scroll: false });
   }
 
-  function clear() {
-    setFromDate("");
-    setToDate("");
-    router.push("/admin/reports");
-  }
+  const list = presets();
+  const activePreset = list.find((p) => p.from === (from ?? "") && p.to === (to ?? ""));
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-4 flex items-end gap-3 flex-wrap">
-      <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Desde</label>
-        <input
-          type="date"
-          value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+    <div className="adm-card p-4 flex flex-col gap-3 print:hidden">
+      <div className="flex flex-col xl:flex-row xl:items-center gap-3 xl:justify-between">
+        <div className="adm-seg">
+          {list.map((p) => (
+            <button key={p.label} type="button" data-active={activePreset?.label === p.label} onClick={() => go(p.from, p.to)}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <CalendarRange size={16} className="text-[var(--adm-ink-3)]" />
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="adm-input h-9 w-auto"
+            aria-label="Desde"
+          />
+          <span className="text-[var(--adm-ink-3)] text-sm">a</span>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="adm-input h-9 w-auto"
+            aria-label="Hasta"
+          />
+          <button type="button" onClick={() => go(fromDate, toDate)} className="adm-btn adm-btn-primary h-9">
+            Aplicar
+          </button>
+          <button type="button" onClick={() => window.print()} className="adm-btn h-9" title="Imprimir o guardar como PDF">
+            <Printer />
+          </button>
+        </div>
       </div>
-      <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1">Hasta</label>
-        <input
-          type="date"
-          value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-      <button
-        onClick={apply}
-        className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
-      >
-        Aplicar
-      </button>
-      {(from || to) && (
-        <button onClick={clear} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2">
-          Quitar filtro
-        </button>
-      )}
-      <p className="text-xs text-gray-400 w-full">
-        Afecta a Compras, Ventas, Utilidad y Caja. Los demás reportes muestran el estado actual.
+      <p className="text-[12px] text-[var(--adm-ink-3)]">
+        El rango afecta a Compras, Ventas, Utilidad y Caja. Inventario, alertas, vendedores y cuentas por pagar muestran el estado actual.
       </p>
     </div>
   );

@@ -10,7 +10,9 @@ type Props = {
 export function AdjustmentForm({ products }: Props) {
   const router = useRouter();
   const [productId, setProductId] = useState<number | "">("");
-  const [quantityDelta, setQuantityDelta] = useState(0);
+  const [direction, setDirection] = useState<"in" | "out">("in");
+  const [quantity, setQuantity] = useState(0);
+  const quantityDelta = direction === "in" ? quantity : -quantity;
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -39,57 +41,67 @@ export function AdjustmentForm({ products }: Props) {
     }
 
     setProductId("");
-    setQuantityDelta(0);
+    setQuantity(0);
     setReason("");
     router.refresh();
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="bg-white rounded-xl shadow-sm p-5 flex flex-col gap-3"
-    >
-      <h2 className="text-sm font-semibold text-gray-700">Ajuste manual de inventario</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+    <form onSubmit={handleSubmit} className="adm-card p-5 flex flex-col gap-4">
+      <div>
+        <h2 className="adm-card-title">Ajuste manual</h2>
+        <p className="adm-card-desc">Corrige el stock tras un conteo físico. Queda registrado en el historial.</p>
+      </div>
+      <div>
+        <label className="adm-label">Producto</label>
         <select
           value={productId}
           onChange={(e) => setProductId(e.target.value ? Number(e.target.value) : "")}
           required
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="adm-input"
         >
-          <option value="">Producto...</option>
+          <option value="">Selecciona…</option>
           {products.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>
           ))}
         </select>
+      </div>
+      <div className="grid grid-cols-[1fr_110px] gap-3 items-end">
+        <div className="adm-seg [&>*]:flex-1 [&>*]:justify-center">
+          <button type="button" data-active={direction === "in"} onClick={() => setDirection("in")}>
+            + Entrada
+          </button>
+          <button type="button" data-active={direction === "out"} onClick={() => setDirection("out")}>
+            − Salida
+          </button>
+        </div>
         <input
           type="number"
-          value={quantityDelta}
-          onChange={(e) => setQuantityDelta(Number(e.target.value))}
-          placeholder="Cantidad (+/-)"
+          min={1}
+          value={quantity || ""}
+          onChange={(e) => setQuantity(Number(e.target.value))}
+          placeholder="Cant."
           required
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label="Cantidad"
+          className="adm-input num"
         />
+      </div>
+      <div>
+        <label className="adm-label">Motivo</label>
         <input
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="Motivo"
+          placeholder="Ej. Conteo físico del sábado"
           required
-          className="sm:col-span-2 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="adm-input"
         />
       </div>
-      {error && <p className="text-sm text-red-500">{error}</p>}
-      <div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition disabled:opacity-60"
-        >
-          {loading ? "Guardando..." : "Registrar ajuste"}
-        </button>
-      </div>
+      {error && <p className="adm-alert adm-alert-danger">{error}</p>}
+      <button type="submit" disabled={loading || quantity < 1} className="adm-btn adm-btn-primary">
+        {loading ? "Guardando…" : "Registrar ajuste"}
+      </button>
     </form>
   );
 }

@@ -1,6 +1,6 @@
 import { db } from "../index";
 import { sellerLosses, sellerLossItems, inventoryMovements, sellers } from "../schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import type { SellerLossInput } from "@/lib/validations";
 import { deductStock } from "@/lib/domain/stock";
 import { getSellerBalance } from "./seller-inventory";
@@ -18,6 +18,8 @@ export function getAllSellerLosses() {
       type: sellerLosses.type,
       lossDate: sellerLosses.lossDate,
       notes: sellerLosses.notes,
+      units: sql<number>`(SELECT COALESCE(SUM(${sellerLossItems.quantity}), 0)::int FROM ${sellerLossItems} WHERE ${sellerLossItems.lossId} = ${sellerLosses.id})`,
+      totalCost: sql<number>`(SELECT COALESCE(SUM(${sellerLossItems.quantity} * ${sellerLossItems.unitCost}), 0)::int FROM ${sellerLossItems} WHERE ${sellerLossItems.lossId} = ${sellerLosses.id})`,
     })
     .from(sellerLosses)
     .leftJoin(sellers, eq(sellerLosses.sellerId, sellers.id))

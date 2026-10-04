@@ -18,6 +18,7 @@ export function getAllSellerReturns() {
       sellerName: sellers.name,
       returnDate: sellerReturns.returnDate,
       notes: sellerReturns.notes,
+      units: sql<number>`(SELECT COALESCE(SUM(${sellerReturnItems.quantity}), 0)::int FROM ${sellerReturnItems} WHERE ${sellerReturnItems.returnId} = ${sellerReturns.id})`,
     })
     .from(sellerReturns)
     .leftJoin(sellers, eq(sellerReturns.sellerId, sellers.id))

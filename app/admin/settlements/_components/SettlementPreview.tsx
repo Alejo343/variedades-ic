@@ -2,16 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatCOP } from "../../_lib/format";
 
 type Preview = { totalSales: number; totalCommission: number; totalLosses: number; amountDue: number };
 
-function formatCOP(amount: number) {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    minimumFractionDigits: 0,
-  }).format(amount);
-}
 
 export function SettlementPreview({
   sellerId,
@@ -52,58 +46,60 @@ export function SettlementPreview({
     router.refresh();
   }
 
+  const lines: [string, string, string][] = [
+    ["Total vendido", "", formatCOP(preview.totalSales)],
+    ["Comisión del vendedor", "−", formatCOP(preview.totalCommission)],
+    ["Pérdidas, daños y robos", "+", formatCOP(preview.totalLosses)],
+  ];
+
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6 max-w-lg flex flex-col gap-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Fecha a liquidar</label>
-        <input
-          type="date"
-          value={periodDate}
-          onChange={(e) => handleDateChange(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <p className="text-xs text-gray-500 mt-1">
-          Incluye todas las ventas y pérdidas del vendedor hasta esta fecha que todavía no se hayan liquidado.
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-2 text-sm border-t border-gray-100 pt-4">
-        <div className="flex justify-between">
-          <span className="text-gray-500">Total vendido</span>
-          <span className="text-gray-800">{formatCOP(preview.totalSales)}</span>
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-4 items-start">
+      <div className="adm-card p-6 flex flex-col gap-4">
+        <div>
+          <label className="adm-label">Liquidar hasta la fecha</label>
+          <input type="date" value={periodDate} onChange={(e) => handleDateChange(e.target.value)} className="adm-input max-w-xs" />
+          <p className="adm-hint">
+            Incluye todas las ventas y pérdidas del vendedor hasta esta fecha que todavía no se hayan liquidado.
+          </p>
         </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">Comisión del vendedor</span>
-          <span className="text-gray-800">- {formatCOP(preview.totalCommission)}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className="text-gray-500">Pérdidas/daños/robos</span>
-          <span className="text-gray-800">+ {formatCOP(preview.totalLosses)}</span>
-        </div>
-        <div className="flex justify-between border-t border-gray-100 pt-2 font-bold">
-          <span className="text-gray-800">A entregar</span>
-          <span className="text-gray-800">{formatCOP(preview.amountDue)}</span>
+        <div className="adm-alert adm-alert-info">
+          <span>
+            Al crearla queda <strong>pendiente</strong>. Cuando el vendedor te entregue el dinero, márcala como liquidada en el listado
+            y elige la cuenta donde entra.
+          </span>
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
-
-      <div className="flex gap-3">
-        <button
-          type="button"
-          onClick={handleCreate}
-          disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition disabled:opacity-60"
-        >
-          {loading ? "Creando..." : "Crear liquidación"}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.push("/admin/settlements")}
-          className="text-sm text-gray-600 hover:text-gray-800 px-3 py-2"
-        >
-          Cancelar
-        </button>
+      {/* Receipt */}
+      <div className="adm-card overflow-hidden">
+        <div className="px-6 pt-6 pb-4 border-b border-dashed border-[var(--adm-line-strong)]">
+          <p className="adm-eyebrow">Resumen de liquidación</p>
+          <p className="num text-[13px] text-[var(--adm-ink-3)] mt-1">Hasta {periodDate}</p>
+        </div>
+        <div className="px-6 py-4 flex flex-col gap-3">
+          {lines.map(([label, sign, value]) => (
+            <div key={label} className="flex justify-between text-[14px]">
+              <span className="text-[var(--adm-ink-2)]">{label}</span>
+              <span className="num">
+                {sign && <span className="text-[var(--adm-ink-3)] mr-1">{sign}</span>}
+                {value}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="px-6 py-5 bg-[#16171b] text-white flex items-end justify-between">
+          <span className="text-[12px] uppercase tracking-[.14em] text-slate-400 font-semibold">A entregar</span>
+          <span className="num text-[30px] font-semibold leading-none">{formatCOP(preview.amountDue)}</span>
+        </div>
+        <div className="p-5 flex flex-col gap-3">
+          {error && <p className="adm-alert adm-alert-danger">{error}</p>}
+          <button type="button" onClick={handleCreate} disabled={loading} className="adm-btn adm-btn-primary adm-btn-lg w-full">
+            {loading ? "Creando…" : "Crear liquidación"}
+          </button>
+          <button type="button" onClick={() => router.push("/admin/settlements")} className="adm-btn adm-btn-ghost w-full">
+            Cancelar
+          </button>
+        </div>
       </div>
     </div>
   );

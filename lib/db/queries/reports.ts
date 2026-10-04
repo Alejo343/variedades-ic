@@ -138,3 +138,49 @@ export async function getProfitReport(from?: string, to?: string) {
 
   return { revenue: sales.totalAmount, cogs, profit: sales.totalAmount - cogs };
 }
+
+export type DailySalesPoint = { date: string; whatsapp: number; local: number; seller: number };
+
+/**
+ * Sales per calendar day and channel over [from, to] (YYYY-MM-DD, inclusive),
+ * with the same channel rules as getSalesReport (WhatsApp counts only
+ * confirmado/entregado). Days without sales are filled with zeros so the
+ * caller gets one point per day in order.
+ */
+export async function getDailySales(from: string, to: string): Promise<DailySalesPoint[]> {
+  const day = (col: AnyColumn) => sql<string>`to_char(${col}, 'YYYY-MM-DD')`;
+
+  const [whatsappRows, localRows, sellerRows] = await Promise.all([
+    db
+      .select({ day: day(salesOrders.createdAt), total: sql<string>`COALESCE(SUM(${salesOrders.totalPrice}), 0)` })
+      .from(salesOrders)
+      .where(and(inArray(salesOrders.status, ["confirmado", "entregado"]), ...dateRangeConditions(salesOrders.createdAt, from, to)))
+      .groupBy(day(salesOrders.createdAt)),
+    db
+      .select({ day: day(directSales.saleDate), total: sql<string>`COALESCE(SUM(${directSales.totalAmount}), 0)` })
+      .from(directSales)
+      .where(and(...dateRangeConditions(directSales.saleDate, from, to)))
+      .groupBy(day(directSales.saleDate)),
+    db
+      .select({ day: day(sellerSales.saleDate), total: sql<string>`COALESCE(SUM(${sellerSales.totalAmount}), 0)` })
+      .from(sellerSales)
+      .where(and(...dateRangeConditions(sellerSales.saleDate, from, to)))
+      .groupBy(day(sellerSales.saleDate)),
+  ]);
+
+  const toMap = (rows: { day: string; total: string }[]) => new Map(rows.map((r) => [r.day, Number(r.total)]));
+  const w = toMap(whatsappRows);
+  const l = toMap(localRows);
+  const s = toMap(sellerRows);
+
+  const points: DailySalesPoint[] = [];
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const cursor = new Date(Date.UTC(fy, fm - 1, fd));
+  for (;;) {
+    const key = cursor.toISOString().slice(0, 10);
+    if (key > to) break;
+    points.push({ date: key, whatsapp: w.get(key) ?? 0, local: l.get(key) ?? 0, seller: s.get(key) ?? 0 });
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return points;
+}

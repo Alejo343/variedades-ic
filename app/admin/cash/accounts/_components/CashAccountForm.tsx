@@ -44,23 +44,23 @@ export function CashAccountForm({ initial }: { initial?: CashAccount }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm p-6 max-w-lg flex flex-col gap-4">
+    <form onSubmit={handleSubmit} className="adm-card p-6 max-w-2xl flex flex-col gap-5">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+        <label className="adm-label">Nombre *</label>
         <input
           value={form.name}
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
           required
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="adm-input"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
+        <label className="adm-label">Tipo</label>
         <select
           value={form.type}
           onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="adm-input"
         >
           <option value="efectivo">Efectivo</option>
           <option value="banco">Banco</option>
@@ -68,39 +68,39 @@ export function CashAccountForm({ initial }: { initial?: CashAccount }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+        <label className="adm-label">Notas</label>
         <textarea
           value={form.notes}
           onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
           rows={3}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="adm-input"
         />
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+      <label className="flex items-center gap-2.5 text-sm text-[var(--adm-ink)] cursor-pointer select-none">
         <input
           type="checkbox"
           checked={form.active}
           onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
-          className="w-4 h-4 accent-blue-600"
+          className="adm-check"
         />
         Activa
       </label>
 
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="adm-alert adm-alert-danger">{error}</p>}
 
       <div className="flex gap-3 pt-2">
         <button
           type="submit"
           disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition disabled:opacity-60"
+          className="adm-btn adm-btn-primary"
         >
           {loading ? "Guardando..." : isEdit ? "Guardar cambios" : "Crear cuenta"}
         </button>
         <button
           type="button"
           onClick={() => router.push("/admin/cash/accounts")}
-          className="text-sm text-gray-600 hover:text-gray-800 px-3 py-2"
+          className="adm-btn adm-btn-ghost"
         >
           Cancelar
         </button>

@@ -1,79 +1,96 @@
 import Link from "next/link";
+import { ChevronRight, MapPin, Phone, Plus, Users } from "lucide-react";
 import { getAllSellers } from "@/lib/db/queries/sellers";
+import { getAllSellersInventory } from "@/lib/db/queries/seller-inventory";
+import { Badge, ButtonLink, EmptyState, Page, PageHeader } from "../_components/ui";
+import { formatCOP } from "../_lib/format";
 
 function formatCommission(type: string, value: number) {
-  return type === "percentage" ? `${(value / 100).toFixed(2)}%` : `$${value.toLocaleString("es-CO")}/u`;
+  return type === "percentage" ? `${(value / 100).toLocaleString("es-CO", { maximumFractionDigits: 2 })}%` : `${formatCOP(value)}/u`;
 }
 
 export default async function SellersPage() {
-  const sellers = await getAllSellers();
+  const [sellers, inventory] = await Promise.all([getAllSellers(), getAllSellersInventory()]);
+
+  const units = new Map<number, number>();
+  for (const row of inventory) {
+    if (row.sellerId !== null) units.set(row.sellerId, (units.get(row.sellerId) ?? 0) + row.quantity);
+  }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Vendedores</h1>
-        <Link
-          href="/admin/sellers/new"
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
-        >
-          + Nuevo vendedor
-        </Link>
-      </div>
+    <Page>
+      <PageHeader
+        eyebrow="Vendedores"
+        title="Vendedores"
+        description="Personas que venden tu mercancía en consignación y liquidan con comisión."
+        actions={
+          <ButtonLink href="/admin/sellers/new" variant="primary" icon={Plus}>
+            Nuevo vendedor
+          </ButtonLink>
+        }
+      />
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Nombre</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Ciudad</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Teléfono</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Comisión</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Estado</th>
-              <th className="px-5 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {sellers.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-5 py-8 text-center text-gray-400">
-                  No hay vendedores registrados
-                </td>
-              </tr>
-            )}
-            {sellers.map((s) => (
-              <tr key={s.id} className="hover:bg-gray-50 transition">
-                <td className="px-5 py-3 font-medium text-gray-800">
-                  <Link href={`/admin/sellers/${s.id}`} className="hover:underline">
-                    {s.name}
-                  </Link>
-                </td>
-                <td className="px-5 py-3 text-gray-600">{s.city ?? "—"}</td>
-                <td className="px-5 py-3 text-gray-600">{s.phone ?? "—"}</td>
-                <td className="px-5 py-3 text-gray-600">
-                  {formatCommission(s.commissionType, s.commissionValue)}
-                </td>
-                <td className="px-5 py-3">
-                  <span
-                    className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                      s.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {s.active ? "Activo" : "Inactivo"}
+      {sellers.length === 0 ? (
+        <div className="adm-card">
+          <EmptyState icon={Users} title="No hay vendedores registrados" description="Agrega un vendedor para entregarle mercancía en consignación." />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {sellers.map((s) => {
+            const initials = s.name
+              .split(/\s+/)
+              .map((w) => w[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase();
+            const u = units.get(s.id) ?? 0;
+            return (
+              <Link
+                key={s.id}
+                href={`/admin/sellers/${s.id}`}
+                className={`adm-card group p-5 flex flex-col gap-4 transition hover:shadow-md hover:border-[var(--adm-line-strong)] ${s.active ? "" : "opacity-60"}`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="w-11 h-11 rounded-full grid place-items-center bg-[#16171b] text-white text-[14px] font-semibold shrink-0">
+                    {initials}
                   </span>
-                </td>
-                <td className="px-5 py-3 text-right">
-                  <Link
-                    href={`/admin/sellers/${s.id}/edit`}
-                    className="text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    Editar
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-[15.5px] truncate">{s.name}</p>
+                    <div className="flex flex-wrap gap-x-3 text-[12.5px] text-[var(--adm-ink-3)]">
+                      {s.city && (
+                        <span className="inline-flex items-center gap-1">
+                          <MapPin size={12} />
+                          {s.city}
+                        </span>
+                      )}
+                      {s.phone && (
+                        <span className="inline-flex items-center gap-1 num">
+                          <Phone size={12} />
+                          {s.phone}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <ChevronRight size={18} className="text-[var(--adm-ink-3)] group-hover:translate-x-0.5 transition" />
+                </div>
+                <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[var(--adm-line)]">
+                  <div>
+                    <p className="adm-eyebrow">Comisión</p>
+                    <p className="num text-[15px] font-semibold mt-1">{formatCommission(s.commissionType, s.commissionValue)}</p>
+                  </div>
+                  <div>
+                    <p className="adm-eyebrow">En su poder</p>
+                    <p className="num text-[15px] font-semibold mt-1">
+                      {u} <span className="text-[12px] font-normal text-[var(--adm-ink-3)]">unidades</span>
+                    </p>
+                  </div>
+                </div>
+                {!s.active && <Badge className="self-start">Inactivo</Badge>}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </Page>
   );
 }

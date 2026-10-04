@@ -1,10 +1,11 @@
+import { Page, PageHeader } from "../../_components/ui";
 import { SellerForm } from "../_components/SellerForm";
 
 export default function NewSellerPage() {
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Nuevo vendedor</h1>
+    <Page>
+      <PageHeader back={{ href: "/admin/sellers", label: "Vendedores" }} title="Nuevo vendedor" />
       <SellerForm />
-    </div>
+    </Page>
   );
 }

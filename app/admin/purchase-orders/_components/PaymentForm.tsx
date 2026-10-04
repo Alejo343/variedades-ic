@@ -60,13 +60,13 @@ export function PaymentForm({ orderId, pending, accounts }: Props) {
           value={amount}
           onChange={(e) => setAmount(Number(e.target.value))}
           placeholder="Monto (COP)"
-          className="w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-40 adm-input num"
         />
         <select
           value={accountId}
           onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : "")}
           required
-          className="flex-1 min-w-40 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex-1 min-w-40 adm-input"
         >
           <option value="">Cuenta...</option>
           {accounts.map((a) => (
@@ -81,15 +81,15 @@ export function PaymentForm({ orderId, pending, accounts }: Props) {
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
         placeholder="Notas (opcional)"
-        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="adm-input"
       />
-      {error && <p className="text-sm text-red-500">{error}</p>}
+      {error && <p className="adm-alert adm-alert-danger">{error}</p>}
       <button
         type="submit"
         disabled={loading || amount < 1}
-        className="self-start bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition disabled:opacity-60"
+        className="adm-btn adm-btn-primary self-start"
       >
-        {loading ? "Registrando..." : "Registrar pago"}
+        {loading ? "Registrando…" : "Registrar pago"}
       </button>
     </form>
   );

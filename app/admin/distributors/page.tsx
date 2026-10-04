@@ -1,85 +1,93 @@
 import Link from "next/link";
+import { MapPin, Phone, Plus, Truck } from "lucide-react";
 import { getAllDistributors } from "@/lib/db/queries/distributors";
 import { getAccountsPayableSummary } from "@/lib/db/queries/purchase-payments";
-
-function formatCOP(n: number) {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    maximumFractionDigits: 0,
-  }).format(n);
-}
+import { Badge, ButtonLink, EmptyState, Page, PageHeader, Stat } from "../_components/ui";
+import { formatCOP } from "../_lib/format";
 
 export default async function DistributorsPage() {
-  const [distributors, payableBalances] = await Promise.all([
-    getAllDistributors(),
-    getAccountsPayableSummary(),
-  ]);
+  const [distributors, payableBalances] = await Promise.all([getAllDistributors(), getAccountsPayableSummary()]);
+  const totalPayable = [...payableBalances.values()].reduce((s, v) => s + v, 0);
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Distribuidores</h1>
-        <Link
-          href="/admin/distributors/new"
-          className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition"
-        >
-          + Nuevo distribuidor
-        </Link>
+    <Page>
+      <PageHeader
+        eyebrow="Compras"
+        title="Distribuidores"
+        description="Proveedores a los que les compras mercancía, con su saldo pendiente de compras a crédito."
+        actions={
+          <ButtonLink href="/admin/distributors/new" variant="primary" icon={Plus}>
+            Nuevo distribuidor
+          </ButtonLink>
+        }
+      />
+
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <Stat label="Distribuidores activos" value={distributors.filter((d) => d.active).length} icon={Truck} tone="info" />
+        <Stat
+          label="Total por pagar"
+          value={formatCOP(totalPayable)}
+          valueTone={totalPayable > 0 ? "warn" : "neutral"}
+          hint={payableBalances.size > 0 ? `Con ${payableBalances.size} proveedores` : "Sin deudas"}
+          tone="warn"
+        />
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Nombre</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Ciudad</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Teléfono</th>
-              <th className="text-left px-5 py-3 font-medium text-gray-600">Estado</th>
-              <th className="text-right px-5 py-3 font-medium text-gray-600">Saldo pendiente</th>
-              <th className="px-5 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {distributors.length === 0 && (
-              <tr>
-                <td colSpan={6} className="px-5 py-8 text-center text-gray-400">
-                  No hay distribuidores registrados
-                </td>
-              </tr>
-            )}
-            {distributors.map((d) => (
-              <tr key={d.id} className="hover:bg-gray-50 transition">
-                <td className="px-5 py-3 font-medium text-gray-800">{d.name}</td>
-                <td className="px-5 py-3 text-gray-600">{d.city ?? "—"}</td>
-                <td className="px-5 py-3 text-gray-600">{d.phone ?? "—"}</td>
-                <td className="px-5 py-3">
-                  <span
-                    className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
-                      d.active
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {d.active ? "Activo" : "Inactivo"}
-                  </span>
-                </td>
-                <td className="px-5 py-3 text-right text-gray-700">
-                  {payableBalances.has(d.id) ? formatCOP(payableBalances.get(d.id)!) : "—"}
-                </td>
-                <td className="px-5 py-3 text-right">
-                  <Link
-                    href={`/admin/distributors/${d.id}/edit`}
-                    className="text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    Editar
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="adm-card overflow-hidden">
+        {distributors.length === 0 ? (
+          <EmptyState icon={Truck} title="No hay distribuidores registrados" description="Agrega a tus proveedores para registrar pedidos de compra." />
+        ) : (
+          <div className="adm-table-wrap">
+            <table className="adm-table">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Contacto</th>
+                  <th>Estado</th>
+                  <th className="t-right">Saldo pendiente</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {distributors.map((d) => {
+                  const pending = payableBalances.get(d.id);
+                  return (
+                    <tr key={d.id}>
+                      <td className="t-strong">{d.name}</td>
+                      <td>
+                        <div className="flex flex-col gap-0.5 text-[13px]">
+                          {d.city && (
+                            <span className="inline-flex items-center gap-1.5">
+                              <MapPin size={13} className="text-[var(--adm-ink-3)]" />
+                              {d.city}
+                            </span>
+                          )}
+                          {d.phone && (
+                            <span className="inline-flex items-center gap-1.5 num">
+                              <Phone size={13} className="text-[var(--adm-ink-3)]" />
+                              {d.phone}
+                            </span>
+                          )}
+                          {!d.city && !d.phone && "—"}
+                        </div>
+                      </td>
+                      <td>{d.active ? <Badge tone="ok">Activo</Badge> : <Badge>Inactivo</Badge>}</td>
+                      <td className="t-right num">
+                        {pending ? <span className="font-semibold text-[var(--adm-warn)]">{formatCOP(pending)}</span> : "—"}
+                      </td>
+                      <td className="t-right">
+                        <Link href={`/admin/distributors/${d.id}/edit`} className="adm-link text-[13px]">
+                          Editar
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-    </div>
+    </Page>
   );
 }
