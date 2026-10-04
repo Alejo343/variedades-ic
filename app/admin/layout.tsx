@@ -1,10 +1,15 @@
+import { auth } from "@/lib/auth";
 import { AdminNav } from "./_components/AdminNav";
 import { SignOutButton } from "./_components/SignOutButton";
 
 // Every admin page reads live DB data: render per request, never prerender at build time.
 export const dynamic = "force-dynamic";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  // Without a session the proxy only lets /admin/login through: render it bare, no nav.
+  const session = await auth();
+  if (!session) return <>{children}</>;
+
   return (
     <div className="min-h-screen flex bg-gray-100">
       <aside className="w-56 bg-white shadow-sm flex flex-col shrink-0">
