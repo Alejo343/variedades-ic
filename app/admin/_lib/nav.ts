@@ -15,6 +15,7 @@ import {
   ShieldAlert,
   ReceiptText,
   Wallet,
+  FileSpreadsheet,
   type LucideIcon,
 } from "lucide-react";
 
@@ -72,6 +73,7 @@ export const NAV: NavGroup[] = [
 export const QUICK_ACTIONS: NavItem[] = [
   { href: "/admin/direct-sales/new", label: "Nueva venta en local", icon: Store, keywords: "cobrar pos" },
   { href: "/admin/products/new", label: "Nuevo producto", icon: Package },
+  { href: "/admin/products/import", label: "Importar productos desde Excel", icon: FileSpreadsheet, keywords: "plantilla cargar catalogo masivo" },
   { href: "/admin/purchase-orders/new", label: "Nuevo pedido de compra", icon: ShoppingCart },
   { href: "/admin/sales-orders/new", label: "Nuevo pedido WhatsApp", icon: MessageCircle },
   { href: "/admin/deliveries/new", label: "Entregar a vendedor", icon: PackageOpen },

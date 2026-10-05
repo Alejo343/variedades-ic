@@ -58,6 +58,28 @@ All animations respect `prefers-reduced-motion`.
 - Navegación en `app/admin/_lib/nav.ts`; formateo de dinero/fechas en
   `app/admin/_lib/format.ts` (no redefinir `formatCOP` por página).
 
+### Importación de productos desde Excel (2026-10-04)
+
+`/admin/products/import`, distinto del Excel de pedidos de compra (ese lee la
+factura del distribuidor por posición A–E y no se tocó). Decisiones del usuario:
+
+- **Solo se acepta la plantilla** que descarga la propia pantalla (hojas
+  "Productos" + "Instrucciones"). Columnas por encabezado, en cualquier orden:
+  SKU, Nombre*, Categoría, Precio venta (*en nuevos), Costo, Cantidad, Stock
+  mínimo, Código proveedor, Garantía (meses), Descripción, Activo. Si falta
+  alguna columna se rechaza el archivo completo.
+- Producto existente (por SKU → código proveedor → nombre normalizado): las
+  celdas llenas actualizan, las vacías no tocan nada; **Cantidad fija el
+  stock** (conteo) y la diferencia queda como `ajuste` en el ledger.
+- Producto nuevo: stock inicial también como `ajuste` ("Carga inicial"), nunca
+  escrito directo en `products.stock`.
+- Todo o nada: cualquier fila con error bloquea la importación; vista previa
+  (`dryRun`) antes de confirmar.
+
+Lógica pura en `lib/domain/product-import.ts` (con tests); aplicación
+transaccional en `lib/db/queries/product-import.ts`; API
+`POST /api/admin/products/import`.
+
 ### Next.js version note
 
 This project uses Next.js **16** (see `package.json`). APIs and conventions may differ from your training data — consult `node_modules/next/dist/docs/` for the authoritative reference before writing Next.js-specific code.

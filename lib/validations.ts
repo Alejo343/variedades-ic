@@ -29,6 +29,29 @@ export const productSchema = z.object({
   whatsappText: z.string().optional(),
 });
 
+// Rows already parsed from the template by lib/domain/product-import.ts#parseProductSheet
+// (the browser reads the .xlsx); the server re-plans them against the DB.
+const nullableInt = z.number().int().min(0).nullable();
+export const productImportRowSchema = z.object({
+  rowNumber: z.number().int().min(1),
+  sku: z.string().trim().min(1).nullable(),
+  name: z.string().trim().min(1, "El nombre es requerido"),
+  category: z.string().trim().min(1).nullable(),
+  price: nullableInt,
+  cost: nullableInt,
+  quantity: nullableInt,
+  minStock: nullableInt,
+  distributorCode: z.string().trim().min(1).nullable(),
+  warrantyMonths: nullableInt,
+  description: z.string().nullable(),
+  active: z.boolean().nullable(),
+});
+
+export const productImportSchema = z.object({
+  rows: z.array(productImportRowSchema).min(1, "El archivo no tiene filas").max(5000, "Máximo 5000 filas por archivo"),
+  dryRun: z.boolean().optional().default(true),
+});
+
 export const distributorSchema = z.object({
   name: z.string().min(1, "El nombre es requerido"),
   city: z.string().optional(),
@@ -229,6 +252,7 @@ export const purchasePaymentSchema = z.object({
 
 export type CategoryInput = z.infer<typeof categorySchema>;
 export type ProductInput = z.infer<typeof productSchema>;
+export type ProductImportInput = z.infer<typeof productImportSchema>;
 export type DistributorInput = z.infer<typeof distributorSchema>;
 export type PurchaseOrderInput = z.infer<typeof purchaseOrderSchema>;
 export type PurchaseOrderNewItemInput = z.infer<typeof purchaseOrderNewItemSchema>;
