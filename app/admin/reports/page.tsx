@@ -7,6 +7,7 @@ import { getReturnedProductsSummary } from "@/lib/db/queries/seller-returns";
 import { getAccountsPayableSummary } from "@/lib/db/queries/purchase-payments";
 import { getAllDistributors } from "@/lib/db/queries/distributors";
 import { CircleDollarSign, ShoppingCart, TrendingUp, Wallet } from "lucide-react";
+import { summarizeCashFlow } from "@/lib/domain/cash";
 import { DateRangeFilter } from "./_components/DateRangeFilter";
 import { SalesChart } from "../_components/SalesChart";
 import { Card, Page, PageHeader, Stat } from "../_components/ui";
@@ -69,8 +70,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     if (to && d > new Date(`${to}T23:59:59.999`)) return false;
     return true;
   });
-  const cashInRangeIncome = cashInRange.filter((m) => m.type === "ingreso").reduce((s, m) => s + m.amount, 0);
-  const cashInRangeExpense = cashInRange.filter((m) => m.type === "gasto").reduce((s, m) => s + m.amount, 0);
+  // Cash adjustments (opening balance, count corrections) are not income/expense.
+  const { income: cashInRangeIncome, expense: cashInRangeExpense } = summarizeCashFlow(cashInRange);
 
   const sellersWithInventory = new Map<number, { sellerName: string | null; items: typeof sellersInventory }>();
   for (const row of sellersInventory) {

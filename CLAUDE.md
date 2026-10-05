@@ -80,6 +80,18 @@ Lógica pura en `lib/domain/product-import.ts` (con tests); aplicación
 transaccional en `lib/db/queries/product-import.ts`; API
 `POST /api/admin/products/import`.
 
+### Ajustes de caja (2026-10-04)
+
+Movimiento de caja que mueve el saldo pero **no cuenta como ingreso ni gasto**
+(saldo inicial al empezar a usar el sistema, diferencias de arqueo). Se guarda
+como `cash_movements` normal (`type` ingreso|gasto = dirección) con
+`sourceType = 'ajuste'` — a propósito NO es un `type` nuevo, porque el móvil
+sincroniza `cash_movements` y calcula su saldo por `type`. Lógica en
+`lib/domain/cash.ts` (`isCashAdjustment`, `summarizeCashFlow`, con tests);
+Caja y Reportes → Flujo de caja los excluyen de ingresos/gastos. Pendiente en
+el móvil: sus reportes aún cuentan un ajuste como ingreso/gasto (el saldo sí
+cuadra) y desde el celular no se pueden crear ajustes.
+
 ### Next.js version note
 
 This project uses Next.js **16** (see `package.json`). APIs and conventions may differ from your training data — consult `node_modules/next/dist/docs/` for the authoritative reference before writing Next.js-specific code.

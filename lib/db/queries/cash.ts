@@ -2,6 +2,7 @@ import { db } from "../index";
 import { cashMovements, cashAccounts } from "../schema";
 import { desc, eq, sql } from "drizzle-orm";
 import type { CashMovementInput } from "@/lib/validations";
+import { CASH_ADJUSTMENT_SOURCE } from "@/lib/domain/cash";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -31,7 +32,8 @@ export function recordCashMovement(dbOrTx: typeof db | Tx, data: RecordCashMovem
 }
 
 export function createCashMovement(data: CashMovementInput) {
-  return recordCashMovement(db, { ...data, sourceType: "manual" });
+  const { adjustment, ...movement } = data;
+  return recordCashMovement(db, { ...movement, sourceType: adjustment ? CASH_ADJUSTMENT_SOURCE : "manual" });
 }
 
 export function getAllCashMovements() {

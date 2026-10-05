@@ -173,6 +173,9 @@ export const cashMovementSchema = z.object({
   concept: z.string().min(1, "El concepto es requerido"),
   accountId: z.number().int(),
   notes: z.string().optional(),
+  // Cash adjustment (opening balance, count correction): moves the balance but
+  // is not income/expense — see lib/domain/cash.ts.
+  adjustment: z.boolean().optional().default(false),
 });
 
 export const directSaleItemSchema = z.object({

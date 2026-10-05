@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowDownLeft, ArrowUpRight, Building2, Settings2, Wallet } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Building2, Scale, Settings2, Wallet } from "lucide-react";
+import { isCashAdjustment, summarizeCashFlow } from "@/lib/domain/cash";
 import { getAllCashMovements, getCashBalance } from "@/lib/db/queries/cash";
 import { getActiveCashAccounts, getCashAccountsWithBalances } from "@/lib/db/queries/cash-accounts";
 import { CashMovementForm } from "./_components/CashMovementForm";
@@ -12,6 +13,7 @@ const SOURCE_LABELS: Record<string, string> = {
   sales_order: "Pedido WhatsApp",
   direct_sale: "Venta en local",
   purchase_payment: "Pago a distribuidor",
+  ajuste: "Ajuste de caja",
 };
 
 export default async function CashPage({ searchParams }: { searchParams: Promise<{ type?: string; account?: string }> }) {
@@ -26,10 +28,12 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
   const month = todayInBogota().slice(0, 7);
   const monthOf = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(d).slice(0, 7);
   const thisMonth = movements.filter((m) => monthOf(new Date(m.movementDate)) === month);
-  const income = thisMonth.filter((m) => m.type === "ingreso").reduce((s, m) => s + m.amount, 0);
-  const expense = thisMonth.filter((m) => m.type === "gasto").reduce((s, m) => s + m.amount, 0);
+  const { income, expense, adjustments } = summarizeCashFlow(thisMonth);
 
-  const rows = movements.filter((m) => (!type || m.type === type) && (!account || String(m.accountId) === account));
+  // Ingresos/Gastos tabs show business movements only; adjustments have their own tab.
+  const matchesType = (m: (typeof movements)[number]) =>
+    !type || (type === "ajuste" ? isCashAdjustment(m) : !isCashAdjustment(m) && m.type === type);
+  const rows = movements.filter((m) => matchesType(m) && (!account || String(m.accountId) === account));
 
   return (
     <Page>
@@ -57,19 +61,31 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
             <p className={`relative num text-[36px] font-semibold mt-2 leading-none ${balance < 0 ? "text-red-300" : ""}`}>
               {formatCOP(balance)}
             </p>
-            <div className="relative flex gap-6 mt-6 text-[13px]">
+            <p className="relative mt-6 mb-2 text-[11px] uppercase tracking-[.14em] text-slate-500 font-semibold">Este mes</p>
+            <div className="relative flex flex-wrap gap-x-6 gap-y-3 text-[13px]">
               <div>
                 <p className="text-slate-400 flex items-center gap-1">
-                  <ArrowDownLeft size={14} className="text-emerald-400" /> Ingresos del mes
+                  <ArrowDownLeft size={14} className="text-emerald-400" /> Ingresos
                 </p>
                 <p className="num font-semibold mt-0.5">{formatCOP(income)}</p>
               </div>
               <div>
                 <p className="text-slate-400 flex items-center gap-1">
-                  <ArrowUpRight size={14} className="text-rose-400" /> Gastos del mes
+                  <ArrowUpRight size={14} className="text-rose-400" /> Gastos
                 </p>
                 <p className="num font-semibold mt-0.5">{formatCOP(expense)}</p>
               </div>
+              {adjustments !== 0 && (
+                <div>
+                  <p className="text-slate-400 flex items-center gap-1">
+                    <Scale size={14} className="text-sky-300" /> Ajustes
+                  </p>
+                  <p className="num font-semibold mt-0.5">
+                    {adjustments > 0 ? "+" : "−"}
+                    {formatCOP(Math.abs(adjustments))}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 divide-y sm:divide-y-0 divide-[var(--adm-line)]">
@@ -113,6 +129,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
                 { value: "", label: "Todos" },
                 { value: "ingreso", label: "Ingresos" },
                 { value: "gasto", label: "Gastos" },
+                { value: "ajuste", label: "Ajustes" },
               ]}
             />
           </div>
@@ -131,35 +148,50 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((m) => (
+                  {rows.map((m) => {
+                    const adj = isCashAdjustment(m);
+                    return (
                     <tr key={m.id}>
                       <td className="whitespace-nowrap">{formatDateTime(m.movementDate)}</td>
                       <td>
                         <div className="flex items-center gap-2.5">
                           <span
                             className={`w-7 h-7 rounded-lg grid place-items-center shrink-0 ${
-                              m.type === "ingreso"
-                                ? "bg-[var(--adm-ok-soft)] text-[var(--adm-ok)]"
-                                : "bg-[var(--adm-danger-soft)] text-[var(--adm-danger)]"
+                              adj
+                                ? "bg-[var(--adm-brand-soft)] text-[var(--adm-brand)]"
+                                : m.type === "ingreso"
+                                  ? "bg-[var(--adm-ok-soft)] text-[var(--adm-ok)]"
+                                  : "bg-[var(--adm-danger-soft)] text-[var(--adm-danger)]"
                             }`}
                           >
-                            {m.type === "ingreso" ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
+                            {adj ? <Scale size={14} /> : m.type === "ingreso" ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
                           </span>
                           <span className="t-strong">{m.concept}</span>
                         </div>
                       </td>
                       <td>{m.accountName ?? "—"}</td>
-                      <td className="text-[13px]">{m.sourceType ? (SOURCE_LABELS[m.sourceType] ?? m.sourceType) : "—"}</td>
+                      <td className="text-[13px]">
+                        {adj ? (
+                          <span className="adm-badge adm-badge-info adm-badge-plain" title="No cuenta como ingreso ni gasto">
+                            Ajuste de caja
+                          </span>
+                        ) : m.sourceType ? (
+                          (SOURCE_LABELS[m.sourceType] ?? m.sourceType)
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       <td
                         className={`t-right num font-semibold whitespace-nowrap ${
-                          m.type === "ingreso" ? "text-[var(--adm-ok)]" : "text-[var(--adm-ink)]"
+                          adj ? "text-[var(--adm-brand)]" : m.type === "ingreso" ? "text-[var(--adm-ok)]" : "text-[var(--adm-ink)]"
                         }`}
                       >
                         {m.type === "ingreso" ? "+" : "−"}
                         {formatCOP(m.amount)}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
