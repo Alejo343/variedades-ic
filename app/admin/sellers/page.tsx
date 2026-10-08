@@ -55,7 +55,10 @@ export default async function SellersPage() {
                     {initials}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-[15.5px] truncate">{s.name}</p>
+                    <p className="font-semibold text-[15.5px] truncate">
+                      {s.name}
+                      {s.inventoryMode === "store" && <span className="ml-2 text-[11.5px] font-medium text-[var(--adm-ink-3)]">· Tienda</span>}
+                    </p>
                     <div className="flex flex-wrap gap-x-3 text-[12.5px] text-[var(--adm-ink-3)]">
                       {s.city && (
                         <span className="inline-flex items-center gap-1">

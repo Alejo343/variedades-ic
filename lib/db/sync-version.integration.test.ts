@@ -47,11 +47,11 @@ describe.skipIf(!url)("sync_version + sync_tombstones (Postgres real)", () => {
     await c2?.end();
   });
 
-  it("las 22 tablas sincronizables tienen el trigger y ninguna fila quedó sin versión", async () => {
+  it("las 23 tablas sincronizables tienen el trigger y ninguna fila quedó sin versión", async () => {
     const { rows: tables } = await c1.query(
       `SELECT table_name FROM information_schema.columns WHERE table_schema = 'public' AND column_name = 'sync_version' AND table_name <> 'sync_tombstones'`,
     );
-    expect(tables).toHaveLength(22);
+    expect(tables).toHaveLength(23);
     for (const { table_name } of tables) {
       const { rows: triggers } = await c1.query(
         `SELECT trigger_name FROM information_schema.triggers WHERE event_object_table = $1 AND trigger_name IN ('sync_bump_version', 'sync_record_tombstone') GROUP BY trigger_name`,

@@ -1,5 +1,5 @@
 import { db } from "../index";
-import { sellerSales, sellerSaleItems, inventoryMovements, products, sellers } from "../schema";
+import { directSales, sellerSales, sellerSaleItems, inventoryMovements, products, sellers } from "../schema";
 import { eq, desc, sql } from "drizzle-orm";
 import type { SellerSaleInput } from "@/lib/validations";
 import { deductStock } from "@/lib/domain/stock";
@@ -80,6 +80,37 @@ export async function getSellerSalesSummary() {
     totalAmount: Number(r.totalAmount),
     totalCommission: Number(r.totalCommission),
   }));
+}
+
+// Sales per seller across both kinds: consignment (seller_sales) and store
+// sellers' in-store sales (direct_sales tagged with the seller). Reports and
+// the seller detail use this; the consignment sales page keeps the one above.
+export async function getAllSellersSalesSummary() {
+  const [consignment, store] = await Promise.all([
+    getSellerSalesSummary(),
+    db
+      .select({
+        sellerId: directSales.sellerId,
+        sellerName: sellers.name,
+        count: sql<string>`COUNT(*)`,
+        totalAmount: sql<string>`COALESCE(SUM(${directSales.totalAmount}), 0)`,
+        totalCommission: sql<string>`COALESCE(SUM(${directSales.commissionAmount}), 0)`,
+      })
+      .from(directSales)
+      .innerJoin(sellers, eq(directSales.sellerId, sellers.id))
+      .groupBy(directSales.sellerId, sellers.name),
+  ]);
+
+  const bySeller = new Map(consignment.map((r) => [r.sellerId, { ...r }]));
+  for (const r of store) {
+    const sellerId = r.sellerId!;
+    const current = bySeller.get(sellerId) ?? { sellerId, sellerName: r.sellerName, count: 0, totalAmount: 0, totalCommission: 0 };
+    current.count += Number(r.count);
+    current.totalAmount += Number(r.totalAmount);
+    current.totalCommission += Number(r.totalCommission);
+    bySeller.set(sellerId, current);
+  }
+  return [...bySeller.values()];
 }
 
 export async function createSellerSale(data: SellerSaleInput): Promise<CreateSellerSaleResult> {

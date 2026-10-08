@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { z } from "zod";
+import { calculateCommission } from "@/lib/domain/commission";
 import { validateAdjustmentReason } from "@/lib/domain/inventory-movement";
 import { defineHandler, SyncRejection } from "../push";
 import { changePrincipalStock, fromUtc, idByUuid, rowUuid, utcTimestamp } from "./shared";
@@ -34,6 +35,9 @@ export const createDirectSale = defineHandler({
     uuid: rowUuid,
     saleDate: utcTimestamp,
     accountUuid: rowUuid,
+    // A 'store' seller who made the sale (absent = the owner). A seller's
+    // phone must send its own uuid here (push.ts checks it).
+    sellerUuid: rowUuid.optional(),
     notes,
     // The income row in cash_movements — required whenever the total is > 0
     // (a phone that omits it for a paid sale is a bug, not a valid zero-total
@@ -43,15 +47,36 @@ export const createDirectSale = defineHandler({
       .array(z.object({ uuid: rowUuid, productUuid: rowUuid, quantity: z.number().int().min(1), unitPrice: z.number().int().min(0), movementUuid: rowUuid }))
       .min(1),
   }),
-  async apply(tx, p) {
+  sellerUuid: (p) => p.sellerUuid,
+  async apply(tx, p, { principal }) {
     const accountId = await idByUuid(tx, "cash_accounts", p.accountUuid, "Cuenta");
     const productIds = [];
     for (const item of p.items) productIds.push(await idByUuid(tx, "products", item.productUuid, "Producto"));
     const totalAmount = p.items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
 
+    // A seller may only push this as a 'store' seller (the phone's view of its
+    // own mode is never trusted).
+    if (principal.role === "seller" && !p.sellerUuid) throw new SyncRejection("Un vendedor solo puede registrar ventas propias");
+    let sellerId: number | null = null;
+    let commissionAmount = 0;
+    if (p.sellerUuid) {
+      const result = await tx.execute(sql`
+        SELECT id, commission_type, commission_value, inventory_mode FROM sellers WHERE uuid = ${p.sellerUuid}`);
+      const seller = result.rows[0] as
+        | { id: number; commission_type: "percentage" | "fixed_per_unit"; commission_value: number; inventory_mode: string }
+        | undefined;
+      if (!seller) throw new SyncRejection(`Vendedor no existe en el servidor (${p.sellerUuid})`);
+      if (seller.inventory_mode !== "store") {
+        throw new SyncRejection("Este vendedor es de consignación: solo puede vender su propio inventario");
+      }
+      sellerId = seller.id;
+      const totalQuantity = p.items.reduce((sum, i) => sum + i.quantity, 0);
+      commissionAmount = calculateCommission({ type: seller.commission_type, value: seller.commission_value }, totalAmount, totalQuantity);
+    }
+
     const inserted = await tx.execute(sql`
-      INSERT INTO direct_sales (uuid, sale_date, total_amount, account_id, notes)
-      VALUES (${p.uuid}, ${fromUtc(p.saleDate)}, ${totalAmount}, ${accountId}, ${p.notes ?? null})
+      INSERT INTO direct_sales (uuid, sale_date, total_amount, account_id, seller_id, commission_amount, notes)
+      VALUES (${p.uuid}, ${fromUtc(p.saleDate)}, ${totalAmount}, ${accountId}, ${sellerId}, ${commissionAmount}, ${p.notes ?? null})
       RETURNING id`);
     const saleId = (inserted.rows[0] as { id: number }).id;
 

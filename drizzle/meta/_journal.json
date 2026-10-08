@@ -169,6 +169,20 @@
       "when": 1790403284420,
       "tag": "0023_seller_losses_settlement",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791430649795,
+      "tag": "0024_store_sellers",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791432588333,
+      "tag": "0025_commission_payments",
+      "breakpoints": true
     }
   ]
 }

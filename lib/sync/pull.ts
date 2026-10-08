@@ -41,6 +41,9 @@ type TableSpec = {
   from: string;
   // null = not visible to a seller; "" = all rows; otherwise a filter on $3 = seller id.
   sellerFilter: string | null;
+  // Same, for a 'store' seller (sells the principal inventory into a cash
+  // account) when it differs from a consignment seller's scope.
+  storeSellerFilter?: string | null;
 };
 
 const SPECS: TableSpec[] = [
@@ -59,13 +62,15 @@ const SPECS: TableSpec[] = [
     select: () => `i.uuid, p.uuid AS "productUuid", i.url, i.alt, i.display_order AS "displayOrder", i.is_primary AS "isPrimary"`,
   },
   {
-    table: "cash_accounts", alias: "a", from: "cash_accounts a", sellerFilter: null,
+    // A store seller picks the account a sale goes into — names only: balances
+    // come from cash_movements, which stays hidden.
+    table: "cash_accounts", alias: "a", from: "cash_accounts a", sellerFilter: null, storeSellerFilter: "",
     select: () => `a.uuid, a.name, a.type, a.active, a.notes, ${ts("a.created_at")} AS "createdAt"`,
   },
   {
     table: "sellers", alias: "s", from: "sellers s", sellerFilter: "s.id = $3",
     select: () => `s.uuid, s.name, s.phone, s.city, s.commission_type AS "commissionType", s.commission_value AS "commissionValue",
-      s.active, s.notes, ${ts("s.created_at")} AS "createdAt"`,
+      s.inventory_mode AS "inventoryMode", s.active, s.notes, ${ts("s.created_at")} AS "createdAt"`,
   },
   {
     table: "inventory_movements", alias: "m",
@@ -80,19 +85,34 @@ const SPECS: TableSpec[] = [
     select: () => `m.uuid, m.type, m.amount, m.concept, ${ts("m.movement_date")} AS "movementDate", m.source_type AS "sourceType",
       CASE m.source_type
         WHEN 'direct_sale' THEN (SELECT x.uuid FROM direct_sales x WHERE x.id = m.source_id)
+        WHEN 'commission_payment' THEN (SELECT x.uuid FROM commission_payments x WHERE x.id = m.source_id)
         WHEN 'settlement' THEN (SELECT x.uuid FROM settlements x WHERE x.id = m.source_id)
         WHEN 'purchase_payment' THEN (SELECT x.uuid FROM purchase_payments x WHERE x.id = m.source_id)
       END AS "sourceUuid",
       a.uuid AS "accountUuid", m.notes, ${ts("m.created_at")} AS "createdAt"`,
   },
   {
-    table: "direct_sales", alias: "d", from: "direct_sales d JOIN cash_accounts a ON a.id = d.account_id", sellerFilter: null,
-    select: () => `d.uuid, ${ts("d.sale_date")} AS "saleDate", d.total_amount AS "totalAmount", a.uuid AS "accountUuid", d.notes,
+    // A store seller sees the payments of their own commissions.
+    table: "commission_payments", alias: "cp",
+    from: "commission_payments cp JOIN sellers s ON s.id = cp.seller_id JOIN cash_accounts a ON a.id = cp.account_id",
+    sellerFilter: null, storeSellerFilter: "cp.seller_id = $3",
+    select: () => `cp.uuid, s.uuid AS "sellerUuid", ${day("cp.period_date")} AS "periodDate", cp.sale_count AS "saleCount",
+      cp.total_commission AS "totalCommission", a.uuid AS "accountUuid", ${ts("cp.paid_at")} AS "paidAt", cp.notes,
+      ${ts("cp.created_at")} AS "createdAt"`,
+  },
+  {
+    table: "direct_sales", alias: "d",
+    from: `direct_sales d JOIN cash_accounts a ON a.id = d.account_id LEFT JOIN sellers s ON s.id = d.seller_id
+      LEFT JOIN commission_payments cp ON cp.id = d.commission_payment_id`,
+    sellerFilter: null, storeSellerFilter: "d.seller_id = $3",
+    select: () => `d.uuid, ${ts("d.sale_date")} AS "saleDate", d.total_amount AS "totalAmount", a.uuid AS "accountUuid",
+      s.uuid AS "sellerUuid", d.commission_amount AS "commissionAmount", cp.uuid AS "commissionPaymentUuid", d.notes,
       ${ts("d.created_at")} AS "createdAt"`,
   },
   {
     table: "direct_sale_items", alias: "i",
-    from: "direct_sale_items i JOIN direct_sales d ON d.id = i.sale_id JOIN products p ON p.id = i.product_id", sellerFilter: null,
+    from: "direct_sale_items i JOIN direct_sales d ON d.id = i.sale_id JOIN products p ON p.id = i.product_id",
+    sellerFilter: null, storeSellerFilter: "d.seller_id = $3",
     select: () => `i.uuid, d.uuid AS "saleUuid", p.uuid AS "productUuid", i.quantity, i.unit_price AS "unitPrice", i.subtotal`,
   },
   {
@@ -199,10 +219,19 @@ export async function pullChanges(q: Queryable, principal: PullPrincipal, since:
   const changes: PullResult["changes"] = {};
   if (upTo === since) return { cursor: since, hasMore: false, changes, tombstones: [] };
 
-  const visible = SPECS.filter((s) => !isSeller || s.sellerFilter !== null);
+  let isStoreSeller = false;
+  if (isSeller) {
+    const { rows } = await q.query(`SELECT inventory_mode FROM sellers WHERE id = $1`, [principal.sellerId]);
+    isStoreSeller = rows[0]?.inventory_mode === "store";
+  }
+  const filterOf = (spec: TableSpec) =>
+    isStoreSeller && spec.storeSellerFilter !== undefined ? spec.storeSellerFilter : spec.sellerFilter;
+
+  const visible = SPECS.filter((s) => !isSeller || filterOf(s) !== null);
   for (const spec of visible) {
-    const scoped = isSeller && spec.sellerFilter;
-    const where = `${spec.alias}.sync_version > $1 AND ${spec.alias}.sync_version <= $2${scoped ? ` AND ${spec.sellerFilter}` : ""}`;
+    const filter = isSeller ? filterOf(spec) : "";
+    const scoped = Boolean(filter);
+    const where = `${spec.alias}.sync_version > $1 AND ${spec.alias}.sync_version <= $2${scoped ? ` AND ${filter}` : ""}`;
     const params = scoped ? [since, upTo, principal.sellerId] : [since, upTo];
     const { rows } = await q.query(
       `SELECT ${spec.select(isSeller)} FROM ${spec.from} WHERE ${where} ORDER BY ${spec.alias}.sync_version`,

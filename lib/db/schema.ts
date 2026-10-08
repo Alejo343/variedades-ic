@@ -1,4 +1,4 @@
-import { pgTable, serial, varchar, text, integer, boolean, timestamp, date, check, pgSequence, unique, uuid, bigint, index } from "drizzle-orm/pg-core";
+import { type AnyPgColumn, pgTable, serial, varchar, text, integer, boolean, timestamp, date, check, pgSequence, unique, uuid, bigint, index } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 // Sync identity of the row, shared with variedades-ic-mobile (see that repo's
@@ -169,10 +169,14 @@ export const sellers = pgTable("sellers", {
   city: varchar("city", { length: 100 }),
   commissionType: varchar("commission_type", { length: 15 }).notNull(),
   commissionValue: integer("commission_value").notNull(),
+  // 'consignment': sells only their own consigned stock and settles later.
+  // 'store': works at the main store — sells the principal inventory and the
+  // money goes straight to a cash account (a direct_sale tagged with them).
+  inventoryMode: varchar("inventory_mode", { length: 15 }).default("consignment").notNull(),
   active: boolean("active").default(true).notNull(),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [check("sellers_inventory_mode_valid", sql`${table.inventoryMode} IN ('consignment', 'store')`)]);
 
 // Real money accounts (e.g. "Efectivo", "Transferencia") — cash_movements,
 // direct_sales and purchase_payments all reference one, so each account's
@@ -214,6 +218,12 @@ export const directSales = pgTable("direct_sales", {
   saleDate: timestamp("sale_date").defaultNow().notNull(),
   totalAmount: integer("total_amount").default(0).notNull(),
   accountId: integer("account_id").notNull().references(() => cashAccounts.id),
+  // Set when a 'store' seller made the sale (null = the owner). The commission
+  // is computed with the seller's config at sale time.
+  sellerId: integer("seller_id").references(() => sellers.id),
+  commissionAmount: integer("commission_amount").default(0).notNull(),
+  // The commission payment that paid this sale's commission (null = pending).
+  commissionPaymentId: integer("commission_payment_id").references((): AnyPgColumn => commissionPayments.id),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -364,6 +374,24 @@ export const settlements = pgTable(
   (table) => [unique("settlements_seller_period_unique").on(table.sellerId, table.periodDate)],
 );
 
+// The owner paying a 'store' seller the commissions of their in-store sales:
+// everything still unpaid up to periodDate (same "todo lo pendiente hasta la
+// fecha" rule as settlements). Paid on creation — an expense in the chosen
+// account (cash_movements, source_type 'commission_payment').
+export const commissionPayments = pgTable("commission_payments", {
+  id: serial("id").primaryKey(),
+  uuid: syncUuid(),
+  syncVersion: syncVersion(),
+  sellerId: integer("seller_id").notNull().references(() => sellers.id),
+  periodDate: date("period_date").notNull(),
+  saleCount: integer("sale_count").notNull(),
+  totalCommission: integer("total_commission").notNull(),
+  accountId: integer("account_id").notNull().references(() => cashAccounts.id),
+  paidAt: timestamp("paid_at").defaultNow().notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [check("commission_payments_total_positive", sql`${table.totalCommission} > 0`)]);
+
 export const purchasePayments = pgTable(
   "purchase_payments",
   {
@@ -483,3 +511,4 @@ export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type DeviceSession = typeof deviceSessions.$inferSelect;
 export type NewDeviceSession = typeof deviceSessions.$inferInsert;
+export type CommissionPayment = typeof commissionPayments.$inferSelect;

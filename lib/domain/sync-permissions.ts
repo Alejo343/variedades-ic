@@ -20,6 +20,7 @@ export const SYNC_OPERATION_TYPES = [
   "createPurchasePayment",
   "createSettlement",
   "markSettlementSettled",
+  "createCommissionPayment",
 ] as const;
 
 export type SyncOperationType = (typeof SYNC_OPERATION_TYPES)[number];
@@ -27,7 +28,9 @@ export type SyncOperationType = (typeof SYNC_OPERATION_TYPES)[number];
 export type SyncPrincipal = { role: UserRole; sellerUuid: string | null };
 
 // What a seller may record from their phone, always about themselves.
-const SELLER_OPERATIONS: ReadonlySet<string> = new Set(["createSellerSale", "createSellerReturn", "createSellerLoss"]);
+// createDirectSale is only for 'store' sellers (selling the principal
+// inventory) — the handler checks the seller's mode against the database.
+const SELLER_OPERATIONS: ReadonlySet<string> = new Set(["createSellerSale", "createSellerReturn", "createSellerLoss", "createDirectSale"]);
 
 export function authorizeOperation(
   principal: SyncPrincipal,

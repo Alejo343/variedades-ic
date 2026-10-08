@@ -19,6 +19,24 @@ export async function getSellerBalance(dbOrTx: typeof db | Tx, sellerId: number,
   return Number(row.balance);
 }
 
+// Whether the seller still holds (or owes, if negative) any consigned unit.
+// A seller can only become a 'store' seller with an empty consignment ledger —
+// otherwise those units would be stranded where no screen shows them.
+export async function hasConsignedStock(dbOrTx: typeof db | Tx, sellerId: number): Promise<boolean> {
+  const rows = await dbOrTx
+    .select({ productId: inventoryMovements.productId })
+    .from(inventoryMovements)
+    .where(and(eq(inventoryMovements.ownerType, "seller"), eq(inventoryMovements.sellerId, sellerId)))
+    .groupBy(inventoryMovements.productId)
+    .having(sql`SUM(${inventoryMovements.quantityDelta}) <> 0`)
+    .limit(1);
+  return rows.length > 0;
+}
+
+export const CONSIGNED_STOCK_BLOCKS_STORE_MODE =
+  "Este vendedor todavía tiene inventario en consignación. Registra la devolución antes de pasarlo a vendedor de tienda.";
+export const STORE_SELLER_NO_DELIVERIES = "Un vendedor de tienda vende del inventario principal: no se le entrega mercancía.";
+
 export async function getSellerInventory(sellerId: number) {
   const rows = await db
     .select({

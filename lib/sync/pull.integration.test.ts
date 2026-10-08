@@ -108,6 +108,23 @@ describe.skipIf(!url)("pullChanges (Postgres real)", () => {
     expect(find(r, "seller_loss_items", ids.lossItem_a.uuid)!.unitCost).toBe(3000); // what the seller owes
   });
 
+  it("un vendedor de tienda además recibe las cuentas y solo sus propias ventas en local, nunca la caja", async () => {
+    const store = await ins("store", `INSERT INTO sellers (name, commission_type, commission_value, inventory_mode) VALUES ('ZZ Store', 'percentage', 1000, 'store')`);
+    const own = await ins("ownSale", `INSERT INTO direct_sales (total_amount, account_id, seller_id, commission_amount) VALUES (5000, $1, $2, 500)`, [ids.acc.id, store.id]);
+    const ownItem = await ins("ownItem", `INSERT INTO direct_sale_items (sale_id, product_id, quantity, unit_price, subtotal) VALUES ($1, $2, 1, 5000, 5000)`, [own.id, ids.prod.id]);
+
+    const r = await pullChanges(c, { role: "seller", sellerId: store.id }, before, 1000);
+    expect(find(r, "sellers", store.uuid)).toMatchObject({ inventoryMode: "store" });
+    expect(find(r, "cash_accounts", ids.acc.uuid)).toMatchObject({ name: "ZZ Caja" });
+    expect(find(r, "direct_sales", own.uuid)).toMatchObject({ sellerUuid: store.uuid, commissionAmount: 500, accountUuid: ids.acc.uuid });
+    expect(find(r, "direct_sale_items", ownItem.uuid)).toMatchObject({ saleUuid: own.uuid });
+    expect(find(r, "direct_sales", ids.sale.uuid)).toBeUndefined(); // the owner's sale
+    expect(find(r, "direct_sale_items", ids.saleItem.uuid)).toBeUndefined();
+    expect(find(r, "sellers", ids.seller_a.uuid)).toBeUndefined();
+    for (const t of ["cash_movements", "distributors", "purchase_orders", "purchase_payments"]) expect(r.changes[t], t).toBeUndefined();
+    expect(find(r, "products", ids.prod.uuid)).toMatchObject({ stock: 10, purchasePrice: 0 });
+  });
+
   it("un borrado llega como lápida", async () => {
     const r1 = await pullChanges(c, owner, before, 1000);
     await c.query("DELETE FROM product_images WHERE id = $1", [ids.img.id]);

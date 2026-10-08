@@ -1275,3 +1275,24 @@ Lo que cambia en este repo (sub-pasos marcados "web" en el plan maestro):
 - Rutas `/api/sync/login`, `/api/sync/pull`, `/api/sync/push` y subida de
   fotos con token, aparte de `/api/admin/*` (esas siguen siendo del panel con
   sesión de NextAuth).
+
+### Vendedor de tienda (2026-10-07)
+
+Segundo tipo de vendedor, `sellers.inventory_mode = 'store'` (migración
+`0024_store_sellers.sql`): vende el inventario principal y su venta es una
+`direct_sales` con `seller_id` y `commission_amount` (entra a caja al momento,
+sin liquidación). El push acepta `createDirectSale` de un vendedor solo con su
+propio `sellerUuid` y si en la base es `store`; el pull le manda además
+`cash_accounts` y sus propias ventas en local. No se le hacen entregas, y un
+vendedor solo pasa a `store` con su ledger de consignación en cero
+(`hasConsignedStock`). Diseño completo y decisiones: `CLAUDE.md` del repo móvil,
+sección "Vendedor de tienda".
+
+**Pago de comisiones** (misma sesión): `commission_payments` (migración `0025`,
+triggers de `sync_version` agregados a mano; ya son 23 tablas sincronizables) +
+`direct_sales.commission_payment_id`. Un pago cubre todas las ventas en local
+del vendedor de tienda hasta la fecha que no se hayan pagado, y genera un gasto
+en la cuenta elegida. La lógica está en `lib/db/queries/commission-payments.ts`
+y la comparten el panel (tarjeta en `/admin/sellers/[id]`,
+`POST /api/admin/sellers/[id]/commission-payments`) y la sync
+(`createCommissionPayment`, solo el dueño).

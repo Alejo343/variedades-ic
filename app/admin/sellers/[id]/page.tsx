@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { HandCoins, MapPin, Package, PackageOpen, Pencil, Phone, ReceiptText, ShieldAlert, Undo2 } from "lucide-react";
+import { HandCoins, MapPin, Package, PackageOpen, Pencil, Phone, ReceiptText, ShieldAlert, Store, Undo2 } from "lucide-react";
 import { getSellerById } from "@/lib/db/queries/sellers";
 import { getSellerInventory } from "@/lib/db/queries/seller-inventory";
-import { getSellerSalesSummary, getAllSellerSales } from "@/lib/db/queries/seller-sales";
+import { getAllSellersSalesSummary, getAllSellerSales } from "@/lib/db/queries/seller-sales";
+import { getAllDirectSales } from "@/lib/db/queries/direct-sales";
 import { getAllSettlements } from "@/lib/db/queries/settlements";
 import { getDeviceSessions, getUserBySellerId } from "@/lib/db/queries/users";
 import { SellerAccessCard } from "../_components/SellerAccessCard";
+import { CommissionPaymentCard } from "../_components/CommissionPaymentCard";
+import { getCommissionPaymentsForSeller } from "@/lib/db/queries/commission-payments";
+import { getActiveCashAccounts } from "@/lib/db/queries/cash-accounts";
 import { Badge, ButtonLink, Card, EmptyState, Page, PageHeader, Stat, StatusBadge } from "../../_components/ui";
 import { formatCOP, formatDateTime, formatPlainDate } from "../../_lib/format";
 
@@ -17,20 +21,26 @@ function formatCommission(type: string, value: number) {
 export default async function SellerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const sellerId = Number(id);
-  const [[seller], inventory, [user], summaries, sales, settlements] = await Promise.all([
+  const [[seller], inventory, [user], summaries, sales, directSales, settlements] = await Promise.all([
     getSellerById(sellerId),
     getSellerInventory(sellerId),
     getUserBySellerId(sellerId),
-    getSellerSalesSummary(),
+    getAllSellersSalesSummary(),
     getAllSellerSales(),
+    getAllDirectSales(),
     getAllSettlements(),
   ]);
 
   if (!seller) notFound();
 
   const sessions = user ? await getDeviceSessions(user.id) : [];
+  const [commissionPayments, accounts] =
+    seller.inventoryMode === "store" ? await Promise.all([getCommissionPaymentsForSeller(sellerId), getActiveCashAccounts()]) : [[], []];
   const summary = summaries.find((s) => s.sellerId === sellerId);
-  const recentSales = sales.filter((s) => s.sellerId === sellerId).slice(0, 6);
+  // A store seller sells the principal inventory as in-store sales (no
+  // deliveries, no settlements); a consignment seller, from their own stock.
+  const isStore = seller.inventoryMode === "store";
+  const recentSales = (isStore ? directSales : sales).filter((s) => s.sellerId === sellerId).slice(0, 6);
   const sellerSettlements = settlements.filter((s) => s.sellerId === sellerId);
   const pendingSettlement = sellerSettlements.filter((s) => s.status === "pendiente").reduce((t, s) => t + s.amountDue, 0);
 
@@ -47,6 +57,7 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
         title={
           <span className="inline-flex items-center gap-3">
             {seller.name}
+            {isStore && <Badge>Tienda principal</Badge>}
             {!seller.active && <Badge>Inactivo</Badge>}
           </span>
         }
@@ -75,6 +86,12 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
       />
 
       {/* Quick operations for this seller */}
+      {isStore ? (
+        <p className="adm-alert adm-alert-info">
+          <Store size={16} />
+          Vende del inventario principal desde su celular; cada venta entra a caja al momento con su comisión.
+        </p>
+      ) : (
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         {[
           { href: `/admin/deliveries/new${q}`, icon: PackageOpen, label: "Entregar" },
@@ -89,10 +106,15 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
           </Link>
         ))}
       </div>
+      )}
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <Stat label="Unidades en su poder" value={units} hint={`${inventory.length} productos distintos`} icon={Package} tone="info" />
-        <Stat label="Valor a precio de venta" value={formatCOP(valueAtPrice)} hint={`A costo: ${formatCOP(valueAtCost)}`} tone="violet" />
+        {!isStore && (
+          <>
+            <Stat label="Unidades en su poder" value={units} hint={`${inventory.length} productos distintos`} icon={Package} tone="info" />
+            <Stat label="Valor a precio de venta" value={formatCOP(valueAtPrice)} hint={`A costo: ${formatCOP(valueAtCost)}`} tone="violet" />
+          </>
+        )}
         <Stat
           label="Ventas históricas"
           value={formatCOP(summary?.totalAmount ?? 0)}
@@ -100,18 +122,19 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
           icon={HandCoins}
           tone="ok"
         />
-        <Stat
+        {isStore && <Stat label="Comisión acumulada" value={formatCOP(summary?.totalCommission ?? 0)} icon={HandCoins} tone="violet" />}
+        {!isStore && <Stat
           label="Por cobrar en liquidaciones"
           value={formatCOP(pendingSettlement)}
           valueTone={pendingSettlement > 0 ? "warn" : "neutral"}
           icon={ReceiptText}
           tone="warn"
           href="/admin/settlements"
-        />
+        />}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.3fr_1fr] gap-4 items-start">
-        <Card title="Inventario actual" description="Lo que el vendedor tiene asignado ahora (entregas − ventas − devoluciones − pérdidas)" flush>
+        {!isStore && <Card title="Inventario actual" description="Lo que el vendedor tiene asignado ahora (entregas − ventas − devoluciones − pérdidas)" flush>
           {inventory.length === 0 ? (
             <EmptyState
               icon={Package}
@@ -154,13 +177,13 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
               </table>
             </div>
           )}
-        </Card>
+        </Card>}
 
         <div className="flex flex-col gap-4">
           <Card
             title="Ventas recientes"
             actions={
-              <Link href="/admin/seller-sales" className="adm-link text-[13px]">
+              <Link href={isStore ? "/admin/direct-sales" : "/admin/seller-sales"} className="adm-link text-[13px]">
                 Ver todas
               </Link>
             }
@@ -185,7 +208,7 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
             )}
           </Card>
 
-          <Card title="Liquidaciones" flush>
+          {!isStore && <Card title="Liquidaciones" flush>
             {sellerSettlements.length === 0 ? (
               <p className="px-5 py-8 text-center text-sm text-[var(--adm-ink-3)]">Aún no hay liquidaciones.</p>
             ) : (
@@ -201,9 +224,17 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
                 ))}
               </ul>
             )}
-          </Card>
+          </Card>}
         </div>
       </div>
+
+      {isStore && (
+        <CommissionPaymentCard
+          sellerId={seller.id}
+          accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
+          payments={commissionPayments.map((p) => ({ ...p, paidAt: p.paidAt.toISOString() }))}
+        />
+      )}
 
       <SellerAccessCard
         sellerId={seller.id}

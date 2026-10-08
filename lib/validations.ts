@@ -111,8 +111,18 @@ export const sellerSchema = z.object({
   city: z.string().optional(),
   commissionType: z.enum(["percentage", "fixed_per_unit"]),
   commissionValue: z.number().int().min(0, "La comisión no puede ser negativa"),
+  // No default here: a partial update (PUT) without it must keep the current
+  // mode. A new seller gets the column default ('consignment').
+  inventoryMode: z.enum(["consignment", "store"]).optional(),
   active: z.boolean().optional().default(true),
   notes: z.string().optional(),
+});
+
+// Paying a store seller every commission still unpaid up to periodDate.
+export const commissionPaymentSchema = z.object({
+  periodDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha con formato inválido"),
+  accountId: z.number().int(),
+  notes: z.string().max(2000).optional(),
 });
 
 // App login of a seller (sub-paso 4 of the mobile sync). The username is
@@ -264,6 +274,7 @@ export type SalesOrderInput = z.infer<typeof salesOrderSchema>;
 export type SalesOrderItemInput = z.infer<typeof salesOrderItemSchema>;
 export type InventoryAdjustmentInput = z.infer<typeof inventoryAdjustmentSchema>;
 export type SellerInput = z.infer<typeof sellerSchema>;
+export type CommissionPaymentInput = z.infer<typeof commissionPaymentSchema>;
 export type SellerUserCreateInput = z.infer<typeof sellerUserCreateSchema>;
 export type SellerUserUpdateInput = z.infer<typeof sellerUserUpdateSchema>;
 export type SyncLoginInput = z.infer<typeof syncLoginSchema>;

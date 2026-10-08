@@ -13,6 +13,7 @@ export function SellerForm({ initial }: { initial?: Seller }) {
     phone: initial?.phone ?? "",
     city: initial?.city ?? "",
     commissionType: initial?.commissionType ?? "percentage",
+    inventoryMode: initial?.inventoryMode ?? "consignment",
     commissionDisplay:
       initial?.commissionType === "fixed_per_unit"
         ? (initial?.commissionValue ?? 0)
@@ -39,6 +40,7 @@ export function SellerForm({ initial }: { initial?: Seller }) {
       city: form.city,
       commissionType: form.commissionType,
       commissionValue,
+      inventoryMode: form.inventoryMode,
       notes: form.notes,
       active: form.active,
     };
@@ -56,7 +58,7 @@ export function SellerForm({ initial }: { initial?: Seller }) {
 
     if (!res.ok) {
       const data = await res.json();
-      setError(data.error?.formErrors?.[0] ?? "Error al guardar");
+      setError(typeof data.error === "string" ? data.error : (data.error?.formErrors?.[0] ?? "Error al guardar"));
       return;
     }
 
@@ -95,6 +97,23 @@ export function SellerForm({ initial }: { initial?: Seller }) {
           onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
           className="adm-input"
         />
+      </div>
+
+      <div>
+        <label className="adm-label">Tipo de vendedor</label>
+        <select
+          value={form.inventoryMode}
+          onChange={(e) => setForm((f) => ({ ...f, inventoryMode: e.target.value }))}
+          className="adm-input"
+        >
+          <option value="consignment">Consignación (otra ciudad)</option>
+          <option value="store">Tienda principal</option>
+        </select>
+        <p className="mt-1.5 text-xs text-[var(--adm-ink-3)]">
+          {form.inventoryMode === "store"
+            ? "Vende del inventario principal y el dinero entra a caja al momento. No recibe entregas ni se liquida."
+            : "Vende solo la mercancía que se le entrega y entrega el dinero al liquidar."}
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">

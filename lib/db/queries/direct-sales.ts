@@ -1,5 +1,5 @@
 import { db } from "../index";
-import { directSales, directSaleItems, products, cashAccounts } from "../schema";
+import { directSales, directSaleItems, products, cashAccounts, sellers } from "../schema";
 import { eq, desc } from "drizzle-orm";
 import type { DirectSaleInput } from "@/lib/validations";
 import { recordPrincipalMovement } from "./inventory";
@@ -17,11 +17,15 @@ export function getAllDirectSales() {
       totalAmount: directSales.totalAmount,
       accountId: directSales.accountId,
       accountName: cashAccounts.name,
+      sellerId: directSales.sellerId,
+      sellerName: sellers.name,
+      commissionAmount: directSales.commissionAmount,
       notes: directSales.notes,
       createdAt: directSales.createdAt,
     })
     .from(directSales)
     .leftJoin(cashAccounts, eq(directSales.accountId, cashAccounts.id))
+    .leftJoin(sellers, eq(directSales.sellerId, sellers.id))
     .orderBy(desc(directSales.saleDate));
 }
 

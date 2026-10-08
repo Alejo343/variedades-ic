@@ -12,7 +12,7 @@ describe("authorizeOperation", () => {
   });
 
   it("un vendedor solo registra sus propias ventas, devoluciones y pérdidas", () => {
-    for (const type of ["createSellerSale", "createSellerReturn", "createSellerLoss"] as const) {
+    for (const type of ["createSellerSale", "createSellerReturn", "createSellerLoss", "createDirectSale"] as const) {
       expect(authorizeOperation(maria, { type, sellerUuid: "seller-maria" }).ok, type).toBe(true);
       expect(authorizeOperation(maria, { type, sellerUuid: "seller-pedro" }).ok, `${type} ajena`).toBe(false);
       expect(authorizeOperation(maria, { type }).ok, `${type} sin vendedor`).toBe(false);
@@ -20,7 +20,7 @@ describe("authorizeOperation", () => {
   });
 
   it("un vendedor no puede tocar catálogo, caja, compras, entregas ni liquidaciones", () => {
-    const allowed = new Set(["createSellerSale", "createSellerReturn", "createSellerLoss"]);
+    const allowed = new Set(["createSellerSale", "createSellerReturn", "createSellerLoss", "createDirectSale"]);
     for (const type of SYNC_OPERATION_TYPES.filter((t) => !allowed.has(t))) {
       const result = authorizeOperation(maria, { type, sellerUuid: "seller-maria" });
       expect(result.ok, type).toBe(false);

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { z } from "zod";
+import { CONSIGNED_STOCK_BLOCKS_STORE_MODE, hasConsignedStock } from "@/lib/db/queries/seller-inventory";
 import { formatSku, getSkuPrefix } from "@/lib/domain/sku";
 import { defineHandler, SyncRejection, type Tx } from "../push";
 import { idByUuid, rowUuid } from "./shared";
@@ -115,15 +116,26 @@ export const upsertSeller = defineHandler({
     city: z.string().max(100).nullish(),
     commissionType: z.enum(["percentage", "fixed_per_unit"]),
     commissionValue: z.number().int().min(0),
+    // Optional so an app version that predates it never resets a seller's mode.
+    inventoryMode: z.enum(["consignment", "store"]).optional(),
     active: z.boolean(),
     notes: optionalText,
   }),
   async apply(tx, p) {
+    if (p.inventoryMode === "store") {
+      const current = await tx.execute(sql`SELECT id, inventory_mode FROM sellers WHERE uuid = ${p.uuid}`);
+      const row = current.rows[0] as { id: number; inventory_mode: string } | undefined;
+      if (row && row.inventory_mode !== "store" && (await hasConsignedStock(tx, row.id))) {
+        throw new SyncRejection(CONSIGNED_STOCK_BLOCKS_STORE_MODE);
+      }
+    }
     await tx.execute(sql`
-      INSERT INTO sellers (uuid, name, phone, city, commission_type, commission_value, active, notes)
-      VALUES (${p.uuid}, ${p.name}, ${p.phone ?? null}, ${p.city ?? null}, ${p.commissionType}, ${p.commissionValue}, ${p.active}, ${p.notes ?? null})
+      INSERT INTO sellers (uuid, name, phone, city, commission_type, commission_value, inventory_mode, active, notes)
+      VALUES (${p.uuid}, ${p.name}, ${p.phone ?? null}, ${p.city ?? null}, ${p.commissionType}, ${p.commissionValue},
+        ${p.inventoryMode ?? "consignment"}, ${p.active}, ${p.notes ?? null})
       ON CONFLICT (uuid) DO UPDATE SET name = EXCLUDED.name, phone = EXCLUDED.phone, city = EXCLUDED.city,
-        commission_type = EXCLUDED.commission_type, commission_value = EXCLUDED.commission_value, active = EXCLUDED.active, notes = EXCLUDED.notes`);
+        commission_type = EXCLUDED.commission_type, commission_value = EXCLUDED.commission_value,
+        inventory_mode = COALESCE(${p.inventoryMode ?? null}, sellers.inventory_mode), active = EXCLUDED.active, notes = EXCLUDED.notes`);
   },
 });
 

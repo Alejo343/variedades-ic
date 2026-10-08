@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { getSellerById, updateSeller, deleteSeller } from "@/lib/db/queries/sellers";
+import { CONSIGNED_STOCK_BLOCKS_STORE_MODE, hasConsignedStock } from "@/lib/db/queries/seller-inventory";
+import { db } from "@/lib/db";
 import { sellerSchema } from "@/lib/validations";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -27,6 +29,13 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  if (parsed.data.inventoryMode === "store") {
+    const [current] = await getSellerById(Number(id));
+    if (current && current.inventoryMode !== "store" && (await hasConsignedStock(db, current.id))) {
+      return NextResponse.json({ error: CONSIGNED_STOCK_BLOCKS_STORE_MODE }, { status: 409 });
+    }
   }
 
   const [updated] = await updateSeller(Number(id), parsed.data);

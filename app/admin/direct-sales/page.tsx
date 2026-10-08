@@ -47,6 +47,7 @@ export default async function DirectSalesPage() {
                   <th>#</th>
                   <th>Fecha</th>
                   <th>Cuenta</th>
+                  <th>Vendió</th>
                   <th>Notas</th>
                   <th className="t-right">Total</th>
                 </tr>
@@ -57,6 +58,7 @@ export default async function DirectSalesPage() {
                     <td className="num text-[var(--adm-ink-3)]">#{s.id}</td>
                     <td className="whitespace-nowrap">{formatDateTime(s.saleDate)}</td>
                     <td>{s.accountName ?? "—"}</td>
+                    <td>{s.sellerName ?? "Dueño"}</td>
                     <td className="max-w-[320px] truncate">{s.notes ?? "—"}</td>
                     <td className="t-right num t-strong">{formatCOP(s.totalAmount)}</td>
                   </tr>

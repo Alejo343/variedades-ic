@@ -13,6 +13,7 @@ const SOURCE_LABELS: Record<string, string> = {
   sales_order: "Pedido WhatsApp",
   direct_sale: "Venta en local",
   purchase_payment: "Pago a distribuidor",
+  commission_payment: "Pago de comisiones",
   ajuste: "Ajuste de caja",
 };
 

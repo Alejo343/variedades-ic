@@ -2,7 +2,7 @@ import { getInventorySummary, getPurchasesReport, getSalesReport, getProfitRepor
 import { getLowStock, getOutOfStock } from "@/lib/db/queries/inventory";
 import { getAllCashMovements, getCashBalance } from "@/lib/db/queries/cash";
 import { getAllSellersInventory } from "@/lib/db/queries/seller-inventory";
-import { getSellerSalesSummary } from "@/lib/db/queries/seller-sales";
+import { getAllSellersSalesSummary } from "@/lib/db/queries/seller-sales";
 import { getReturnedProductsSummary } from "@/lib/db/queries/seller-returns";
 import { getAccountsPayableSummary } from "@/lib/db/queries/purchase-payments";
 import { getAllDistributors } from "@/lib/db/queries/distributors";
@@ -57,7 +57,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     getCashBalance(),
     getAllCashMovements(),
     getAllSellersInventory(),
-    getSellerSalesSummary(),
+    getAllSellersSalesSummary(),
     getReturnedProductsSummary(),
     getAllDistributors(),
     getAccountsPayableSummary(),

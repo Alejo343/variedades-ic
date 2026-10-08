@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { z } from "zod";
+import { STORE_SELLER_NO_DELIVERIES } from "@/lib/db/queries/seller-inventory";
 import { aggregatePeriod, markIncludedInSettlement } from "@/lib/db/queries/settlements";
 import { calculateSettlement } from "@/lib/domain/settlement";
 import { canTransitionSettlement, type SettlementStatus } from "@/lib/domain/settlement-status";
@@ -32,6 +33,8 @@ export const createSellerDelivery = defineHandler({
   }),
   async apply(tx, p) {
     const sellerId = await idByUuid(tx, "sellers", p.sellerUuid, "Vendedor");
+    const mode = await tx.execute(sql`SELECT inventory_mode FROM sellers WHERE id = ${sellerId}`);
+    if ((mode.rows[0] as { inventory_mode: string }).inventory_mode === "store") throw new SyncRejection(STORE_SELLER_NO_DELIVERIES);
     const productIds = [];
     for (const item of p.items) productIds.push(await idByUuid(tx, "products", item.productUuid, "Producto"));
 

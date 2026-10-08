@@ -3,6 +3,7 @@ import { sellerDeliveries, sellerDeliveryItems, inventoryMovements, products, se
 import { eq, desc, sql } from "drizzle-orm";
 import type { SellerDeliveryInput } from "@/lib/validations";
 import { recordPrincipalMovement } from "./inventory";
+import { STORE_SELLER_NO_DELIVERIES } from "./seller-inventory";
 
 export type CreateSellerDeliveryResult =
   | { ok: true; delivery: typeof sellerDeliveries.$inferSelect }
@@ -59,6 +60,9 @@ export async function getSellerDeliveryById(id: number) {
 export async function createSellerDelivery(data: SellerDeliveryInput): Promise<CreateSellerDeliveryResult> {
   try {
     return await db.transaction(async (tx) => {
+      const [seller] = await tx.select({ inventoryMode: sellers.inventoryMode }).from(sellers).where(eq(sellers.id, data.sellerId));
+      if (seller?.inventoryMode === "store") throw new Error(STORE_SELLER_NO_DELIVERIES);
+
       const [delivery] = await tx
         .insert(sellerDeliveries)
         .values({ sellerId: data.sellerId, notes: data.notes ?? null })
