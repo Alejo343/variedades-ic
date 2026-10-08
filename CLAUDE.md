@@ -1296,3 +1296,11 @@ en la cuenta elegida. La lógica está en `lib/db/queries/commission-payments.ts
 y la comparten el panel (tarjeta en `/admin/sellers/[id]`,
 `POST /api/admin/sellers/[id]/commission-payments`) y la sync
 (`createCommissionPayment`, solo el dueño).
+
+**Acceso de vendedores desde el celular** (2026-10-07): el dueño puede crear el
+usuario/contraseña de un vendedor, cambiar su contraseña y activar/desactivar
+su acceso desde la app. Ruta `GET/POST/PATCH /api/sync/sellers/[sellerUuid]/access`
+(token de dispositivo, solo dueño). Las reglas viven en `lib/sellers/access.ts`
+y las comparte con `/api/admin/sellers/[id]/user` del panel (test
+`lib/sellers/access.integration.test.ts`). Revocar celulares sigue siendo solo
+desde el panel.
