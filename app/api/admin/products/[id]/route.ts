@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { getProductById, updateProduct, deleteProduct, addProductImage, deleteProductImage } from "@/lib/db/queries/products";
 import { productSchema } from "@/lib/validations";
+import { SkuConflictError } from "@/lib/db/queries/sku";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -44,8 +45,13 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     if (!updated) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
     return NextResponse.json(updated);
   } catch (err) {
-    if ((err as { code?: string }).code === "23505") {
-      return NextResponse.json({ error: "Ya existe un producto con ese código de proveedor" }, { status: 400 });
+    if (err instanceof SkuConflictError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    const pgErr = err as { code?: string; constraint?: string };
+    if (pgErr.code === "23505") {
+      const field = pgErr.constraint?.includes("sku") ? "SKU" : "código de proveedor";
+      return NextResponse.json({ error: `Ya existe un producto con ese ${field}` }, { status: 400 });
     }
     throw err;
   }

@@ -2,7 +2,8 @@ import { db } from "../index";
 import { categories, products } from "../schema";
 import { eq } from "drizzle-orm";
 import { planProductImport, type ProductImportPlan, type ProductImportRow } from "@/lib/domain/product-import";
-import { generateProductSku, recordPrincipalMovement } from "./inventory";
+import { recordPrincipalMovement } from "./inventory";
+import { nextAutoSku, skuForCategoryChange } from "./sku";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -57,7 +58,7 @@ export async function applyProductImport(rows: ProductImportRow[]): Promise<Appl
       }
 
       for (const c of plan.creates) {
-        const sku = await generateProductSku(c.categoryName);
+        const sku = await nextAutoSku(tx, c.categoryName);
         const [created] = await tx
           .insert(products)
           .values({ ...c.fields, slug: c.slug, sku, stock: 0 })
@@ -76,9 +77,17 @@ export async function applyProductImport(rows: ProductImportRow[]): Promise<Appl
 
       for (const u of plan.updates) {
         if (Object.keys(u.fields).length > 0) {
+          let sku: string | null = null;
+          if (u.fields.categoryId !== undefined) {
+            const [current] = await tx
+              .select({ id: products.id, sku: products.sku, categoryId: products.categoryId })
+              .from(products)
+              .where(eq(products.id, u.productId));
+            sku = await skuForCategoryChange(tx, current, u.fields.categoryId);
+          }
           await tx
             .update(products)
-            .set({ ...u.fields, updatedAt: new Date() })
+            .set({ ...u.fields, ...(sku ? { sku } : {}), updatedAt: new Date() })
             .where(eq(products.id, u.productId));
         }
         if (u.stockDelta !== 0) {

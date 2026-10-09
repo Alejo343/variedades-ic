@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { CONSIGNED_STOCK_BLOCKS_STORE_MODE, hasConsignedStock } from "@/lib/db/queries/seller-inventory";
-import { formatSku, getSkuPrefix } from "@/lib/domain/sku";
+import { nextAutoSku, skuForCategoryChange } from "@/lib/db/queries/sku";
 import { defineHandler, SyncRejection, type Tx } from "../push";
 import { idByUuid, rowUuid } from "./shared";
 
@@ -64,11 +64,10 @@ export const upsertProduct = defineHandler({
     let productId = await exists(tx, "products", p.uuid);
 
     if (productId === null) {
-      // Same SKU scheme as the panel's generateProductSku.
+      // Same SKU policy as the panel (lib/db/queries/sku.ts).
       const category = categoryId === null ? null : await tx.execute(sql`SELECT name FROM categories WHERE id = ${categoryId}`);
       const categoryName = (category?.rows[0] as { name: string } | undefined)?.name ?? null;
-      const seq = await tx.execute(sql`SELECT nextval('product_sku_seq') AS n`);
-      const sku = formatSku(getSkuPrefix(categoryName), Number((seq.rows[0] as { n: string }).n));
+      const sku = await nextAutoSku(tx, categoryName);
       const inserted = await tx.execute(sql`
         INSERT INTO products (uuid, name, slug, description, sku, price, purchase_price, category_id, distributor_code, min_stock, warranty_months, active)
         VALUES (${p.uuid}, ${p.name}, ${p.slug}, ${p.description ?? null}, ${sku}, ${p.price}, ${p.purchasePrice}, ${categoryId},
@@ -76,6 +75,11 @@ export const upsertProduct = defineHandler({
         RETURNING id`);
       productId = (inserted.rows[0] as { id: number }).id;
     } else {
+      // A category change moves an auto SKU to the new prefix, same as in the panel.
+      const current = await tx.execute(sql`SELECT id, sku, category_id FROM products WHERE id = ${productId}`);
+      const row = current.rows[0] as { id: number; sku: string; category_id: number | null };
+      const newSku = await skuForCategoryChange(tx, { id: row.id, sku: row.sku, categoryId: row.category_id }, categoryId);
+      if (newSku) await tx.execute(sql`UPDATE products SET sku = ${newSku} WHERE id = ${productId}`);
       await tx.execute(sql`
         UPDATE products SET name = ${p.name}, slug = ${p.slug}, description = ${p.description ?? null}, price = ${p.price},
           purchase_price = ${p.purchasePrice}, category_id = ${categoryId}, distributor_code = ${p.distributorCode},

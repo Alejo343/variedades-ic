@@ -92,6 +92,24 @@ Caja y Reportes → Flujo de caja los excluyen de ingresos/gastos. Pendiente en
 el móvil: sus reportes aún cuentan un ajuste como ingreso/gasto (el saldo sí
 cuadra) y desde el celular no se pueden crear ajustes.
 
+### SKU editable y cambio de categoría (2026-10-08)
+
+- El SKU se puede escribir a mano en el panel (crear y editar). Formato
+  válido: `A-Z 0-9 . _ -`, máx. 50, se guarda en mayúsculas, único (sin
+  distinguir mayúsculas). Vacío al crear = automático; vacío al editar = sin
+  cambio. Desde el celular y la importación de Excel el SKU no se edita.
+- Al cambiar de categoría, un SKU que sigue el formato automático **de su
+  categoría actual** pasa al prefijo nuevo conservando el número
+  (`TECN-00012` → `BELL-00012`; sin categoría = `GEN`). Un SKU propio no se
+  toca. Si en el mismo guardado se escribe un SKU, gana el escrito. Si el SKU
+  re-prefijado ya existe, se asigna uno automático nuevo.
+- Lógica pura en `lib/domain/sku.ts` (`normalizeSku`, `parseAutoSku`,
+  `skuAfterCategoryChange`, con tests); política única para todos los que
+  escriben productos en `lib/db/queries/sku.ts` (`nextAutoSku`,
+  `skuForCategoryChange`, `isSkuTaken`), usada por el panel, la importación y
+  la sync (`upsertProduct`). `nextAutoSku` salta números ya ocupados por SKUs
+  escritos a mano. `generateProductSku` se eliminó.
+
 ### Next.js version note
 
 This project uses Next.js **16** (see `package.json`). APIs and conventions may differ from your training data — consult `node_modules/next/dist/docs/` for the authoritative reference before writing Next.js-specific code.

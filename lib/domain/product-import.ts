@@ -1,5 +1,6 @@
 import { toSlug } from "@/lib/validations";
 import { parseCOPNumber } from "./purchase-import";
+import { skuAfterCategoryChange } from "./sku";
 
 // Catalog import from the downloadable template (Productos → Importar).
 //
@@ -319,6 +320,11 @@ export function planProductImport(
       set("price", row.price, match.price, money);
       set("purchasePrice", row.cost, match.purchasePrice ?? 0, money);
       set("categoryId", categoryId, match.categoryId, catName);
+      if (fields.categoryId !== undefined) {
+        // Preview only: the server re-checks (and avoids collisions) when applying.
+        const nextSku = skuAfterCategoryChange(match.sku, categoryName.get(match.categoryId ?? -1) ?? null, categoryName.get(fields.categoryId ?? -1) ?? null);
+        if (nextSku) changes.push({ field: "SKU", from: match.sku, to: nextSku });
+      }
       set("minStock", row.minStock, match.minStock);
       set("distributorCode", row.distributorCode, match.distributorCode);
       set("warrantyMonths", row.warrantyMonths, match.warrantyMonths);

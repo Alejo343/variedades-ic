@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sellerUserCreateSchema, sellerUserUpdateSchema, syncLoginSchema, syncPushSchema, toSlug } from "./validations";
+import { productSchema, sellerUserCreateSchema, sellerUserUpdateSchema, syncLoginSchema, syncPushSchema, toSlug } from "./validations";
 
 describe("toSlug", () => {
   it("convierte a minúsculas", () => {
@@ -88,5 +88,23 @@ describe("syncPushSchema", () => {
     expect(syncPushSchema.safeParse({ operations: Array.from({ length: 101 }, (_, i) => ({ ...op, id: `3f2a9c1e-7b4d-4e1a-9c2f-${String(i).padStart(12, "0")}` })) }).success).toBe(false);
     expect(syncPushSchema.safeParse({ operations: [{ ...op, id: "7" }] }).success).toBe(false);
     expect(syncPushSchema.safeParse({ operations: [op, op] }).success).toBe(false);
+  });
+});
+
+describe("productSchema.sku", () => {
+  const base = { name: "Producto", slug: "producto", price: 1000 };
+
+  it("vacío o ausente significa 'automático / sin cambio'", () => {
+    expect(productSchema.parse(base).sku).toBeUndefined();
+    expect(productSchema.parse({ ...base, sku: "   " }).sku).toBeUndefined();
+  });
+
+  it("normaliza un SKU propio a mayúsculas", () => {
+    expect(productSchema.parse({ ...base, sku: " mi-sku-1 " }).sku).toBe("MI-SKU-1");
+  });
+
+  it("rechaza un SKU con espacios o caracteres no permitidos", () => {
+    expect(productSchema.safeParse({ ...base, sku: "MI SKU" }).success).toBe(false);
+    expect(productSchema.safeParse({ ...base, sku: "SKU#1" }).success).toBe(false);
   });
 });

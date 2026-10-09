@@ -1,8 +1,7 @@
 import { db } from "../index";
-import { inventoryMovements, products, productSkuSeq } from "../schema";
+import { inventoryMovements, products } from "../schema";
 import { eq, desc, and, lte, gt, sql } from "drizzle-orm";
 import { applyMovement, validateAdjustmentReason, type MovementType } from "@/lib/domain/inventory-movement";
-import { formatSku, getSkuPrefix } from "@/lib/domain/sku";
 import type { InventoryAdjustmentInput } from "@/lib/validations";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -116,12 +115,4 @@ export function getNegativeStock() {
     .select({ id: products.id, name: products.name, stock: products.stock })
     .from(products)
     .where(and(eq(products.active, true), sql`${products.stock} < 0`));
-}
-
-export async function generateProductSku(categoryName?: string | null): Promise<string> {
-  const result = await db.execute<{ nextval: string }>(
-    sql`SELECT nextval(${productSkuSeq.seqName}::regclass) AS nextval`,
-  );
-  const prefix = getSkuPrefix(categoryName);
-  return formatSku(prefix, Number(result.rows[0].nextval));
 }

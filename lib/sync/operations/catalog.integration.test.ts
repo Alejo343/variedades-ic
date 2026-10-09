@@ -66,7 +66,7 @@ describe.skipIf(!url)("operaciones de catálogo (Postgres real)", async () => {
     ]);
   });
 
-  it("producto existente: actualiza sin tocar SKU, stock ni campos que solo tiene la web; la foto quitada deja lápida", async () => {
+  it("producto existente: actualiza sin tocar stock ni campos que solo tiene la web; el SKU automático sigue a la categoría; la foto quitada deja lápida", async () => {
     await q(`UPDATE products SET featured = true, whatsapp_text = 'hola', stock = 7 WHERE uuid = $1`, [prodUuid]);
     const { sku } = await one(`SELECT sku FROM products WHERE uuid = $1`, [prodUuid]);
     const r = await push("upsertProduct", {
@@ -76,12 +76,28 @@ describe.skipIf(!url)("operaciones de catálogo (Postgres real)", async () => {
     });
     expect(r.status).toBe("applied");
     expect(await one(`SELECT name, price, sku, stock, featured, whatsapp_text, category_id FROM products WHERE uuid = $1`, [prodUuid])).toEqual({
-      name: "Audífonos Pro", price: 55000, sku, stock: 7, featured: true, whatsapp_text: "hola", category_id: null,
+      // Tecnología → sin categoría: TECN-NNNNN becomes GEN-NNNNN (same number).
+      name: "Audífonos Pro", price: 55000, sku: sku.replace(/^TECN-/, "GEN-"), stock: 7, featured: true, whatsapp_text: "hola", category_id: null,
     });
     expect(await q(`SELECT uuid, is_primary, display_order FROM product_images WHERE product_id = (SELECT id FROM products WHERE uuid = $1)`, [prodUuid])).toEqual([
       { uuid: img.b, is_primary: true, display_order: 0 },
     ]);
     expect(await q(`SELECT table_name FROM sync_tombstones WHERE uuid = $1`, [img.a])).toEqual([{ table_name: "product_images" }]);
+  });
+
+  it("producto con SKU propio: cambiar de categoría no lo toca", async () => {
+    const customSku = `${tag}-SKU`.toUpperCase();
+    await q(`UPDATE products SET sku = $2 WHERE uuid = $1`, [prodUuid, customSku]);
+    const r = await push("upsertProduct", {
+      uuid: prodUuid, name: "Audífonos Pro", slug: `${tag}-aud`, description: null, price: 55000, purchasePrice: 30000,
+      categoryUuid: catUuid, distributorCode: null, minStock: 2, warrantyMonths: null, active: true,
+    });
+    expect(r.status).toBe("applied");
+    expect(await one(`SELECT sku, category_id IS NOT NULL AS has_cat FROM products WHERE uuid = $1`, [prodUuid])).toEqual({ sku: customSku, has_cat: true });
+    await push("upsertProduct", {
+      uuid: prodUuid, name: "Audífonos Pro", slug: `${tag}-aud`, description: null, price: 55000, purchasePrice: 30000,
+      categoryUuid: null, distributorCode: null, minStock: 2, warrantyMonths: null, active: true,
+    });
   });
 
   it("producto: sin `images` no toca la galería", async () => {

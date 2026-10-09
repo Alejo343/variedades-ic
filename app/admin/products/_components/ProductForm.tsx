@@ -7,6 +7,14 @@ import { toSlug } from "@/lib/validations";
 import { ImagePlus, X } from "lucide-react";
 import type { Category, Product, ProductImage } from "@/lib/db/schema";
 import { formatCOP } from "../../_lib/format";
+import { getSkuPrefix, normalizeSku, skuAfterCategoryChange } from "@/lib/domain/sku";
+
+// API errors come as a plain string or as a zod flatten() object.
+function apiError(data: { error?: unknown }, fallback: string): string {
+  const err = data.error as string | { formErrors?: string[]; fieldErrors?: Record<string, string[] | undefined> } | undefined;
+  if (typeof err === "string") return err;
+  return err?.formErrors?.[0] ?? Object.values(err?.fieldErrors ?? {}).flat()[0] ?? fallback;
+}
 
 type ExistingImg = { kind: "existing"; id: number; url: string; alt: string };
 type NewImg = { kind: "new"; url: string; alt: string };
@@ -36,6 +44,7 @@ export function ProductForm({ categories, initial }: Props) {
     featured: initial?.featured ?? false,
     active: initial?.active ?? true,
     whatsappText: initial?.whatsappText ?? "",
+    sku: initial?.sku ?? "",
   });
   const [duplicateProduct, setDuplicateProduct] = useState<{ id: number; name: string } | null>(null);
 
@@ -112,7 +121,7 @@ export function ProductForm({ categories, initial }: Props) {
         });
         if (!res.ok) {
           const data = await res.json();
-          setError(data.error?.formErrors?.[0] ?? "Error al guardar");
+          setError(apiError(data, "Error al guardar"));
           return;
         }
 
@@ -156,7 +165,7 @@ export function ProductForm({ categories, initial }: Props) {
         });
         if (!res.ok) {
           const data = await res.json();
-          setError(data.error?.formErrors?.[0] ?? "Error al guardar");
+          setError(apiError(data, "Error al guardar"));
           return;
         }
         const product = await res.json();
@@ -184,6 +193,16 @@ export function ProductForm({ categories, initial }: Props) {
       setLoading(false);
     }
   }
+
+  const categoryName = (id: number | null | undefined) => categories.find((c) => c.id === id)?.name ?? null;
+  const categoryPrefix = getSkuPrefix(categoryName(form.categoryId));
+  const skuInvalid = form.sku.trim() !== "" && normalizeSku(form.sku) === null;
+  // Same rule as the server (lib/db/queries/products.ts#updateProduct): only when
+  // the SKU wasn't edited by hand and the category changed.
+  const skuPreview =
+    isEdit && normalizeSku(form.sku) === initial!.sku && form.categoryId !== initial!.categoryId
+      ? skuAfterCategoryChange(initial!.sku, categoryName(initial!.categoryId), categoryName(form.categoryId))
+      : null;
 
   const margin = form.price > 0 && form.purchasePrice > 0 ? Math.round(((form.price - form.purchasePrice) / form.price) * 100) : null;
 
@@ -240,10 +259,24 @@ export function ProductForm({ categories, initial }: Props) {
             <div>
               <label className="adm-label">SKU</label>
               <input
-                value={isEdit ? initial!.sku : "Se genera al guardar"}
-                disabled
-                className="adm-input num text-[13px]"
+                value={form.sku}
+                onChange={(e) => setForm((f) => ({ ...f, sku: e.target.value.toUpperCase() }))}
+                placeholder={`Automático: ${categoryPrefix}-#####`}
+                maxLength={50}
+                aria-invalid={skuInvalid}
+                className={`adm-input num text-[13px] ${skuInvalid ? "!border-[var(--adm-danger)]" : ""}`}
               />
+              {skuInvalid ? (
+                <p className="adm-hint !text-[var(--adm-danger)]">Solo letras, números, guion, punto o guion bajo, sin espacios.</p>
+              ) : skuPreview ? (
+                <p className="adm-hint !text-[var(--adm-brand)]">
+                  Al guardar cambiará a <strong className="num">{skuPreview}</strong> por el cambio de categoría.
+                </p>
+              ) : (
+                <p className="adm-hint">
+                  {isEdit ? "Puedes escribir tu propio SKU." : "Déjalo vacío para que se genere solo, o escribe el tuyo."}
+                </p>
+              )}
             </div>
             <div>
               <label className="adm-label">Código de proveedor</label>

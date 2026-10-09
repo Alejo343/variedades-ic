@@ -210,4 +210,18 @@ describe("planProductImport", () => {
     );
     expect(plan.creates[0].slug).toBe("cargador-usb-c-2");
   });
+
+  it("al cambiar de categoría avisa que el SKU automático cambia de prefijo", () => {
+    const plan = planProductImport([row({ sku: "TECN-00001", name: "Audífonos Bluetooth", category: "Belleza" })], EXISTING, CATEGORIES);
+    expect(plan.updates[0].changes).toContainEqual({ field: "SKU", from: "TECN-00001", to: "BELL-00001" });
+  });
+
+  it("un SKU propio no cambia al cambiar de categoría", () => {
+    const plan = planProductImport(
+      [row({ sku: "AUD-1H", name: "Audífonos Bluetooth", category: "Belleza" })],
+      [{ ...EXISTING[0], sku: "AUD-1H" }],
+      CATEGORIES,
+    );
+    expect(plan.updates[0].changes.map((c) => c.field)).toEqual(["Categoría"]);
+  });
 });

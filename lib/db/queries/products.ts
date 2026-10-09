@@ -2,7 +2,7 @@ import { db } from "../index";
 import { products, categories, productImages } from "../schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import type { ProductInput } from "@/lib/validations";
-import { generateProductSku } from "./inventory";
+import { SkuConflictError, isSkuTaken, nextAutoSku, skuForCategoryChange } from "./sku";
 
 export async function findProductByDistributorCode(code: string) {
   const [product] = await db
@@ -167,27 +167,57 @@ export async function getProductBySlug(slug: string) {
   return { ...product, images };
 }
 
+/** `data.sku` (already normalized by productSchema) = SKU propio; absent = auto. Throws SkuConflictError. */
 export async function createProduct(data: ProductInput) {
-  let categoryName: string | null = null;
-  if (data.categoryId) {
-    const [category] = await db
-      .select({ name: categories.name })
-      .from(categories)
-      .where(eq(categories.id, data.categoryId))
-      .limit(1);
-    categoryName = category?.name ?? null;
-  }
-
-  const sku = await generateProductSku(categoryName);
-  return db.insert(products).values({ ...data, sku }).returning();
+  return db.transaction(async (tx) => {
+    let sku = data.sku;
+    if (sku) {
+      if (await isSkuTaken(tx, sku)) throw new SkuConflictError(sku);
+    } else {
+      let categoryName: string | null = null;
+      if (data.categoryId) {
+        const [category] = await tx
+          .select({ name: categories.name })
+          .from(categories)
+          .where(eq(categories.id, data.categoryId))
+          .limit(1);
+        categoryName = category?.name ?? null;
+      }
+      sku = await nextAutoSku(tx, categoryName);
+    }
+    return tx.insert(products).values({ ...data, sku }).returning();
+  });
 }
 
-export function updateProduct(id: number, data: Partial<ProductInput>) {
-  return db
-    .update(products)
-    .set({ ...data, updatedAt: new Date() })
-    .where(eq(products.id, id))
-    .returning();
+/**
+ * SKU rules on edit: a SKU typed by the owner wins (must be unique); otherwise
+ * a category change re-prefixes an auto SKU (lib/domain/sku.ts#skuAfterCategoryChange).
+ * Throws SkuConflictError.
+ */
+export async function updateProduct(id: number, data: Partial<ProductInput>) {
+  return db.transaction(async (tx) => {
+    const [current] = await tx
+      .select({ id: products.id, sku: products.sku, categoryId: products.categoryId })
+      .from(products)
+      .where(eq(products.id, id))
+      .limit(1);
+    if (!current) return [];
+
+    const { sku: typedSku, ...rest } = data;
+    let sku: string | undefined;
+    if (typedSku && typedSku !== current.sku) {
+      if (await isSkuTaken(tx, typedSku, id)) throw new SkuConflictError(typedSku);
+      sku = typedSku;
+    } else if (rest.categoryId !== undefined) {
+      sku = (await skuForCategoryChange(tx, current, rest.categoryId ?? null)) ?? undefined;
+    }
+
+    return tx
+      .update(products)
+      .set({ ...rest, ...(sku ? { sku } : {}), updatedAt: new Date() })
+      .where(eq(products.id, id))
+      .returning();
+  });
 }
 
 export function deleteProduct(id: number) {

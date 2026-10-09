@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeSku } from "./domain/sku";
 import { normalizeUsername } from "@/lib/domain/users";
 
 export const categorySchema = z.object({
@@ -27,6 +28,13 @@ export const productSchema = z.object({
   featured: z.boolean().optional().default(false),
   active: z.boolean().optional().default(true),
   whatsappText: z.string().optional(),
+  // SKU propio. Empty/absent = auto-generated on create, unchanged on edit.
+  sku: z
+    .string()
+    .optional()
+    .transform((v) => (v && v.trim() !== "" ? v : undefined))
+    .refine((v) => v === undefined || normalizeSku(v) !== null, "SKU inválido: usa letras, números, guion, punto o guion bajo (máx. 50, sin espacios)")
+    .transform((v) => (v === undefined ? undefined : normalizeSku(v)!)),
 });
 
 // Rows already parsed from the template by lib/domain/product-import.ts#parseProductSheet
