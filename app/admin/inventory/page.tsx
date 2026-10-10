@@ -15,8 +15,8 @@ const TYPE_FILTERS = [
   ["ajuste", "Ajustes"],
 ] as const;
 
-export default async function InventoryPage({ searchParams }: { searchParams: Promise<{ type?: string }> }) {
-  const { type = "" } = await searchParams;
+export default async function InventoryPage({ searchParams }: { searchParams: Promise<{ type?: string; ajustar?: string }> }) {
+  const { type = "", ajustar } = await searchParams;
   const [lowStock, outOfStock, negativeStock, movements, products, summary] = await Promise.all([
     getLowStock(),
     getOutOfStock(),
@@ -64,7 +64,10 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                   {negativeStock.map((p, i) => (
                     <span key={p.id}>
                       {i > 0 && ", "}
-                      <strong>{p.name}</strong> ({p.stock})
+                      <Link href={`/admin/inventory?ajustar=${p.id}`} className="font-semibold underline underline-offset-2">
+                        {p.name}
+                      </Link>{" "}
+                      ({p.stock})
                     </span>
                   ))}
                 </p>
@@ -165,7 +168,18 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         </div>
 
         <div className="xl:sticky xl:top-24">
-          <AdjustmentForm products={activeProducts.map((p) => ({ id: p.id, name: p.name }))} />
+          <AdjustmentForm
+            key={ajustar ?? ""}
+            initialProductId={ajustar ? Number(ajustar) : undefined}
+            products={activeProducts.map((p) => ({
+              id: p.id,
+              name: p.name,
+              sku: p.sku,
+              stock: p.stock,
+              minStock: p.minStock,
+              imageUrl: p.imageUrl,
+            }))}
+          />
         </div>
       </div>
     </Page>
