@@ -1229,7 +1229,11 @@ mismo VPS aloja otros proyectos — no tocar sus vhosts ni procesos PM2.
   y tiene un contexto `/uploads/` que OLS sirve directo desde
   `public/uploads/` — necesario porque `next start` no sirve archivos
   agregados a `public/` después del build (las imágenes subidas desde el
-  admin no se verían). Tras editar la config: `/usr/local/lsws/bin/lswsctrl restart`.
+  admin no se verían). El optimizador (`/_next/image`) no pasa por OLS: le
+  pide el archivo a Next, así que para él existe `app/uploads/[...path]/route.ts`,
+  que lee las fotos del disco (sin él respondía 400 con cualquier foto
+  subida después del último build). Tras editar la config:
+  `/usr/local/lsws/bin/lswsctrl restart`.
 - BD: PostgreSQL **16** en el VPS (en local es 18), base y rol
   `variedades_ic` con contraseña propia. Producción arrancó **vacía**, sin
   los datos de prueba locales (solo las cuentas de caja que siembra la
