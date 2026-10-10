@@ -51,13 +51,22 @@ Public storefront for **IC Variedades** (a Colombian store selling tech, beauty,
   a "Avísame cuando llegue" en vez de deshabilitarse.
 - Hero del home: collage de recortes de producto (PNG/WebP transparentes,
   recortados al borde) sobre un disco amarillo, en `public/vitrina/` con su
-  manifiesto en `app/(site)/_lib/vitrina.ts` (`CUTOUTS`, `categoryCutouts`,
-  `TICKER_CUTOUTS`). Son decoración, no enlazan a productos. Encima van hasta
-  dos productos reales (`getHeroProducts`: con stock y foto, destacados
-  primero y luego los más nuevos) como tarjetas con precio. Los mismos
-  recortes ilustran las tarjetas de categoría sin imagen propia (por slug) y
-  separan las palabras del ticker. Para cambiar un recorte: reemplazar el
-  archivo y actualizar ancho/alto en el manifiesto.
+  manifiesto en `app/(site)/_lib/vitrina.ts` (`CUTOUTS`, `TICKER_CUTOUTS`).
+  Son decoración, no enlazan a productos. Encima van hasta dos productos
+  reales (`getHeroProducts`: con stock y foto, destacados primero y luego los
+  más nuevos) como tarjetas con precio. Los mismos recortes separan las
+  palabras del ticker. Para cambiar un recorte: reemplazar el archivo y
+  actualizar ancho/alto en el manifiesto.
+- Imagen de cada categoría (tarjetas del home y menú "Categorías"), decisión
+  del usuario 2026-10-10: **nunca se deduce del nombre/slug**. Manual si
+  `categories.image_url` tiene valor (se elige en el formulario de categoría
+  del admin: subir imagen o escoger la foto de uno de sus productos; "Usar
+  automática" la vuelve `null`); si no, automática = foto principal de un
+  producto activo de la categoría (destacado → con stock → más nuevo),
+  resuelta en SQL por `getCategoriesWithCount().image`. Sin productos con
+  foto → ícono genérico (`PlaceholderArt`). `categorySchema.imageUrl` solo
+  acepta rutas `/uploads/…` o `null`. La sync con el celular no lee ni escribe
+  `image_url`, así que no la pisa.
 - Se quitaron el selector de fuente (`FontContext`, Orbitron), el carrito
   falso del header y textos con promesas no verificadas (envío en 1–3 días,
   devoluciones 30 días, soporte 24/7, "200+ productos"); las cifras del hero

@@ -1,6 +1,6 @@
 // Product cutouts (transparent WebP, trimmed to their edges) in
-// public/vitrina/. They are decoration for the home page — hero collage,
-// category tiles, ticker — not catalog data, so they don't link anywhere.
+// public/vitrina/. They are decoration for the home page — hero collage
+// and ticker — not catalog data, so they don't link anywhere.
 
 export type Cutout = { src: string; w: number; h: number; alt: string }
 
@@ -23,17 +23,6 @@ export const CUTOUTS = {
   manguera: cut('manguera', 447, 281, 'Manguera extensible'),
   cepillo: cut('cepillo-limpieza', 275, 501, 'Cepillo de limpieza recargable'),
 } as const
-
-// Main + secondary cutout for a category tile, matched by slug. null = no
-// match (the tile falls back to its line icon).
-export function categoryCutouts(slug: string | null): [Cutout, Cutout?] | null {
-  const s = (slug ?? '').toLowerCase()
-  if (/tecno|tech|electr/.test(s)) return [CUTOUTS.intercomunicador, CUTOUTS.camara]
-  if (/bellez|beauty|cosmet/.test(s)) return [CUTOUTS.plancha]
-  if (/hogar|home|casa/.test(s)) return [CUTOUTS.dispensador, CUTOUTS.huevera]
-  if (/herramient|tool|ferret/.test(s)) return [CUTOUTS.manguera, CUTOUTS.candado]
-  return null
-}
 
 // Small cutouts that separate the words of the ticker.
 export const TICKER_CUTOUTS: Cutout[] = [

@@ -7,7 +7,16 @@ export const categorySchema = z.object({
   slug: z.string().min(1, "El slug es requerido").regex(/^[a-z0-9-]+$/, "Solo letras minúsculas, números y guiones"),
   description: z.string().optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Color hex inválido").optional(),
-  imageUrl: z.string().optional(),
+  // Manual picture for the category: an image uploaded to this server (its
+  // own upload or one of its products' photos). null = automatic (the
+  // public site picks a photo from the category's products).
+  imageUrl: z
+    .string()
+    .max(500)
+    .regex(/^\/uploads\/[A-Za-z0-9/_.-]+$/, "Imagen inválida")
+    .refine((url) => !url.includes(".."), "Imagen inválida")
+    .nullable()
+    .optional(),
   active: z.boolean().optional().default(true),
 });
 

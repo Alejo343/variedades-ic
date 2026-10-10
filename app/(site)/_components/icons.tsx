@@ -1,4 +1,4 @@
-import { Headphones, Sparkles, Sofa, Package } from 'lucide-react'
+import { Package } from 'lucide-react'
 
 export function WhatsAppIcon() {
   return (
@@ -18,11 +18,9 @@ export function InstagramIcon() {
   )
 }
 
-/** Line illustration for a category with no uploaded image, picked by slug. */
-export function CategoryArt({ slug }: { slug: string | null }) {
-  const s = (slug ?? '').toLowerCase()
-  if (/tecno|tech|electr/.test(s)) return <Headphones aria-hidden="true" />
-  if (/bellez|beauty|cosmet/.test(s)) return <Sparkles aria-hidden="true" />
-  if (/hogar|home|casa/.test(s)) return <Sofa aria-hidden="true" />
+/** Line illustration where there is no photo (product without images,
+ *  category without products with photos). Same for every category: the
+ *  picture never depends on what the category is called. */
+export function PlaceholderArt() {
   return <Package aria-hidden="true" />
 }

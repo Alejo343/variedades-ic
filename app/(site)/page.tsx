@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight, MapPin, Truck } from "lucide-react";
 import ProductCard from "./_components/ProductCard";
-import { CategoryArt, InstagramIcon, WhatsAppIcon } from "./_components/icons";
+import { InstagramIcon, PlaceholderArt, WhatsAppIcon } from "./_components/icons";
 import {
   FREE_DELIVERY_LIST,
   FREE_DELIVERY_TOWNS,
@@ -11,7 +11,7 @@ import {
   formatCOP,
   waLink,
 } from "./_lib/shop";
-import { CUTOUTS, TICKER_CUTOUTS, categoryCutouts } from "./_lib/vitrina";
+import { CUTOUTS, TICKER_CUTOUTS } from "./_lib/vitrina";
 import { getCategoriesWithCount } from "@/lib/db/queries/categories";
 import {
   countPublicProducts,
@@ -222,7 +222,7 @@ export default async function Home() {
                     <h3 className="display">{c.name}</h3>
                     {c.description && <p className="desc">{c.description}</p>}
                   </div>
-                  <CategoryTileArt imageUrl={c.imageUrl} slug={c.slug} />
+                  <CategoryTileArt image={c.image} />
                   <span className="go" aria-hidden="true">
                     <ArrowUpRight />
                   </span>
@@ -354,52 +354,25 @@ export default async function Home() {
   );
 }
 
-// Category picture: the admin-uploaded image if there is one, else product
-// cutouts matched by slug, else a line icon.
-function CategoryTileArt({
-  imageUrl,
-  slug,
-}: {
-  imageUrl: string | null;
-  slug: string;
-}) {
-  if (imageUrl) {
+// Category picture (already resolved by getCategoriesWithCount: manual
+// image, else a photo of one of its products), else a line icon.
+function CategoryTileArt({ image }: { image: string | null }) {
+  if (!image) {
     return (
-      <span className="art" aria-hidden="true">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={imageUrl} alt="" />
+      <span className="art-photo art-photo-none" aria-hidden="true">
+        <PlaceholderArt />
       </span>
     );
   }
-  const cuts = categoryCutouts(slug);
-  if (!cuts) {
-    return (
-      <span className="art" aria-hidden="true">
-        <CategoryArt slug={slug} />
-      </span>
-    );
-  }
-  const [main, second] = cuts;
   return (
-    <span className="art-cut" aria-hidden="true">
+    <span className="art-photo" aria-hidden="true">
       <Image
-        src={main.src}
-        width={main.w}
-        height={main.h}
+        src={image}
         alt=""
+        fill
         sizes="(max-width: 640px) 45vw, 240px"
-        className="main"
+        style={{ objectFit: "contain" }}
       />
-      {second && (
-        <Image
-          src={second.src}
-          width={second.w}
-          height={second.h}
-          alt=""
-          sizes="120px"
-          className="second"
-        />
-      )}
     </span>
   );
 }

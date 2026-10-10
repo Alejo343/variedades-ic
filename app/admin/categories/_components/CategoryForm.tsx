@@ -1,11 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { ImagePlus, Sparkles } from "lucide-react";
 import { toSlug } from "@/lib/validations";
 import type { Category } from "@/lib/db/schema";
 
-export function CategoryForm({ initial }: { initial?: Category }) {
+type ProductPhoto = { productId: number; name: string; active: boolean; url: string };
+
+export function CategoryForm({
+  initial,
+  productPhotos = [],
+}: {
+  initial?: Category;
+  productPhotos?: ProductPhoto[];
+}) {
   const router = useRouter();
   const isEdit = !!initial;
 
@@ -15,9 +25,38 @@ export function CategoryForm({ initial }: { initial?: Category }) {
     description: initial?.description ?? "",
     color: initial?.color ?? "#3B82F6",
     active: initial?.active ?? true,
+    // null = automatic: the store uses a photo of one of its products.
+    imageUrl: initial?.imageUrl ?? null,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const autoPhoto = productPhotos.find((p) => p.active) ?? null;
+  const preview = form.imageUrl ?? autoPhoto?.url ?? null;
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setError("");
+
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
+
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error ?? "Error al subir imagen");
+      return;
+    }
+    const { url } = await res.json();
+    setForm((f) => ({ ...f, imageUrl: url }));
+  }
 
   function handleNameChange(name: string) {
     setForm((f) => ({ ...f, name, slug: isEdit ? f.slug : toSlug(name) }));
@@ -108,6 +147,79 @@ export function CategoryForm({ initial }: { initial?: Category }) {
           <span className="text-sm text-gray-500">{form.color}</span>
         </div>
       </div>
+
+      <section>
+        <span className="adm-label">Imagen en la tienda</span>
+        <div className="flex items-start gap-4">
+          <div className="relative w-28 h-28 shrink-0 rounded-xl overflow-hidden border border-[var(--adm-line)] bg-white grid place-items-center text-[var(--adm-ink-3)]">
+            {preview ? (
+              <Image src={preview} alt="" fill sizes="112px" className="object-contain p-2" />
+            ) : (
+              <ImagePlus size={26} aria-hidden="true" />
+            )}
+          </div>
+          <div className="flex flex-col gap-2 min-w-0">
+            <p className="text-sm text-[var(--adm-ink)] m-0">
+              {form.imageUrl
+                ? "Elegida a mano."
+                : autoPhoto
+                  ? <>Automática: foto de <strong>{autoPhoto.name}</strong>.</>
+                  : "Automática: se usará la foto de uno de sus productos cuando tenga alguno con foto."}
+            </p>
+            <p className="adm-hint !mt-0">
+              En automático se usa un producto destacado, si no uno con stock, si no el más nuevo.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="adm-btn adm-btn-ghost"
+              >
+                <ImagePlus size={16} aria-hidden="true" /> {uploading ? "Subiendo…" : "Subir imagen"}
+              </button>
+              {form.imageUrl && (
+                <button
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, imageUrl: null }))}
+                  className="adm-btn adm-btn-ghost"
+                >
+                  <Sparkles size={16} aria-hidden="true" /> Usar automática
+                </button>
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleUpload} className="hidden" />
+          </div>
+        </div>
+
+        {productPhotos.length > 0 && (
+          <div className="mt-4">
+            <p className="adm-hint !mt-0 mb-2">O elige la foto de uno de sus productos:</p>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-2">
+              {productPhotos.map((p) => {
+                const selected = form.imageUrl === p.url;
+                return (
+                  <button
+                    key={p.productId}
+                    type="button"
+                    title={p.name}
+                    aria-label={`Usar la foto de ${p.name}`}
+                    aria-pressed={selected}
+                    onClick={() => setForm((f) => ({ ...f, imageUrl: p.url }))}
+                    className={`relative aspect-square rounded-lg overflow-hidden bg-white border-2 transition ${
+                      selected
+                        ? "border-[var(--adm-brand)] ring-2 ring-[var(--adm-brand)]/25"
+                        : "border-[var(--adm-line)] hover:border-[var(--adm-line-strong)]"
+                    } ${p.active ? "" : "opacity-50"}`}
+                  >
+                    <Image src={p.url} alt="" fill sizes="80px" className="object-contain p-1" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </section>
 
       <label className="flex items-center gap-2.5 text-sm text-[var(--adm-ink)] cursor-pointer select-none">
         <input

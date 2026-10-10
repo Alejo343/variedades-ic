@@ -5,15 +5,14 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, ChevronDown, Menu, Search, X } from 'lucide-react'
-import { CategoryArt, InstagramIcon, WhatsAppIcon } from './icons'
+import { InstagramIcon, PlaceholderArt, WhatsAppIcon } from './icons'
 import { INSTAGRAM_HANDLE, INSTAGRAM_URL, waLink } from '../_lib/shop'
-import { categoryCutouts } from '../_lib/vitrina'
 
 type NavCategory = {
   name: string
   slug: string
   color: string | null
-  imageUrl: string | null
+  image: string | null
   productCount: number
 }
 
@@ -34,15 +33,11 @@ function SearchForm({ autoFocus = false }: { autoFocus?: boolean }) {
   )
 }
 
-// Picture for a category in the menu: uploaded image → product cutout → icon.
+// Picture for a category in the menu (manual or one of its products'
+// photos, resolved on the server), else a line icon.
 function CategoryThumb({ category }: { category: NavCategory }) {
-  if (category.imageUrl) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={category.imageUrl} alt="" className="cover" />
-  }
-  const cut = categoryCutouts(category.slug)?.[0]
-  if (cut) return <Image src={cut.src} width={cut.w} height={cut.h} alt="" sizes="56px" />
-  return <CategoryArt slug={category.slug} />
+  if (!category.image) return <PlaceholderArt />
+  return <Image src={category.image} alt="" width={56} height={56} sizes="56px" />
 }
 
 // Desktop "Categorías" dropdown. Every category lives here, so the bar keeps

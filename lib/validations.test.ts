@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { productSchema, sellerUserCreateSchema, sellerUserUpdateSchema, syncLoginSchema, syncPushSchema, toSlug } from "./validations";
+import { categorySchema, productSchema, sellerUserCreateSchema, sellerUserUpdateSchema, syncLoginSchema, syncPushSchema, toSlug } from "./validations";
 
 describe("toSlug", () => {
   it("convierte a minúsculas", () => {
@@ -106,5 +106,31 @@ describe("productSchema.sku", () => {
   it("rechaza un SKU con espacios o caracteres no permitidos", () => {
     expect(productSchema.safeParse({ ...base, sku: "MI SKU" }).success).toBe(false);
     expect(productSchema.safeParse({ ...base, sku: "SKU#1" }).success).toBe(false);
+  });
+});
+
+describe("categorySchema.imageUrl", () => {
+  const base = { name: "Hogar", slug: "hogar" };
+
+  it("accepts an uploaded image path", () => {
+    const r = categorySchema.partial().safeParse({ imageUrl: "/uploads/products/abc.webp" });
+    expect(r.success && r.data.imageUrl).toBe("/uploads/products/abc.webp");
+  });
+
+  it("accepts null to go back to the automatic image", () => {
+    const r = categorySchema.partial().safeParse({ imageUrl: null });
+    expect(r.success).toBe(true);
+    expect(r.success && r.data.imageUrl).toBeNull();
+  });
+
+  it("leaves imageUrl out when not sent, so a partial update doesn't touch it", () => {
+    const r = categorySchema.partial().safeParse({ name: "Casa" });
+    expect(r.success && "imageUrl" in r.data).toBe(false);
+  });
+
+  it("rejects external URLs and other junk", () => {
+    expect(categorySchema.safeParse({ ...base, imageUrl: "https://evil.example/x.png" }).success).toBe(false);
+    expect(categorySchema.safeParse({ ...base, imageUrl: "javascript:alert(1)" }).success).toBe(false);
+    expect(categorySchema.safeParse({ ...base, imageUrl: "/uploads/../.env.local" }).success).toBe(false);
   });
 });

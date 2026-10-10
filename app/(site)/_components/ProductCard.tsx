@@ -1,7 +1,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowUpRight, Star } from 'lucide-react'
-import { CategoryArt } from './icons'
+import { PlaceholderArt } from './icons'
 import { formatCOP } from '../_lib/shop'
 
 export type ProductCardData = {
@@ -41,7 +41,7 @@ export default function ProductCard({
             priority={priority}
           />
         ) : (
-          <div className="img-fallback"><CategoryArt slug={p.categorySlug} /></div>
+          <div className="img-fallback"><PlaceholderArt /></div>
         )}
         <div className="pc-badges">
           {soldOut ? (

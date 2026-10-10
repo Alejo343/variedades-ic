@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { CategoryArt } from './icons'
+import { PlaceholderArt } from './icons'
 
 type GalleryImage = {
   id: number
@@ -16,11 +16,9 @@ type GalleryImage = {
 export default function ProductGallery({
   images,
   productName,
-  categorySlug,
 }: {
   images: GalleryImage[]
   productName: string
-  categorySlug: string | null
 }) {
   const sorted = [...images].sort((a, b) =>
     a.isPrimary !== b.isPrimary ? (a.isPrimary ? -1 : 1) : a.displayOrder - b.displayOrder
@@ -51,7 +49,7 @@ export default function ProductGallery({
             priority
           />
         ) : (
-          <div className="img-fallback"><CategoryArt slug={categorySlug} /></div>
+          <div className="img-fallback"><PlaceholderArt /></div>
         )}
         {many && (
           <>

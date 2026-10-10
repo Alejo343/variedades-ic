@@ -172,10 +172,9 @@
 .site .cat-panel li a:hover { background: var(--paper); }
 .site .cat-panel .thumb {
   flex: none; width: 56px; height: 56px; border-radius: 14px; display: grid; place-items: center; overflow: hidden;
-  background: color-mix(in srgb, var(--cat) 16%, var(--card)); color: color-mix(in srgb, var(--cat) 70%, var(--ink));
+  background: #fff; border: 1px solid var(--line); color: var(--ink-3);
 }
-.site .cat-panel .thumb img { width: 80%; height: 80%; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(12, 22, 51, .2)); transition: transform .25s var(--ease); }
-.site .cat-panel .thumb img.cover { width: 100%; height: 100%; object-fit: cover; filter: none; }
+.site .cat-panel .thumb img { width: 86%; height: 86%; object-fit: contain; transition: transform .25s var(--ease); }
 .site .cat-panel .thumb svg { width: 26px; height: 26px; }
 .site .cat-panel li a:hover .thumb img { transform: scale(1.08) rotate(-4deg); }
 .site .cat-panel .name { display: block; font-weight: 700; font-size: 15px; line-height: 1.25; }
@@ -422,30 +421,22 @@
 }
 .site .cat-tile:hover .go { transform: rotate(-45deg); background: var(--cat); }
 .site .cat-tile .go svg { width: 20px; height: 20px; }
-.site .cat-tile .art {
-  position: absolute; right: -3%; top: -4%; width: min(46%, 220px); aspect-ratio: 1; transform: rotate(8deg);
-  color: color-mix(in srgb, var(--cat) 55%, transparent); z-index: -1; opacity: .9;
+/* Category photo (manual or one of its products'): a white card tilted in
+   the corner, so cutouts and photos with a background both look right. */
+.site .cat-tile .art-photo {
+  position: absolute; right: 6%; top: 8%; width: min(36%, 140px); aspect-ratio: 1; z-index: -1;
+  border-radius: 20px; background: #fff; overflow: hidden; transform: rotate(6deg);
+  box-shadow: 0 14px 28px -14px rgba(12, 22, 51, .45);
   transition: transform .35s var(--ease);
 }
-.site .cat-tile:hover .art { transform: rotate(0deg) scale(1.05); }
-.site .cat-tile .art img { width: 100%; height: 100%; object-fit: cover; border-radius: 22px; }
-.site .cat-tile .art svg { width: 100%; height: 100%; stroke-width: 1.1; }
-.site .cat-tile .art-cut {
-  position: absolute; right: 5%; top: 5%; width: min(38%, 150px); aspect-ratio: 1; z-index: -1;
-  display: grid; place-items: center; transition: transform .35s var(--ease);
-}
-.site .cat-tile .art-cut::before {
-  content: ""; position: absolute; inset: 8%; border-radius: 50%;
-  background: color-mix(in srgb, var(--cat) 22%, var(--card));
-}
-.site .cat-tile .art-cut img { position: relative; object-fit: contain; filter: drop-shadow(0 12px 14px rgba(12, 22, 51, .22)); }
-.site .cat-tile .art-cut .main { width: 88%; height: 88%; }
-.site .cat-tile .art-cut .second { position: absolute; left: -26%; top: 4%; width: 44%; height: 44%; transform: rotate(-10deg); }
-.site .cat-tile:hover .art-cut { transform: rotate(-4deg) scale(1.06); }
+.site .cat-tile .art-photo img { padding: 8%; }
+.site .cat-tile .art-photo-none { display: grid; place-items: center; background: rgba(255, 255, 255, .7); box-shadow: none; color: color-mix(in srgb, var(--cat) 55%, var(--ink-3)); }
+.site .cat-tile .art-photo-none svg { width: 42%; height: 42%; stroke-width: 1.4; }
+.site .cat-tile:hover .art-photo { transform: rotate(0deg) scale(1.06); }
 @media (min-width: 1024px) {
-  .site .cat-grid:has(.art-cut) { grid-auto-rows: 250px; }
-  .site .cat-grid[data-count="3"] .cat-tile:first-child .art-cut,
-  .site .cat-grid[data-count="5"] .cat-tile:first-child .art-cut { width: min(64%, 340px); top: 14%; right: 6%; }
+  .site .cat-grid:has(.art-photo) { grid-auto-rows: 250px; }
+  .site .cat-grid[data-count="3"] .cat-tile:first-child .art-photo,
+  .site .cat-grid[data-count="5"] .cat-tile:first-child .art-photo { width: min(56%, 300px); top: 10%; right: 7%; }
 }
 
 /* ── Product card ── */

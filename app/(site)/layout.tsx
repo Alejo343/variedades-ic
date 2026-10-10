@@ -26,7 +26,7 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
     name: c.name,
     slug: c.slug,
     color: c.color,
-    imageUrl: c.imageUrl,
+    image: c.image,
     productCount: c.productCount,
   }))
 

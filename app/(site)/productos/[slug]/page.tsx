@@ -68,7 +68,6 @@ export default async function ProductoDetallePage({
           <ProductGallery
             images={product.images}
             productName={product.name}
-            categorySlug={product.categorySlug}
           />
 
           <div className="pd-info">
