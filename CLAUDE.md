@@ -96,6 +96,17 @@ Public storefront for **IC Variedades** (a Colombian store selling tech, beauty,
 - Navegación en `app/admin/_lib/nav.ts`; formateo de dinero/fechas en
   `app/admin/_lib/format.ts` (no redefinir `formatCOP` por página).
 
+### Cambiar la contraseña del dueño (2026-10-10)
+
+`/admin/account` ("Mi cuenta", enlazada desde la tarjeta del usuario en el
+sidebar y desde Ctrl+K): pide la contraseña actual, la nueva (mín. 8) y su
+confirmación (`ownPasswordChangeSchema`, con tests). `PATCH
+/api/admin/account/password` → `lib/account/password.ts#changeOwnPassword`
+(compara con bcrypt y guarda el hash nuevo en `users`). Los celulares ya
+conectados siguen sincronizando (su token no depende de la contraseña).
+`ADMIN_PASSWORD_HASH` del `.env.local` solo siembra al dueño la primera vez:
+cambiarlo ahí no cambia nada.
+
 ### Importación de productos desde Excel (2026-10-04)
 
 `/admin/products/import`, distinto del Excel de pedidos de compra (ese lee la

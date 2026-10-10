@@ -16,6 +16,7 @@ import {
   ReceiptText,
   Wallet,
   FileSpreadsheet,
+  KeyRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -68,6 +69,14 @@ export const NAV: NavGroup[] = [
     items: [{ href: "/admin/cash", label: "Caja", icon: Wallet, keywords: "cuentas ingresos gastos saldo" }],
   },
 ];
+
+/** The signed-in owner's own account, linked from the user card in the sidebar. */
+export const ACCOUNT_ITEM: NavItem = {
+  href: "/admin/account",
+  label: "Mi cuenta",
+  icon: KeyRound,
+  keywords: "contraseña clave password perfil",
+};
 
 /** Shortcuts to create things, shown in the command palette and the "Nuevo" menu. */
 export const QUICK_ACTIONS: NavItem[] = [

@@ -4,8 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { signOut } from "next-auth/react";
-import { ChevronRight, LogOut, Menu, Plus, Search, X, ExternalLink } from "lucide-react";
-import { NAV, QUICK_ACTIONS, currentGroup, currentNavItem, isActive } from "../_lib/nav";
+import { ChevronRight, KeyRound, LogOut, Menu, Plus, Search, X, ExternalLink } from "lucide-react";
+import { ACCOUNT_ITEM, NAV, QUICK_ACTIONS, currentGroup, currentNavItem, isActive } from "../_lib/nav";
 import { CommandPalette } from "./CommandPalette";
 
 export function AdminShell({ user, children }: { user: { name: string; email: string }; children: React.ReactNode }) {
@@ -149,10 +149,18 @@ function SidebarContent({ pathname, user }: { pathname: string; user: { name: st
           <span className="w-8 h-8 rounded-full grid place-items-center bg-[#1e293b] text-[#cbd5e1] text-[12px] font-semibold shrink-0">
             {initials || "A"}
           </span>
-          <div className="min-w-0 flex-1 leading-tight">
-            <p className="text-[13px] text-white font-medium truncate">{user.name}</p>
+          <Link href={ACCOUNT_ITEM.href} className="min-w-0 flex-1 leading-tight group" title="Mi cuenta · cambiar contraseña">
+            <p className="text-[13px] text-white font-medium truncate group-hover:underline underline-offset-2">{user.name}</p>
             <p className="text-[11.5px] text-[#6b7890] truncate">{user.email}</p>
-          </div>
+          </Link>
+          <Link
+            href={ACCOUNT_ITEM.href}
+            className="w-8 h-8 grid place-items-center rounded-lg text-[#8592aa] hover:text-white hover:bg-white/10 transition"
+            title="Cambiar contraseña"
+            aria-label="Cambiar contraseña"
+          >
+            <KeyRound size={16} />
+          </Link>
           <button
             onClick={() => signOut({ callbackUrl: "/admin/login" })}
             className="w-8 h-8 grid place-items-center rounded-lg text-[#8592aa] hover:text-white hover:bg-white/10 transition"

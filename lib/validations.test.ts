@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { categorySchema, productSchema, sellerUserCreateSchema, sellerUserUpdateSchema, syncLoginSchema, syncPushSchema, toSlug } from "./validations";
+import { categorySchema, ownPasswordChangeSchema, productSchema, sellerUserCreateSchema, sellerUserUpdateSchema, syncLoginSchema, syncPushSchema, toSlug } from "./validations";
 
 describe("toSlug", () => {
   it("convierte a minúsculas", () => {
@@ -57,6 +57,24 @@ describe("sellerUserUpdateSchema", () => {
   it("rechaza un cambio vacío o una contraseña corta", () => {
     expect(sellerUserUpdateSchema.safeParse({}).success).toBe(false);
     expect(sellerUserUpdateSchema.safeParse({ password: "corta" }).success).toBe(false);
+  });
+});
+
+describe("ownPasswordChangeSchema", () => {
+  it("acepta una contraseña nueva confirmada", () => {
+    expect(
+      ownPasswordChangeSchema.parse({ currentPassword: "vieja", newPassword: "nueva-clave", confirmPassword: "nueva-clave" }),
+    ).toEqual({ currentPassword: "vieja", newPassword: "nueva-clave", confirmPassword: "nueva-clave" });
+  });
+
+  it("rechaza confirmación distinta, contraseña corta, igual a la actual o sin la actual", () => {
+    const base = { currentPassword: "vieja", newPassword: "nueva-clave", confirmPassword: "nueva-clave" };
+    expect(ownPasswordChangeSchema.safeParse({ ...base, confirmPassword: "otra-clave" }).success).toBe(false);
+    expect(ownPasswordChangeSchema.safeParse({ ...base, newPassword: "corta", confirmPassword: "corta" }).success).toBe(false);
+    expect(
+      ownPasswordChangeSchema.safeParse({ currentPassword: "misma-clave", newPassword: "misma-clave", confirmPassword: "misma-clave" }).success,
+    ).toBe(false);
+    expect(ownPasswordChangeSchema.safeParse({ ...base, currentPassword: "" }).success).toBe(false);
   });
 });
 

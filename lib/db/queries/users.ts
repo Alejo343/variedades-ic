@@ -67,3 +67,21 @@ export function revokeSellerDeviceSession(sellerId: number, sessionId: number) {
     )
     .returning({ id: deviceSessions.id });
 }
+
+// The owner's own login (/admin/account). The hash only leaves this file to
+// be compared, never returned to the panel.
+export function getOwnerCredentials(username: string) {
+  return db
+    .select({ id: users.id, passwordHash: users.passwordHash })
+    .from(users)
+    .where(and(eq(users.username, username), eq(users.role, "owner"), eq(users.active, true)))
+    .limit(1);
+}
+
+export function updateOwnerPassword(userId: number, passwordHash: string) {
+  return db
+    .update(users)
+    .set({ passwordHash, updatedAt: new Date() })
+    .where(and(eq(users.id, userId), eq(users.role, "owner")))
+    .returning({ id: users.id });
+}

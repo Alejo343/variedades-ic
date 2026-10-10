@@ -168,6 +168,23 @@ export const sellerUserUpdateSchema = z
   })
   .refine((d) => d.password !== undefined || d.active !== undefined, "No hay nada que cambiar");
 
+// The signed-in owner changing their own panel password (/admin/account).
+// The current password is checked against the hash by the query layer.
+export const ownPasswordChangeSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Escribe tu contraseña actual").max(200),
+    newPassword: passwordField,
+    confirmPassword: z.string(),
+  })
+  .refine((d) => d.newPassword === d.confirmPassword, {
+    message: "Las contraseñas nuevas no coinciden",
+    path: ["confirmPassword"],
+  })
+  .refine((d) => d.newPassword !== d.currentPassword, {
+    message: "La contraseña nueva debe ser distinta de la actual",
+    path: ["newPassword"],
+  });
+
 // Sync login from the phone (sub-paso 5). No format rules on the username
 // here — only normalization — so the owner can sign in with their email as is.
 export const syncLoginSchema = z.object({

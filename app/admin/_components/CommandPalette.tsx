@@ -3,13 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CornerDownLeft, Search } from "lucide-react";
-import { NAV, QUICK_ACTIONS, type NavItem } from "../_lib/nav";
+import { ACCOUNT_ITEM, NAV, QUICK_ACTIONS, type NavItem } from "../_lib/nav";
 
 type Entry = NavItem & { section: string };
 
 const ENTRIES: Entry[] = [
   ...QUICK_ACTIONS.map((a) => ({ ...a, section: "Acciones" })),
   ...NAV.flatMap((g) => g.items.map((it) => ({ ...it, section: g.label }))),
+  { ...ACCOUNT_ITEM, section: "Cuenta" },
 ];
 
 function normalize(s: string) {
