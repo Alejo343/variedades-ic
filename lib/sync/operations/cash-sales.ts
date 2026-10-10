@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { z } from "zod";
+import { planCashTransfer } from "@/lib/domain/cash";
 import { calculateCommission } from "@/lib/domain/commission";
 import { validateAdjustmentReason } from "@/lib/domain/inventory-movement";
 import { defineHandler, SyncRejection } from "../push";
@@ -27,6 +28,34 @@ export const createCashMovement = defineHandler({
     await tx.execute(sql`
       INSERT INTO cash_movements (uuid, type, amount, concept, movement_date, source_type, account_id, notes)
       VALUES (${p.uuid}, ${p.type}, ${p.amount}, ${p.concept}, ${fromUtc(p.movementDate)}, 'manual', ${accountId}, ${p.notes ?? null})`);
+  },
+});
+
+// A transfer between cash accounts (owner only): the two movements of
+// planCashTransfer, with the uuids the phone generated, in one transaction.
+export const createCashTransfer = defineHandler({
+  schema: z.object({
+    fromAccountUuid: rowUuid,
+    toAccountUuid: rowUuid,
+    amount: z.number().int().min(1),
+    transferDate: utcTimestamp,
+    notes,
+    outMovementUuid: rowUuid,
+    inMovementUuid: rowUuid,
+  }),
+  async apply(tx, p) {
+    const fromId = await idByUuid(tx, "cash_accounts", p.fromAccountUuid, "Cuenta de origen");
+    const toId = await idByUuid(tx, "cash_accounts", p.toAccountUuid, "Cuenta de destino");
+    const names = await tx.execute(sql`SELECT id, name FROM cash_accounts WHERE id IN (${fromId}, ${toId})`);
+    const nameOf = (id: number) => (names.rows as { id: number; name: string }[]).find((r) => r.id === id)?.name ?? "";
+    const plan = planCashTransfer({ from: { id: fromId, name: nameOf(fromId) }, to: { id: toId, name: nameOf(toId) }, amount: p.amount });
+    if (!plan.ok) throw new SyncRejection(plan.reason);
+    const uuids = [p.outMovementUuid, p.inMovementUuid];
+    for (const [i, m] of plan.movements.entries()) {
+      await tx.execute(sql`
+        INSERT INTO cash_movements (uuid, type, amount, concept, movement_date, source_type, account_id, notes)
+        VALUES (${uuids[i]}, ${m.type}, ${m.amount}, ${m.concept}, ${fromUtc(p.transferDate)}, ${m.sourceType}, ${m.accountId}, ${p.notes ?? null})`);
+    }
   },
 });
 

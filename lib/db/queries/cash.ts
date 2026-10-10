@@ -1,8 +1,8 @@
 import { db } from "../index";
 import { cashMovements, cashAccounts } from "../schema";
-import { desc, eq, sql } from "drizzle-orm";
-import type { CashMovementInput } from "@/lib/validations";
-import { CASH_ADJUSTMENT_SOURCE } from "@/lib/domain/cash";
+import { desc, eq, inArray, sql } from "drizzle-orm";
+import type { CashMovementInput, CashTransferInput } from "@/lib/validations";
+import { CASH_ADJUSTMENT_SOURCE, planCashTransfer } from "@/lib/domain/cash";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -34,6 +34,28 @@ export function recordCashMovement(dbOrTx: typeof db | Tx, data: RecordCashMovem
 export function createCashMovement(data: CashMovementInput) {
   const { adjustment, ...movement } = data;
   return recordCashMovement(db, { ...movement, sourceType: adjustment ? CASH_ADJUSTMENT_SOURCE : "manual" });
+}
+
+// The two movements of a transfer (lib/domain/cash.ts#planCashTransfer), in
+// one transaction. Throws with a readable message when the plan is invalid.
+export async function createCashTransfer(data: CashTransferInput) {
+  return db.transaction(async (tx) => {
+    const accounts = await tx
+      .select({ id: cashAccounts.id, name: cashAccounts.name })
+      .from(cashAccounts)
+      .where(inArray(cashAccounts.id, [data.fromAccountId, data.toAccountId]));
+    const from = accounts.find((a) => a.id === data.fromAccountId);
+    const to = accounts.find((a) => a.id === data.toAccountId);
+    if (!from || !to) throw new Error("Cuenta no encontrada");
+    const plan = planCashTransfer({ from, to, amount: data.amount });
+    if (!plan.ok) throw new Error(plan.reason);
+    const rows = [];
+    for (const m of plan.movements) {
+      const [row] = await recordCashMovement(tx, { ...m, notes: data.notes ?? null });
+      rows.push(row);
+    }
+    return rows;
+  });
 }
 
 export function getAllCashMovements() {

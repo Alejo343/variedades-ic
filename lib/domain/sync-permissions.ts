@@ -10,6 +10,7 @@ export const SYNC_OPERATION_TYPES = [
   "upsertCashAccount",
   "createInventoryAdjustment",
   "createCashMovement",
+  "createCashTransfer",
   "createDirectSale",
   "createSellerDelivery",
   "createSellerSale",

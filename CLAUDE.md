@@ -88,9 +88,39 @@ como `cash_movements` normal (`type` ingreso|gasto = dirección) con
 `sourceType = 'ajuste'` — a propósito NO es un `type` nuevo, porque el móvil
 sincroniza `cash_movements` y calcula su saldo por `type`. Lógica en
 `lib/domain/cash.ts` (`isCashAdjustment`, `summarizeCashFlow`, con tests);
-Caja y Reportes → Flujo de caja los excluyen de ingresos/gastos. Pendiente en
-el móvil: sus reportes aún cuentan un ajuste como ingreso/gasto (el saldo sí
-cuadra) y desde el celular no se pueden crear ajustes.
+Caja y Reportes → Flujo de caja los excluyen de ingresos/gastos. El móvil ya
+los excluye también (2026-10-08, ver abajo); desde el celular todavía no se
+pueden crear ajustes.
+
+### Transferencias entre cuentas (2026-10-08)
+
+Mover dinero de una cuenta de caja a otra, desde el panel y desde el celular.
+Mismo patrón que los ajustes: **dos** `cash_movements` con
+`sourceType = 'transferencia'` — un gasto en la cuenta de origen y un ingreso
+en la de destino, con el mismo concepto ("Transferencia: Efectivo → Nequi").
+Cada saldo queda bien, el total no cambia, y no cuenta como ingreso ni gasto.
+Sin migración ni tabla nueva (`sourceType` es texto libre y ya viaja en la
+sync); la contra: una transferencia no se puede editar ni anular como un solo
+registro.
+
+- `lib/domain/cash.ts` (con tests): `isCashTransfer`, `isBusinessCashMovement`
+  (ni ajuste ni transferencia), `planCashTransfer` (arma las dos filas;
+  rechaza la misma cuenta y montos no positivos) y `summarizeCashFlow` gana
+  `transfers` (neto: 0 sobre todas las cuentas). El móvil tiene una copia
+  idéntica de este archivo.
+- Panel: `POST /api/admin/cash-transfers` (`cashTransferSchema`) →
+  `lib/db/queries/cash.ts#createCashTransfer` (una transacción). En `/admin/cash`:
+  botón "Transferir entre cuentas" en el encabezado (abre el formulario en
+  modo transferencia, `?form=transferencia`), opción "Transferir" en el
+  formulario, pestaña "Transferencias" y su propio ícono/etiqueta en la tabla.
+- Sync: operación nueva `createCashTransfer {fromAccountUuid, toAccountUuid,
+  amount, transferDate, notes?, outMovementUuid, inMovementUuid}` (solo
+  dueño), en `lib/sync/operations/cash-sales.ts`. **Desplegar la web antes de
+  instalar la versión de la app que la usa**: un servidor viejo la rechaza
+  como "Operación desconocida" (se puede reintentar desde Configuración).
+- Test `lib/sync/operations/cash-transfer.integration.test.ts`: las dos filas
+  con los uuid del celular, sin duplicar al reenviar, rechazos sin escribir
+  nada, y el panel escribiendo lo mismo.
 
 ### SKU editable y cambio de categoría (2026-10-08)
 

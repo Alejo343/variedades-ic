@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { ArrowDownLeft, ArrowUpRight, Building2, Scale, Settings2, Wallet } from "lucide-react";
-import { isCashAdjustment, summarizeCashFlow } from "@/lib/domain/cash";
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Building2, Scale, Settings2, Wallet } from "lucide-react";
+import { isBusinessCashMovement, isCashAdjustment, isCashTransfer, summarizeCashFlow } from "@/lib/domain/cash";
 import { getAllCashMovements, getCashBalance } from "@/lib/db/queries/cash";
 import { getActiveCashAccounts, getCashAccountsWithBalances } from "@/lib/db/queries/cash-accounts";
-import { CashMovementForm } from "./_components/CashMovementForm";
+import { CashMovementForm, type CashFormKind } from "./_components/CashMovementForm";
 import { ButtonLink, Card, FilterTabs, Page, PageHeader } from "../_components/ui";
 import { formatCOP, formatDateTime, todayInBogota } from "../_lib/format";
 
@@ -15,10 +15,16 @@ const SOURCE_LABELS: Record<string, string> = {
   purchase_payment: "Pago a distribuidor",
   commission_payment: "Pago de comisiones",
   ajuste: "Ajuste de caja",
+  transferencia: "Transferencia",
 };
 
-export default async function CashPage({ searchParams }: { searchParams: Promise<{ type?: string; account?: string }> }) {
-  const { type = "", account = "" } = await searchParams;
+export default async function CashPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string; account?: string; form?: string }>;
+}) {
+  const { type = "", account = "", form = "" } = await searchParams;
+  const initialKind: CashFormKind = form === "transferencia" ? "transferencia" : "gasto";
   const [movements, balance, accounts, accountBalances] = await Promise.all([
     getAllCashMovements(),
     getCashBalance(),
@@ -31,9 +37,15 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
   const thisMonth = movements.filter((m) => monthOf(new Date(m.movementDate)) === month);
   const { income, expense, adjustments } = summarizeCashFlow(thisMonth);
 
-  // Ingresos/Gastos tabs show business movements only; adjustments have their own tab.
+  // Ingresos/Gastos tabs show business movements only; adjustments and
+  // transfers have their own tabs.
   const matchesType = (m: (typeof movements)[number]) =>
-    !type || (type === "ajuste" ? isCashAdjustment(m) : !isCashAdjustment(m) && m.type === type);
+    !type ||
+    (type === "ajuste"
+      ? isCashAdjustment(m)
+      : type === "transferencia"
+        ? isCashTransfer(m)
+        : isBusinessCashMovement(m) && m.type === type);
   const rows = movements.filter((m) => matchesType(m) && (!account || String(m.accountId) === account));
 
   return (
@@ -43,9 +55,14 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
         title="Caja"
         description="Cada peso que entra o sale, por cuenta. El saldo se calcula a partir de los movimientos."
         actions={
-          <ButtonLink href="/admin/cash/accounts" icon={Settings2}>
-            Gestionar cuentas
-          </ButtonLink>
+          <>
+            <ButtonLink href="/admin/cash?form=transferencia#registrar" icon={ArrowLeftRight} variant="brand">
+              Transferir entre cuentas
+            </ButtonLink>
+            <ButtonLink href="/admin/cash/accounts" icon={Settings2}>
+              Gestionar cuentas
+            </ButtonLink>
+          </>
         }
       />
 
@@ -131,6 +148,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
                 { value: "ingreso", label: "Ingresos" },
                 { value: "gasto", label: "Gastos" },
                 { value: "ajuste", label: "Ajustes" },
+                { value: "transferencia", label: "Transferencias" },
               ]}
             />
           </div>
@@ -151,6 +169,8 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
                 <tbody>
                   {rows.map((m) => {
                     const adj = isCashAdjustment(m);
+                    const transfer = isCashTransfer(m);
+                    const neutral = adj || transfer;
                     return (
                     <tr key={m.id}>
                       <td className="whitespace-nowrap">{formatDateTime(m.movementDate)}</td>
@@ -158,23 +178,31 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
                         <div className="flex items-center gap-2.5">
                           <span
                             className={`w-7 h-7 rounded-lg grid place-items-center shrink-0 ${
-                              adj
+                              neutral
                                 ? "bg-[var(--adm-brand-soft)] text-[var(--adm-brand)]"
                                 : m.type === "ingreso"
                                   ? "bg-[var(--adm-ok-soft)] text-[var(--adm-ok)]"
                                   : "bg-[var(--adm-danger-soft)] text-[var(--adm-danger)]"
                             }`}
                           >
-                            {adj ? <Scale size={14} /> : m.type === "ingreso" ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
+                            {transfer ? (
+                              <ArrowLeftRight size={14} />
+                            ) : adj ? (
+                              <Scale size={14} />
+                            ) : m.type === "ingreso" ? (
+                              <ArrowDownLeft size={14} />
+                            ) : (
+                              <ArrowUpRight size={14} />
+                            )}
                           </span>
                           <span className="t-strong">{m.concept}</span>
                         </div>
                       </td>
                       <td>{m.accountName ?? "—"}</td>
                       <td className="text-[13px]">
-                        {adj ? (
+                        {neutral ? (
                           <span className="adm-badge adm-badge-info adm-badge-plain" title="No cuenta como ingreso ni gasto">
-                            Ajuste de caja
+                            {transfer ? "Transferencia" : "Ajuste de caja"}
                           </span>
                         ) : m.sourceType ? (
                           (SOURCE_LABELS[m.sourceType] ?? m.sourceType)
@@ -184,7 +212,7 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
                       </td>
                       <td
                         className={`t-right num font-semibold whitespace-nowrap ${
-                          adj ? "text-[var(--adm-brand)]" : m.type === "ingreso" ? "text-[var(--adm-ok)]" : "text-[var(--adm-ink)]"
+                          neutral ? "text-[var(--adm-brand)]" : m.type === "ingreso" ? "text-[var(--adm-ok)]" : "text-[var(--adm-ink)]"
                         }`}
                       >
                         {m.type === "ingreso" ? "+" : "−"}
@@ -199,8 +227,9 @@ export default async function CashPage({ searchParams }: { searchParams: Promise
           )}
         </Card>
 
-        <div className="xl:sticky xl:top-24">
-          <CashMovementForm accounts={accounts} />
+        <div id="registrar" className="xl:sticky xl:top-24 scroll-mt-24">
+          {/* key: the header's "Transferir" link must reset the form to that kind. */}
+          <CashMovementForm key={initialKind} accounts={accounts} initialKind={initialKind} />
         </div>
       </div>
     </Page>
