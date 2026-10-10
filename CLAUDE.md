@@ -1303,10 +1303,12 @@ contraseña generada al azar, etc.) debe escaparse igual al escribirlo en
 
 ## Sincronización con variedades-ic-mobile + roles (lado servidor)
 
-En construcción (desde la sesión 2026-09-25). El plan maestro, con las
-decisiones tomadas con el usuario y la tabla completa de sub-pasos, vive en
-el `CLAUDE.md` del repo móvil (sección "Fase 10 — Sincronización con el
-servidor + roles") — no se duplica aquí para que no se desincronicen. En
+Completa y verificada en producción con celulares reales (2026-10-09). El
+contrato vigente del lado del celular está en el `CLAUDE.md` del repo móvil
+(sección "Sincronización con el servidor"); el plan original, las decisiones
+tomadas con el usuario y la tabla de sub-pasos están en el
+`docs/historial.md` del repo móvil (sección "Fase 10 — Sincronización con el
+servidor + roles"). No se duplica aquí para que no se desincronicen. En
 resumen: el móvil sigue offline-first y sincroniza contra esta web vía
 endpoints nuevos `/api/sync/*` (login con token de dispositivo, pull por
 versión, push de operaciones idempotentes); hay dos roles (`owner` ve todo;
