@@ -21,25 +21,54 @@ are verified manually (`npm run dev` + exercising the flow) plus
 
 ## Architecture
 
-Single-page marketing site for **IC Variedades** (a Colombian store selling tech, beauty, and home goods). Built with Next.js 16, React 19, Tailwind CSS v4, TypeScript.
+Public storefront for **IC Variedades** (a Colombian store selling tech, beauty, and home goods). Built with Next.js 16, React 19, Tailwind CSS v4, TypeScript.
 
-### Components
+### Sitio público — rediseño (2026-10-10)
 
-`app/components/` contains: `Hero`, `Categories`, `FeaturedProducts`, `WhyChooseUs`, `Footer`, and `Navbar`. All are rendered by `app/page.tsx`.
-
-### Font system
-
-`app/context/FontContext.tsx` provides a global font toggle (Outfit ↔ Orbitron) via React context. The `FontProvider` wraps the app in `layout.tsx`. The Navbar exposes a toggle button that calls `useFont().toggleFont()`. Two Google Fonts are registered as CSS variables in `layout.tsx`: `--font-outfit`, `--font-orbitron`.
-
-### Styling
-
-`app/globals.css` uses Tailwind v4's `@import "tailwindcss"` and `@theme inline` for design tokens. Custom CSS animation classes:
-
-- `.slide-in-left`, `.slide-in-right` — entrance animations
-- `.pulse-dot`, `.hero-card` — ambient animations
-- `.scroll-reveal` — scroll-triggered fade-in (add `.visible` to activate)
-
-All animations respect `prefers-reduced-motion`.
+- Las páginas públicas viven en el grupo de rutas `app/(site)/` (las URLs no
+  cambian: `/`, `/productos`, `/productos/[slug]`). `app/(site)/layout.tsx`
+  pone header, footer y las fuentes del sitio (Archivo con eje `wdth` para
+  títulos → `--font-site-display`; Hanken Grotesk para texto →
+  `--font-site-body`), lee las categorías activas para la navegación y lleva
+  `dynamic = 'force-dynamic'` para todo el grupo.
+- Componentes en `app/(site)/_components/`: `SiteHeader` (client: buscador,
+  menú móvil, y en escritorio un botón "Categorías" que abre un panel con
+  todas las categorías — miniatura y conteo de productos — para que la
+  barra no crezca al agregar categorías; se cierra con Esc, clic afuera o al
+  elegir), `SiteFooter`, `ProductCard` (compartida por home, catálogo y
+  relacionados), `ProductGallery` (client), `SortSelect` (client), `icons`.
+  Número de WhatsApp, `waLink()` y `formatCOP()` en `app/(site)/_lib/shop.ts`.
+- Estilos en `app/globals.css`, sección "PUBLIC SITE", todo bajo `.site`
+  (tokens `--ink`, `--paper`, `--blue`, `--sun`, `--wa`…; clases `btn-*`,
+  `pc` = tarjeta de producto, `tag` = etiqueta de precio amarilla, `chip`,
+  `cat-tile`, `reveal`). La animación al hacer scroll (`.reveal`) solo
+  desplaza, nunca toca la opacidad, para que el contenido se vea aunque la
+  animación no corra. Todo respeta `prefers-reduced-motion`.
+- Catálogo: `getPublicProducts(categoria, { search, sort })` (búsqueda por
+  nombre con `ilike`, orden `recientes|precio-asc|precio-desc`, agotados al
+  final). Detalle: `getRelatedProducts` (misma categoría) y garantía si el
+  producto tiene `warrantyMonths`. Si está agotado, el botón de WhatsApp pasa
+  a "Avísame cuando llegue" en vez de deshabilitarse.
+- Hero del home: collage de recortes de producto (PNG/WebP transparentes,
+  recortados al borde) sobre un disco amarillo, en `public/vitrina/` con su
+  manifiesto en `app/(site)/_lib/vitrina.ts` (`CUTOUTS`, `categoryCutouts`,
+  `TICKER_CUTOUTS`). Son decoración, no enlazan a productos. Encima van hasta
+  dos productos reales (`getHeroProducts`: con stock y foto, destacados
+  primero y luego los más nuevos) como tarjetas con precio. Los mismos
+  recortes ilustran las tarjetas de categoría sin imagen propia (por slug) y
+  separan las palabras del ticker. Para cambiar un recorte: reemplazar el
+  archivo y actualizar ancho/alto en el manifiesto.
+- Se quitaron el selector de fuente (`FontContext`, Orbitron), el carrito
+  falso del header y textos con promesas no verificadas (envío en 1–3 días,
+  devoluciones 30 días, soporte 24/7, "200+ productos"); las cifras del hero
+  salen de la BD. El layout raíz solo carga Outfit, que usa el admin.
+- Envíos e Instagram (confirmados por el usuario, 2026-10-10): domicilio
+  gratis en Andalucía, Tuluá, Buga y Bugalagrande, y envíos a todo el país;
+  Instagram `@ic_variedades.1`. Viven en `app/(site)/_lib/shop.ts`
+  (`FREE_DELIVERY_TOWNS`, `FREE_DELIVERY_LIST`, `INSTAGRAM_URL`) y se muestran
+  en el home (franja de envíos tras el ticker, paso 3, CTA), la ficha de
+  producto, el header (ícono; en celular dentro del menú) y el footer. Para
+  agregar o quitar un municipio basta con editar la lista.
 
 ### Panel admin — sistema de diseño (rediseño 2026-10-03)
 
@@ -1270,7 +1299,7 @@ al prerenderizar páginas que consultan la BD.
 
 **Lección del primer despliegue:** en `next start` las páginas sin API
 dinámica se prerenderizan en el build y quedan congeladas con los datos de
-ese momento — en `npm run dev` no se nota. La home (`app/page.tsx`) y todo
+ese momento — en `npm run dev` no se nota. El sitio público (`app/(site)/layout.tsx`) y todo
 `/admin` (`app/admin/layout.tsx`) llevan `export const dynamic =
 "force-dynamic"` por eso. Cualquier página nueva que lea la BD fuera de
 `/admin` y sin `searchParams`/params dinámicos necesita lo mismo. Para
