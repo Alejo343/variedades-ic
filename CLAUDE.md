@@ -206,7 +206,7 @@ This project uses Next.js **16** (see `package.json`). APIs and conventions may 
 - Un solo admin: `admin@icvariedades.com` / contraseña en `.env.local` (hash bcrypt)
 - Imágenes subidas al servidor en `public/uploads/products/` (convertidas a WebP con sharp, max 10 MB)
 - Sin pagos, sin cuentas de clientes, sin variantes de producto
-- Pedidos de clientes vía WhatsApp — número: 573176642382
+- Pedidos de clientes vía WhatsApp — número: 573005234938
 - El dueño viaja a otra ciudad a recoger pedidos de distribuidores (flujo: pendiente → en_viaje → recibido)
 - Al marcar compra como "recibido", el stock se actualiza automáticamente en transacción
 
@@ -1098,7 +1098,7 @@ La idea clave: cada capa tiene una responsabilidad y no invade a las demás.
 - Panel admin completo en `app/admin/`.
 - Página principal (`app/page.tsx`) y páginas públicas conectadas a la BD:
   catálogo `/productos`, detalle `/productos/[slug]`, filtro por categoría.
-- Botón de WhatsApp en el detalle de producto (número `573176642382`).
+- Botón de WhatsApp en el detalle de producto (número `573005234938`).
 - Módulo de compras a distribuidores con actualización automática de stock al recibir,
   y guard que exige que el pedido esté `en_viaje` antes de aceptarlo.
 - Módulo de ventas: al confirmar un pedido se descuenta el stock automáticamente

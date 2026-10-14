@@ -1,4 +1,4 @@
-export const WA_NUMBER = '573176642382'
+export const WA_NUMBER = '573005234938'
 
 export function waLink(text?: string) {
   return text

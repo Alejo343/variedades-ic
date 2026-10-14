@@ -4,7 +4,7 @@ import { FREE_DELIVERY_LIST, INSTAGRAM_HANDLE, INSTAGRAM_URL, WA_NUMBER, waLink 
 
 type NavCategory = { name: string; slug: string }
 
-// 573176642382 → +57 317 664 2382
+// 573005234938 → +57 300 523 4938
 const WA_DISPLAY = `+${WA_NUMBER.slice(0, 2)} ${WA_NUMBER.slice(2, 5)} ${WA_NUMBER.slice(5, 8)} ${WA_NUMBER.slice(8)}`
 
 export default function SiteFooter({ categories }: { categories: NavCategory[] }) {
