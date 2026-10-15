@@ -15,8 +15,8 @@ describe.skipIf(!url)("acceso a la app de un vendedor (Postgres real)", async ()
   let otherId: number;
 
   beforeAll(async () => {
-    sellerId = (await q(`INSERT INTO sellers (name, commission_type, commission_value) VALUES ($1, 'percentage', 0) RETURNING id`, [`${tag}-a`]))[0].id;
-    otherId = (await q(`INSERT INTO sellers (name, commission_type, commission_value) VALUES ($1, 'percentage', 0) RETURNING id`, [`${tag}-b`]))[0].id;
+    sellerId = (await q(`INSERT INTO sellers (name) VALUES ($1) RETURNING id`, [`${tag}-a`]))[0].id;
+    otherId = (await q(`INSERT INTO sellers (name) VALUES ($1) RETURNING id`, [`${tag}-b`]))[0].id;
   });
 
   afterAll(async () => {

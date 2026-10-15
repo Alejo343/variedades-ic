@@ -21,7 +21,7 @@ describe.skipIf(!url)("users: reglas de rol en la base (Postgres real)", () => {
 
   beforeEach(async () => {
     await c.query("BEGIN");
-    const { rows } = await c.query(`INSERT INTO sellers (name, commission_type, commission_value) VALUES ('Test', 'percentage', 1000) RETURNING id`);
+    const { rows } = await c.query(`INSERT INTO sellers (name) VALUES ('Test') RETURNING id`);
     sellerId = rows[0].id;
   });
   afterEach(async () => { await c.query("ROLLBACK"); });
@@ -49,7 +49,7 @@ describe.skipIf(!url)("users: reglas de rol en la base (Postgres real)", () => {
 
   it("un vendedor tiene un solo usuario y el nombre de usuario es único", async () => {
     await insertUser("seller", sellerId, "maria");
-    const { rows } = await c.query(`INSERT INTO sellers (name, commission_type, commission_value) VALUES ('Otro', 'percentage', 1000) RETURNING id`);
+    const { rows } = await c.query(`INSERT INTO sellers (name) VALUES ('Otro') RETURNING id`);
     await rejects(() => insertUser("seller", sellerId), /users_seller_id_unique/);
     await rejects(() => insertUser("seller", rows[0].id, "maria"), /users_username_unique/);
   });

@@ -170,11 +170,6 @@ export const sellers = pgTable("sellers", {
   name: varchar("name", { length: 200 }).notNull(),
   phone: varchar("phone", { length: 50 }),
   city: varchar("city", { length: 100 }),
-  // Unused since the commission moved to products.commission_bps: kept (with
-  // defaults, so new sellers don't need them) only while phones running the
-  // previous app version still pull them as NOT NULL. Drop once they update.
-  commissionType: varchar("commission_type", { length: 15 }).default("percentage").notNull(),
-  commissionValue: integer("commission_value").default(0).notNull(),
   // 'consignment': sells only their own consigned stock and settles later.
   // 'store': works at the main store — sells the principal inventory and the
   // money goes straight to a cash account (a direct_sale tagged with them).

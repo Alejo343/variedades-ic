@@ -50,7 +50,7 @@ describe.skipIf(!url)("applyOperations (Postgres real)", async () => {
   };
 
   beforeAll(async () => {
-    const [s] = await q(`INSERT INTO sellers (name, commission_type, commission_value) VALUES ($1, 'percentage', 1000) RETURNING id, uuid`, [tag]);
+    const [s] = await q(`INSERT INTO sellers (name) VALUES ($1) RETURNING id, uuid`, [tag]);
     const [ou] = await q(`INSERT INTO users (username, name, password_hash, role) VALUES ($1, 'ZZ', 'h', 'owner') RETURNING id`, [`${tag}-owner`]);
     const [su] = await q(`INSERT INTO users (username, name, password_hash, role, seller_id) VALUES ($1, 'ZZ', 'h', 'seller', $2) RETURNING id`, [`${tag}-seller`, s.id]);
     const [od] = await q(`INSERT INTO device_sessions (user_id, token_hash) VALUES ($1, $2) RETURNING id`, [ou.id, `${tag}-o`]);

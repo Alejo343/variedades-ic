@@ -110,7 +110,7 @@ describe.skipIf(!url)("vendedor de tienda: venta en local (Postgres real)", asyn
   });
 
   it("pasar a tienda exige que no le quede inventario en consignación", async () => {
-    const seller = { uuid: consignment.sellerUuid, name: `${tag}-cons`, commissionType: "percentage", commissionValue: 1000, active: true };
+    const seller = { uuid: consignment.sellerUuid, name: `${tag}-cons`, active: true };
     await q(`INSERT INTO inventory_movements (product_id, owner_type, seller_id, type, quantity_delta) VALUES ($1, 'seller', $2, 'entrega_vendedor', 2)`, [productId, consignment.sellerId]);
     const blocked = await push(owner, "upsertSeller", { ...seller, inventoryMode: "store" });
     expect(blocked.status).toBe("rejected");

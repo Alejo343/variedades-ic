@@ -68,11 +68,8 @@ const SPECS: TableSpec[] = [
     select: () => `a.uuid, a.name, a.type, a.active, a.notes, ${ts("a.created_at")} AS "createdAt"`,
   },
   {
-    // commissionType/commissionValue are unused (the commission lives on the
-    // product) but app versions from before that still require them.
     table: "sellers", alias: "s", from: "sellers s", sellerFilter: "s.id = $3",
-    select: () => `s.uuid, s.name, s.phone, s.city, s.commission_type AS "commissionType", s.commission_value AS "commissionValue",
-      s.inventory_mode AS "inventoryMode", s.active, s.notes, ${ts("s.created_at")} AS "createdAt"`,
+    select: () => `s.uuid, s.name, s.phone, s.city, s.inventory_mode AS "inventoryMode", s.active, s.notes, ${ts("s.created_at")} AS "createdAt"`,
   },
   {
     table: "inventory_movements", alias: "m",

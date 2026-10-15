@@ -136,10 +136,9 @@ describe.skipIf(!url)("operaciones de catálogo (Postgres real)", async () => {
 
   it("vendedor, distribuidor y cuenta: crean y actualizan por uuid", async () => {
     const s = u(), d = u(), a = u();
-    await push("upsertSeller", { uuid: s, name: `${tag}-Maria`, phone: null, city: "Bogotá", commissionType: "percentage", commissionValue: 1500, active: true, notes: null });
-    await push("upsertSeller", { uuid: s, name: `${tag}-Maria`, phone: "300", city: "Medellín", commissionType: "fixed_per_unit", commissionValue: 2000, active: false, notes: null });
-    // The commission fields an older app still sends are ignored (it lives on the product now).
-    expect(await one(`SELECT city, commission_type, commission_value, active FROM sellers WHERE uuid = $1`, [s])).toEqual({ city: "Medellín", commission_type: "percentage", commission_value: 0, active: false });
+    await push("upsertSeller", { uuid: s, name: `${tag}-Maria`, phone: null, city: "Bogotá", active: true, notes: null });
+    await push("upsertSeller", { uuid: s, name: `${tag}-Maria`, phone: "300", city: "Medellín", active: false, notes: null });
+    expect(await one(`SELECT city, active FROM sellers WHERE uuid = $1`, [s])).toEqual({ city: "Medellín", active: false });
 
     await push("upsertDistributor", { uuid: d, name: `${tag}-Dist`, city: null, phone: null, notes: null, active: true });
     await push("upsertDistributor", { uuid: d, name: `${tag}-Dist`, city: "Cali", phone: null, notes: null, active: true });

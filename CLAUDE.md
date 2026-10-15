@@ -218,11 +218,9 @@ comisión por vendedor ni fija por unidad. Migración `0026_product_commission`
 - Sync: `upsertProduct` acepta `commissionBps` opcional (ausente = 0 al crear,
   sin cambio al editar, para las versiones viejas de la app) y el pull lo
   manda en `products` (también a los vendedores: ven cuánto ganan).
-- `sellers.commission_type`/`commission_value` quedan **sin uso**, con
-  defaults (`'percentage'`, 0) para que un vendedor nuevo no los necesite;
-  `upsertSeller` los ignora y el pull los sigue mandando solo porque los
-  celulares con la versión anterior los exigen. Borrarlos (aquí y en el móvil)
-  cuando todos los celulares actualicen.
+- `sellers.commission_type`/`commission_value` se borraron (migración `0027`;
+  `0023` en el móvil) cuando todos los celulares tuvieron la versión nueva.
+  `upsertSeller` ignora esos campos si una app vieja los manda (zod los quita).
 - **Desplegar la web antes de instalar la versión de la app que la usa.**
 
 ### Next.js version note

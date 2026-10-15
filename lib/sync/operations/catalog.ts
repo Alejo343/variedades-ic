@@ -121,8 +121,6 @@ export const upsertSeller = defineHandler({
     name: text(200),
     phone: z.string().max(50).nullish(),
     city: z.string().max(100).nullish(),
-    // commissionType/commissionValue, still sent by app versions from before
-    // the commission moved to products, are dropped by zod and ignored.
     // Optional so an app version that predates it never resets a seller's mode.
     inventoryMode: z.enum(["consignment", "store"]).optional(),
     active: z.boolean(),

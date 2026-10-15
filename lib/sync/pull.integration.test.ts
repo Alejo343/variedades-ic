@@ -41,7 +41,7 @@ describe.skipIf(!url)("pullChanges (Postgres real)", () => {
     await ins("saleItem", `INSERT INTO direct_sale_items (sale_id, product_id, quantity, unit_price, subtotal) VALUES ($1, $2, 1, 5000, 5000)`, [sale.id, prod.id]);
     await ins("cash", `INSERT INTO cash_movements (type, amount, concept, source_type, source_id, account_id) VALUES ('ingreso', 5000, 'Venta', 'direct_sale', $1, $2)`, [sale.id, acc.id]);
     for (const who of ["a", "b"]) {
-      const s = await ins(`seller_${who}`, `INSERT INTO sellers (name, commission_type, commission_value) VALUES ($1, 'percentage', 1000)`, [`ZZ Seller ${who}`]);
+      const s = await ins(`seller_${who}`, `INSERT INTO sellers (name) VALUES ($1)`, [`ZZ Seller ${who}`]);
       const d = await ins(`delivery_${who}`, `INSERT INTO seller_deliveries (seller_id) VALUES ($1)`, [s.id]);
       await ins(`deliveryItem_${who}`, `INSERT INTO seller_delivery_items (delivery_id, product_id, quantity, unit_cost) VALUES ($1, $2, 2, 3000)`, [d.id, prod.id]);
       await ins(`move_${who}`, `INSERT INTO inventory_movements (product_id, owner_type, seller_id, type, quantity_delta) VALUES ($1, 'seller', $2, 'entrega_vendedor', 2)`, [prod.id, s.id]);
@@ -109,7 +109,7 @@ describe.skipIf(!url)("pullChanges (Postgres real)", () => {
   });
 
   it("un vendedor de tienda además recibe las cuentas y solo sus propias ventas en local, nunca la caja", async () => {
-    const store = await ins("store", `INSERT INTO sellers (name, commission_type, commission_value, inventory_mode) VALUES ('ZZ Store', 'percentage', 1000, 'store')`);
+    const store = await ins("store", `INSERT INTO sellers (name, inventory_mode) VALUES ('ZZ Store', 'store')`);
     const own = await ins("ownSale", `INSERT INTO direct_sales (total_amount, account_id, seller_id, commission_amount) VALUES (5000, $1, $2, 500)`, [ids.acc.id, store.id]);
     const ownItem = await ins("ownItem", `INSERT INTO direct_sale_items (sale_id, product_id, quantity, unit_price, subtotal) VALUES ($1, $2, 1, 5000, 5000)`, [own.id, ids.prod.id]);
 
