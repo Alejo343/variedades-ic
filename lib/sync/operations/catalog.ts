@@ -46,6 +46,9 @@ export const upsertProduct = defineHandler({
     description: optionalText,
     price: z.number().int().min(0),
     purchasePrice: z.number().int().min(0),
+    // Sellers' commission (basis points). Optional only so an app version that
+    // predates it never resets it: absent = 0 on create, unchanged on update.
+    commissionBps: z.number().int().min(0).max(10000).optional(),
     categoryUuid: rowUuid.nullable(),
     distributorCode: z.string().trim().min(1).max(100).nullable(),
     minStock: z.number().int().min(0),
@@ -69,8 +72,8 @@ export const upsertProduct = defineHandler({
       const categoryName = (category?.rows[0] as { name: string } | undefined)?.name ?? null;
       const sku = await nextAutoSku(tx, categoryName);
       const inserted = await tx.execute(sql`
-        INSERT INTO products (uuid, name, slug, description, sku, price, purchase_price, category_id, distributor_code, min_stock, warranty_months, active)
-        VALUES (${p.uuid}, ${p.name}, ${p.slug}, ${p.description ?? null}, ${sku}, ${p.price}, ${p.purchasePrice}, ${categoryId},
+        INSERT INTO products (uuid, name, slug, description, sku, price, purchase_price, commission_bps, category_id, distributor_code, min_stock, warranty_months, active)
+        VALUES (${p.uuid}, ${p.name}, ${p.slug}, ${p.description ?? null}, ${sku}, ${p.price}, ${p.purchasePrice}, ${p.commissionBps ?? 0}, ${categoryId},
                 ${p.distributorCode}, ${p.minStock}, ${p.warrantyMonths}, ${p.active})
         RETURNING id`);
       productId = (inserted.rows[0] as { id: number }).id;
@@ -82,7 +85,7 @@ export const upsertProduct = defineHandler({
       if (newSku) await tx.execute(sql`UPDATE products SET sku = ${newSku} WHERE id = ${productId}`);
       await tx.execute(sql`
         UPDATE products SET name = ${p.name}, slug = ${p.slug}, description = ${p.description ?? null}, price = ${p.price},
-          purchase_price = ${p.purchasePrice}, category_id = ${categoryId}, distributor_code = ${p.distributorCode},
+          purchase_price = ${p.purchasePrice}, commission_bps = COALESCE(${p.commissionBps ?? null}::integer, commission_bps), category_id = ${categoryId}, distributor_code = ${p.distributorCode},
           min_stock = ${p.minStock}, warranty_months = ${p.warrantyMonths}, active = ${p.active}, updated_at = now()
         WHERE id = ${productId}`);
     }
@@ -118,8 +121,8 @@ export const upsertSeller = defineHandler({
     name: text(200),
     phone: z.string().max(50).nullish(),
     city: z.string().max(100).nullish(),
-    commissionType: z.enum(["percentage", "fixed_per_unit"]),
-    commissionValue: z.number().int().min(0),
+    // commissionType/commissionValue, still sent by app versions from before
+    // the commission moved to products, are dropped by zod and ignored.
     // Optional so an app version that predates it never resets a seller's mode.
     inventoryMode: z.enum(["consignment", "store"]).optional(),
     active: z.boolean(),
@@ -134,11 +137,10 @@ export const upsertSeller = defineHandler({
       }
     }
     await tx.execute(sql`
-      INSERT INTO sellers (uuid, name, phone, city, commission_type, commission_value, inventory_mode, active, notes)
-      VALUES (${p.uuid}, ${p.name}, ${p.phone ?? null}, ${p.city ?? null}, ${p.commissionType}, ${p.commissionValue},
+      INSERT INTO sellers (uuid, name, phone, city, inventory_mode, active, notes)
+      VALUES (${p.uuid}, ${p.name}, ${p.phone ?? null}, ${p.city ?? null},
         ${p.inventoryMode ?? "consignment"}, ${p.active}, ${p.notes ?? null})
       ON CONFLICT (uuid) DO UPDATE SET name = EXCLUDED.name, phone = EXCLUDED.phone, city = EXCLUDED.city,
-        commission_type = EXCLUDED.commission_type, commission_value = EXCLUDED.commission_value,
         inventory_mode = COALESCE(${p.inventoryMode ?? null}, sellers.inventory_mode), active = EXCLUDED.active, notes = EXCLUDED.notes`);
   },
 });

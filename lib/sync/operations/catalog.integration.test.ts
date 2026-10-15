@@ -100,6 +100,18 @@ describe.skipIf(!url)("operaciones de catálogo (Postgres real)", async () => {
     });
   });
 
+  it("producto: guarda la comisión; un celular que no la envía (versión vieja) no la cambia", async () => {
+    const fields = {
+      uuid: prodUuid, name: "Audífonos Pro", slug: `${tag}-aud`, description: null, price: 55000, purchasePrice: 30000,
+      categoryUuid: null, distributorCode: null, minStock: 2, warrantyMonths: null, active: true,
+    };
+    expect((await push("upsertProduct", { ...fields, commissionBps: 1250 })).status).toBe("applied");
+    expect((await one(`SELECT commission_bps FROM products WHERE uuid = $1`, [prodUuid])).commission_bps).toBe(1250);
+    expect((await push("upsertProduct", fields)).status).toBe("applied");
+    expect((await one(`SELECT commission_bps FROM products WHERE uuid = $1`, [prodUuid])).commission_bps).toBe(1250);
+    expect((await push("upsertProduct", { ...fields, commissionBps: 10001 })).status).toBe("rejected");
+  });
+
   it("producto: sin `images` no toca la galería", async () => {
     await push("upsertProduct", {
       uuid: prodUuid, name: "Audífonos Pro", slug: `${tag}-aud`, description: null, price: 56000, purchasePrice: 30000,
@@ -126,7 +138,8 @@ describe.skipIf(!url)("operaciones de catálogo (Postgres real)", async () => {
     const s = u(), d = u(), a = u();
     await push("upsertSeller", { uuid: s, name: `${tag}-Maria`, phone: null, city: "Bogotá", commissionType: "percentage", commissionValue: 1500, active: true, notes: null });
     await push("upsertSeller", { uuid: s, name: `${tag}-Maria`, phone: "300", city: "Medellín", commissionType: "fixed_per_unit", commissionValue: 2000, active: false, notes: null });
-    expect(await one(`SELECT city, commission_type, commission_value, active FROM sellers WHERE uuid = $1`, [s])).toEqual({ city: "Medellín", commission_type: "fixed_per_unit", commission_value: 2000, active: false });
+    // The commission fields an older app still sends are ignored (it lives on the product now).
+    expect(await one(`SELECT city, commission_type, commission_value, active FROM sellers WHERE uuid = $1`, [s])).toEqual({ city: "Medellín", commission_type: "percentage", commission_value: 0, active: false });
 
     await push("upsertDistributor", { uuid: d, name: `${tag}-Dist`, city: null, phone: null, notes: null, active: true });
     await push("upsertDistributor", { uuid: d, name: `${tag}-Dist`, city: "Cali", phone: null, notes: null, active: true });

@@ -1,6 +1,7 @@
 import { toSlug } from "@/lib/validations";
 import { parseCOPNumber } from "./purchase-import";
 import { skuAfterCategoryChange } from "./sku";
+import { formatCommissionPercent, parseCommissionPercent } from "./commission";
 
 // Catalog import from the downloadable template (Productos → Importar).
 //
@@ -8,14 +9,15 @@ import { skuAfterCategoryChange } from "./sku";
 // - The sheet's first row must contain ALL template headers (any order, case
 //   and accents ignored); otherwise the whole file is rejected with the list
 //   of missing columns — the user is expected to fill the template, not an
-//   arbitrary sheet. Extra columns are ignored.
+//   arbitrary sheet. Extra columns are ignored. Exception: "Comisión %" may be
+//   missing (templates downloaded before it existed); then no row has one.
 // - Fully empty rows are skipped silently; any other invalid row is reported.
 // - Matching against existing products: SKU first (if given it MUST exist),
 //   then código de proveedor, then normalized name.
 // - Existing product: non-empty cells overwrite, empty cells keep the current
 //   value. "Cantidad" SETS the stock (a count), producing a stock delta.
-// - New product: "Precio venta" is required; empty optional cells get the same
-//   defaults as the product form. "Cantidad" is the initial stock.
+// - New product: "Precio venta" and "Comisión %" are required; empty optional
+//   cells get the same defaults as the product form. "Cantidad" is the initial stock.
 // - A plan with any row error must not be applied (all-or-nothing).
 
 export type ImportColumnKey =
@@ -24,6 +26,7 @@ export type ImportColumnKey =
   | "category"
   | "price"
   | "cost"
+  | "commission"
   | "quantity"
   | "minStock"
   | "distributorCode"
@@ -37,6 +40,8 @@ export type ImportColumn = {
   required: "always" | "new" | "no";
   help: string;
   example: string;
+  /** The header may be absent from the file (a template older than the column). */
+  headerOptional?: boolean;
 };
 
 export const PRODUCT_IMPORT_COLUMNS: ImportColumn[] = [
@@ -45,6 +50,7 @@ export const PRODUCT_IMPORT_COLUMNS: ImportColumn[] = [
   { key: "category", header: "Categoría", required: "no", help: "Debe ser una categoría que ya exista en el panel.", example: "Tecnología" },
   { key: "price", header: "Precio venta", required: "new", help: "Precio al público, en pesos. Obligatorio para productos nuevos.", example: "50000" },
   { key: "cost", header: "Costo", required: "no", help: "Precio de compra, en pesos.", example: "30000" },
+  { key: "commission", header: "Comisión %", required: "new", help: "Porcentaje del precio de venta que gana cualquier vendedor con este producto (15 = 15%). Obligatorio para productos nuevos.", example: "15", headerOptional: true },
   { key: "quantity", header: "Cantidad", required: "no", help: "Unidades que tienes. En productos existentes reemplaza el stock actual (queda como ajuste en el historial).", example: "12" },
   { key: "minStock", header: "Stock mínimo", required: "no", help: "Avisa cuando el stock llegue a este número.", example: "3" },
   { key: "distributorCode", header: "Código proveedor", required: "no", help: "Código que usa tu distribuidor para el producto. Debe ser único.", example: "AUD-1H" },
@@ -60,6 +66,8 @@ export type ProductImportRow = {
   category: string | null;
   price: number | null;
   cost: number | null;
+  /** Basis points (1500 = 15%). */
+  commissionBps: number | null;
   quantity: number | null;
   minStock: number | null;
   distributorCode: string | null;
@@ -99,8 +107,8 @@ export function parseProductSheet(sheetRows: unknown[][]): ParseProductSheetResu
   const missing: string[] = [];
   for (const col of PRODUCT_IMPORT_COLUMNS) {
     const idx = header.indexOf(normalizeText(col.header));
-    if (idx === -1) missing.push(col.header);
-    else indexOf.set(col.key, idx);
+    if (idx !== -1) indexOf.set(col.key, idx);
+    else if (!col.headerOptional) missing.push(col.header);
   }
   if (missing.length > 0) return { ok: false, missingColumns: missing };
 
@@ -109,7 +117,7 @@ export function parseProductSheet(sheetRows: unknown[][]): ParseProductSheetResu
 
   sheetRows.slice(1).forEach((raw, i) => {
     const rowNumber = i + 2;
-    const cell = (key: ImportColumnKey) => cellText(raw?.[indexOf.get(key)!]);
+    const cell = (key: ImportColumnKey) => (indexOf.has(key) ? cellText(raw?.[indexOf.get(key)!]) : "");
     if (PRODUCT_IMPORT_COLUMNS.every((c) => cell(c.key) === "")) return;
 
     const name = cell("name");
@@ -134,6 +142,15 @@ export function parseProductSheet(sheetRows: unknown[][]): ParseProductSheetResu
       numbers[key] = n;
     }
 
+    let commissionBps: number | null = null;
+    if (cell("commission")) {
+      commissionBps = parseCommissionPercent(raw?.[indexOf.get("commission")!]);
+      if (commissionBps === null) {
+        errors.push({ rowNumber, reason: `"Comisión %" debe ser un porcentaje entre 0 y 100: ${cell("commission")}` });
+        return;
+      }
+    }
+
     const active = parseActive(cell("active"));
     if (active === "invalid") {
       errors.push({ rowNumber, reason: `"Activo" debe ser sí o no: ${cell("active")}` });
@@ -147,6 +164,7 @@ export function parseProductSheet(sheetRows: unknown[][]): ParseProductSheetResu
       category: cell("category") || null,
       price: numbers.price ?? null,
       cost: numbers.cost ?? null,
+      commissionBps,
       quantity: numbers.quantity ?? null,
       minStock: numbers.minStock ?? null,
       distributorCode: cell("distributorCode") || null,
@@ -168,6 +186,7 @@ export type ExistingProduct = {
   stock: number;
   price: number;
   purchasePrice: number | null;
+  commissionBps: number;
   categoryId: number | null;
   minStock: number;
   warrantyMonths: number | null;
@@ -181,6 +200,7 @@ export type ProductFields = {
   name: string;
   price: number;
   purchasePrice: number;
+  commissionBps: number;
   categoryId: number | null;
   minStock: number;
   distributorCode: string | null;
@@ -221,6 +241,7 @@ const FIELD_LABEL: Record<keyof ProductFields, string> = {
   name: "Nombre",
   price: "Precio venta",
   purchasePrice: "Costo",
+  commissionBps: "Comisión",
   categoryId: "Categoría",
   minStock: "Stock mínimo",
   distributorCode: "Código proveedor",
@@ -319,6 +340,7 @@ export function planProductImport(
       if (normalizeText(row.name) !== normalizeText(match.name)) set("name", row.name, match.name);
       set("price", row.price, match.price, money);
       set("purchasePrice", row.cost, match.purchasePrice ?? 0, money);
+      set("commissionBps", row.commissionBps, match.commissionBps, formatCommissionPercent);
       set("categoryId", categoryId, match.categoryId, catName);
       if (fields.categoryId !== undefined) {
         // Preview only: the server re-checks (and avoids collisions) when applying.
@@ -353,6 +375,10 @@ export function planProductImport(
       plan.errors.push({ rowNumber: row.rowNumber, reason: `"${row.name}" es nuevo y le falta el Precio venta.` });
       continue;
     }
+    if (row.commissionBps === null) {
+      plan.errors.push({ rowNumber: row.rowNumber, reason: `"${row.name}" es nuevo y le falta la Comisión %.` });
+      continue;
+    }
     seenNewName.set(key, row.rowNumber);
     if (row.distributorCode) seenCode.set(row.distributorCode.toLowerCase(), row.rowNumber);
 
@@ -366,6 +392,7 @@ export function planProductImport(
         name: row.name,
         price: row.price,
         purchasePrice: row.cost ?? 0,
+        commissionBps: row.commissionBps,
         categoryId: categoryId ?? null,
         minStock: row.minStock ?? 0,
         distributorCode: row.distributorCode,

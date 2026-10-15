@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import { FileSpreadsheet } from "lucide-react";
 import type { Distributor } from "@/lib/db/schema";
-import { parseImportSheet, resolveImportRows } from "@/lib/domain/purchase-import";
+import { newProductsMissingCommission, parseImportSheet, resolveImportRows } from "@/lib/domain/purchase-import";
 import { CartLines, PosLayout, ProductSearch, addToCart, cartTotal, cartUnits, type CartLine, type CartProduct } from "../../_components/Cart";
 import { formatCOP } from "../../_lib/format";
 
@@ -81,6 +81,15 @@ export function PurchaseOrderForm({ distributors, products: allProducts }: Props
         allProducts.map((p) => ({ id: p.id, name: p.name, sku: p.sku, slug: p.slug })),
       );
 
+      // All or nothing: a product can't be created without its commission.
+      const missing = newProductsMissingCommission(resolved);
+      if (missing.length > 0) {
+        setError(
+          `No se importó nada: ${missing.length === 1 ? "este producto nuevo no tiene" : "estos productos nuevos no tienen"} el % de comisión del vendedor en la columna F: ${missing.join(", ")}. Complétalo en el Excel y vuelve a importarlo.`,
+        );
+        return;
+      }
+
       let created = 0;
       for (const row of resolved) {
         if (row.kind === "existing") {
@@ -89,7 +98,7 @@ export function PurchaseOrderForm({ distributors, products: allProducts }: Props
           const res = await fetch("/api/admin/products", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: row.name, slug: row.slug, price: row.unitCost, purchasePrice: row.unitCost }),
+            body: JSON.stringify({ name: row.name, slug: row.slug, price: row.unitCost, purchasePrice: row.unitCost, commissionBps: row.commissionBps }),
           });
           if (!res.ok) {
             const data = await res.json();
@@ -212,6 +221,10 @@ export function PurchaseOrderForm({ distributors, products: allProducts }: Props
                 </button>
               </div>
 
+              <p className="adm-hint !mt-0 mb-3">
+                Excel del proveedor: A código, B nombre, C cantidad, D valor unitario, E total y F % de comisión del vendedor
+                (obligatorio solo para los productos que todavía no existen).
+              </p>
               {importSummary && <p className="adm-alert adm-alert-ok mb-3">{importSummary}</p>}
               {importSkipped.length > 0 && (
                 <div className="adm-alert adm-alert-warn mb-3 flex-col !gap-1">

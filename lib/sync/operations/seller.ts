@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { calculateCommission } from "@/lib/domain/commission";
 import { defineHandler, SyncRejection, type Tx } from "../push";
-import { changePrincipalStock, fromUtc, idByUuid, recordSellerMovement, rowUuid, utcTimestamp } from "./shared";
+import { changePrincipalStock, fromUtc, idByUuid, recordSellerMovement, rowUuid, soldProductByUuid, utcTimestamp } from "./shared";
 
 // Operations a seller records on their phone (sub-paso 7, parte 2): sale,
 // return and loss of their own consigned inventory. The owner may push them
@@ -18,8 +18,8 @@ const quantity = z.number().int().min(1);
 const notes = z.string().max(2000).nullish();
 
 async function requireSeller(tx: Tx, uuid: string) {
-  const result = await tx.execute(sql`SELECT id, commission_type, commission_value FROM sellers WHERE uuid = ${uuid}`);
-  const row = result.rows[0] as { id: number; commission_type: "percentage" | "fixed_per_unit"; commission_value: number } | undefined;
+  const result = await tx.execute(sql`SELECT id FROM sellers WHERE uuid = ${uuid}`);
+  const row = result.rows[0] as { id: number } | undefined;
   if (!row) throw new SyncRejection(`Vendedor no existe en el servidor (${uuid})`);
   return row;
 }
@@ -37,14 +37,16 @@ export const createSellerSale = defineHandler({
   sellerUuid: (p) => p.sellerUuid,
   async apply(tx, p) {
     const seller = await requireSeller(tx, p.sellerUuid);
-    const productIds = [];
-    for (const item of p.items) productIds.push(await idByUuid(tx, "products", item.productUuid, "Producto"));
+    const products: Awaited<ReturnType<typeof soldProductByUuid>>[] = [];
+    for (const item of p.items) products.push(await soldProductByUuid(tx, item.productUuid));
+    const productIds = products.map((product) => product.id);
 
     const totalAmount = p.items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
-    const totalQuantity = p.items.reduce((sum, i) => sum + i.quantity, 0);
-    // Server-side, with the seller's current configuration — the phone's own
+    // Server-side, with each product's current percentage — the phone's own
     // estimate is replaced by this value on the next pull.
-    const commissionAmount = calculateCommission({ type: seller.commission_type, value: seller.commission_value }, totalAmount, totalQuantity);
+    const commissionAmount = calculateCommission(
+      p.items.map((item, i) => ({ quantity: item.quantity, unitPrice: item.unitPrice, commissionBps: products[i].commissionBps })),
+    );
 
     const inserted = await tx.execute(sql`
       INSERT INTO seller_sales (uuid, seller_id, sale_date, total_amount, commission_amount, notes)

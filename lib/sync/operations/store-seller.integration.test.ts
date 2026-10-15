@@ -46,13 +46,13 @@ describe.skipIf(!url)("vendedor de tienda: venta en local (Postgres real)", asyn
   }
 
   beforeAll(async () => {
-    ({ id: productId, uuid: productUuid } = await one(`INSERT INTO products (name, slug, sku, price, stock) VALUES ($1, $1, $1, 5000, 10) RETURNING id, uuid`, [tag]));
+    ({ id: productId, uuid: productUuid } = await one(`INSERT INTO products (name, slug, sku, price, commission_bps, stock) VALUES ($1, $1, $1, 5000, 1000, 10) RETURNING id, uuid`, [tag]));
     ({ id: accountId, uuid: accountUuid } = await one(`INSERT INTO cash_accounts (name) VALUES ($1) RETURNING id, uuid`, [tag]));
     const s = await one(
-      `INSERT INTO sellers (name, commission_type, commission_value, inventory_mode) VALUES ($1, 'percentage', 1000, 'store') RETURNING id, uuid`,
+      `INSERT INTO sellers (name, inventory_mode) VALUES ($1, 'store') RETURNING id, uuid`,
       [`${tag}-store`],
     );
-    const c = await one(`INSERT INTO sellers (name, commission_type, commission_value) VALUES ($1, 'percentage', 1000) RETURNING id, uuid`, [`${tag}-cons`]);
+    const c = await one(`INSERT INTO sellers (name) VALUES ($1) RETURNING id, uuid`, [`${tag}-cons`]);
     sellerIds.push(s.id, c.id);
     owner = await principalFor("owner", null, null, "o");
     store = await principalFor("seller", s.id, s.uuid, "s");

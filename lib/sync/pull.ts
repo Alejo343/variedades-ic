@@ -54,7 +54,7 @@ const SPECS: TableSpec[] = [
   {
     table: "products", alias: "p", from: "products p LEFT JOIN categories c ON c.id = p.category_id", sellerFilter: "",
     select: (s) => `p.uuid, p.name, p.slug, p.description, p.sku, p.price, ${s ? "0" : "p.purchase_price"} AS "purchasePrice",
-      c.uuid AS "categoryUuid", p.distributor_code AS "distributorCode", p.stock, p.min_stock AS "minStock",
+      p.commission_bps AS "commissionBps", c.uuid AS "categoryUuid", p.distributor_code AS "distributorCode", p.stock, p.min_stock AS "minStock",
       p.warranty_months AS "warrantyMonths", p.active, ${ts("p.created_at")} AS "createdAt", ${ts("p.updated_at")} AS "updatedAt"`,
   },
   {
@@ -68,6 +68,8 @@ const SPECS: TableSpec[] = [
     select: () => `a.uuid, a.name, a.type, a.active, a.notes, ${ts("a.created_at")} AS "createdAt"`,
   },
   {
+    // commissionType/commissionValue are unused (the commission lives on the
+    // product) but app versions from before that still require them.
     table: "sellers", alias: "s", from: "sellers s", sellerFilter: "s.id = $3",
     select: () => `s.uuid, s.name, s.phone, s.city, s.commission_type AS "commissionType", s.commission_value AS "commissionValue",
       s.inventory_mode AS "inventoryMode", s.active, s.notes, ${ts("s.created_at")} AS "createdAt"`,

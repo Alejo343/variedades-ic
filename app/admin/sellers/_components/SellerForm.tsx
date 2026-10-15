@@ -12,12 +12,7 @@ export function SellerForm({ initial }: { initial?: Seller }) {
     name: initial?.name ?? "",
     phone: initial?.phone ?? "",
     city: initial?.city ?? "",
-    commissionType: initial?.commissionType ?? "percentage",
     inventoryMode: initial?.inventoryMode ?? "consignment",
-    commissionDisplay:
-      initial?.commissionType === "fixed_per_unit"
-        ? (initial?.commissionValue ?? 0)
-        : ((initial?.commissionValue ?? 0) / 100),
     notes: initial?.notes ?? "",
     active: initial?.active ?? true,
   });
@@ -29,17 +24,10 @@ export function SellerForm({ initial }: { initial?: Seller }) {
     setLoading(true);
     setError("");
 
-    const commissionValue =
-      form.commissionType === "fixed_per_unit"
-        ? Math.round(form.commissionDisplay)
-        : Math.round(form.commissionDisplay * 100);
-
     const payload = {
       name: form.name,
       phone: form.phone,
       city: form.city,
-      commissionType: form.commissionType,
-      commissionValue,
       inventoryMode: form.inventoryMode,
       notes: form.notes,
       active: form.active,
@@ -114,41 +102,9 @@ export function SellerForm({ initial }: { initial?: Seller }) {
             ? "Vende del inventario principal y el dinero entra a caja al momento. No recibe entregas ni se liquida."
             : "Vende solo la mercancía que se le entrega y entrega el dinero al liquidar."}
         </p>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="adm-label">Tipo de comisión</label>
-          <select
-            value={form.commissionType}
-            onChange={(e) =>
-              setForm((f) => ({
-                ...f,
-                commissionType: e.target.value as "percentage" | "fixed_per_unit",
-                commissionDisplay: 0,
-              }))
-            }
-            className="adm-input"
-          >
-            <option value="percentage">Porcentaje</option>
-            <option value="fixed_per_unit">Fijo por unidad</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="adm-label">
-            {form.commissionType === "percentage" ? "Porcentaje (%)" : "Valor por unidad (COP)"}
-          </label>
-          <input
-            type="number"
-            min={0}
-            step={form.commissionType === "percentage" ? "0.01" : "1"}
-            value={form.commissionDisplay}
-            onChange={(e) => setForm((f) => ({ ...f, commissionDisplay: Number(e.target.value) }))}
-            required
-            className="adm-input"
-          />
-        </div>
+        <p className="mt-1.5 text-xs text-[var(--adm-ink-3)]">
+          La comisión no se configura aquí: cada producto tiene su porcentaje y vale para todos los vendedores.
+        </p>
       </div>
 
       <div>

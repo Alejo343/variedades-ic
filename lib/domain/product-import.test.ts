@@ -21,6 +21,7 @@ function row(partial: Partial<ProductImportRow>): ProductImportRow {
     category: null,
     price: null,
     cost: null,
+    commissionBps: null,
     quantity: null,
     minStock: null,
     distributorCode: null,
@@ -41,6 +42,7 @@ const EXISTING: ExistingProduct[] = [
     stock: 10,
     price: 50000,
     purchasePrice: 30000,
+    commissionBps: 0,
     categoryId: 1,
     minStock: 2,
     warrantyMonths: null,
@@ -56,6 +58,7 @@ const EXISTING: ExistingProduct[] = [
     stock: 0,
     price: 25000,
     purchasePrice: null,
+    commissionBps: 1000,
     categoryId: null,
     minStock: 0,
     warrantyMonths: null,
@@ -116,19 +119,74 @@ describe("parseProductSheet", () => {
     expect(result.rows).toEqual([]);
     expect(result.errors.map((e) => e.rowNumber)).toEqual([3, 4, 5, 6]);
   });
+
+  it("lee la comisión como porcentaje (texto, número o celda con formato %)", () => {
+    const result = parseProductSheet([
+      HEADER,
+      sheetRow({ Nombre: "A", "Comisión %": "12,5" }),
+      sheetRow({ Nombre: "B", "Comisión %": 15 }),
+      sheetRow({ Nombre: "C", "Comisión %": 0.2 }),
+      sheetRow({ Nombre: "D" }),
+    ]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.errors).toEqual([]);
+    expect(result.rows.map((r) => r.commissionBps)).toEqual([1250, 1500, 2000, null]);
+  });
+
+  it("reporta una comisión inválida", () => {
+    const result = parseProductSheet([HEADER, sheetRow({ Nombre: "A", "Comisión %": "mucha" }), sheetRow({ Nombre: "B", "Comisión %": 150 })]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.errors.map((e) => e.rowNumber)).toEqual([2, 3]);
+    expect(result.errors[0].reason).toContain("Comisión %");
+  });
+
+  it("acepta una plantilla anterior sin la columna de comisión", () => {
+    const old = HEADER.filter((h) => h !== "Comisión %");
+    const result = parseProductSheet([old, old.map((h) => (h === "Nombre" ? "A" : ""))]);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.rows[0].commissionBps).toBeNull();
+  });
 });
 
 describe("planProductImport", () => {
   it("crea un producto nuevo con valores por defecto y stock inicial", () => {
-    const plan = planProductImport([row({ name: "Plancha", price: 80000, quantity: 4, category: "belleza" })], EXISTING, CATEGORIES);
+    const plan = planProductImport(
+      [row({ name: "Plancha", price: 80000, commissionBps: 1500, quantity: 4, category: "belleza" })],
+      EXISTING,
+      CATEGORIES,
+    );
     expect(plan.errors).toEqual([]);
     expect(plan.creates).toHaveLength(1);
     expect(plan.creates[0]).toMatchObject({
       slug: "plancha",
       categoryName: "Belleza",
       initialStock: 4,
-      fields: { name: "Plancha", price: 80000, purchasePrice: 0, categoryId: 2, minStock: 0, active: true },
+      fields: { name: "Plancha", price: 80000, purchasePrice: 0, commissionBps: 1500, categoryId: 2, minStock: 0, active: true },
     });
+  });
+
+  it("exige comisión para productos nuevos", () => {
+    const plan = planProductImport([row({ name: "Plancha", price: 80000 })], EXISTING, CATEGORIES);
+    expect(plan.creates).toEqual([]);
+    expect(plan.errors[0].reason).toContain("Comisión %");
+  });
+
+  it("cambia la comisión de un producto existente; vacía no la toca", () => {
+    const plan = planProductImport(
+      [
+        row({ rowNumber: 2, sku: "TECN-00001", name: "Audífonos Bluetooth", commissionBps: 1500 }),
+        row({ rowNumber: 3, sku: "TECN-00002", name: "Cargador USB-C" }),
+      ],
+      EXISTING,
+      CATEGORIES,
+    );
+    expect(plan.updates).toHaveLength(1);
+    expect(plan.updates[0].fields).toEqual({ commissionBps: 1500 });
+    expect(plan.updates[0].changes).toEqual([{ field: "Comisión", from: "0%", to: "15%" }]);
+    expect(plan.unchanged.map((u) => u.productId)).toEqual([2]);
   });
 
   it("exige precio para productos nuevos", () => {
@@ -189,8 +247,8 @@ describe("planProductImport", () => {
   it("detecta filas repetidas dentro del mismo archivo", () => {
     const plan = planProductImport(
       [
-        row({ rowNumber: 2, name: "Nuevo", price: 1 }),
-        row({ rowNumber: 3, name: "NUEVO", price: 2 }),
+        row({ rowNumber: 2, name: "Nuevo", price: 1, commissionBps: 0 }),
+        row({ rowNumber: 3, name: "NUEVO", price: 2, commissionBps: 0 }),
         row({ rowNumber: 4, sku: "TECN-00002", name: "Cargador USB-C", quantity: 1 }),
         row({ rowNumber: 5, name: "cargador usb-c", quantity: 2 }),
       ],
@@ -204,7 +262,7 @@ describe("planProductImport", () => {
 
   it("genera slugs únicos frente a existentes y entre filas nuevas", () => {
     const plan = planProductImport(
-      [row({ rowNumber: 2, name: "Cargador USB C", price: 1 })],
+      [row({ rowNumber: 2, name: "Cargador USB C", price: 1, commissionBps: 0 })],
       [{ ...EXISTING[1], name: "Otro nombre" }],
       CATEGORIES,
     );

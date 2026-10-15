@@ -25,6 +25,16 @@ export async function idByUuid(tx: Tx, table: UuidTable, uuid: string, label: st
   return row.id;
 }
 
+// A sold product's id plus its current commission percentage (basis points):
+// the server always computes a sale's commission from the product as it is
+// when the operation arrives, never from what the phone estimated.
+export async function soldProductByUuid(tx: Tx, uuid: string): Promise<{ id: number; commissionBps: number }> {
+  const result = await tx.execute(sql`SELECT id, commission_bps FROM products WHERE uuid = ${uuid}`);
+  const row = result.rows[0] as { id: number; commission_bps: number } | undefined;
+  if (!row) throw new SyncRejection(`Producto no existe en el servidor (${uuid})`);
+  return { id: row.id, commissionBps: row.commission_bps };
+}
+
 // Principal stock change for a sync operation: unlike the panel's
 // recordPrincipalMovement, it never refuses a negative result — the
 // operation already happened offline (see CLAUDE.md, "Fase 10").

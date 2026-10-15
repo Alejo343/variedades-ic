@@ -19,6 +19,7 @@ async function loadPlan(dbOrTx: typeof db | Tx, rows: ProductImportRow[]): Promi
         stock: products.stock,
         price: products.price,
         purchasePrice: products.purchasePrice,
+        commissionBps: products.commissionBps,
         categoryId: products.categoryId,
         minStock: products.minStock,
         warrantyMonths: products.warrantyMonths,

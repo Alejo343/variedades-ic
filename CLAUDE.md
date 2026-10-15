@@ -110,13 +110,16 @@ cambiarlo ahí no cambia nada.
 ### Importación de productos desde Excel (2026-10-04)
 
 `/admin/products/import`, distinto del Excel de pedidos de compra (ese lee la
-factura del distribuidor por posición A–E y no se tocó). Decisiones del usuario:
+factura del distribuidor por posición A–F, ver "Comisión por producto").
+Decisiones del usuario:
 
 - **Solo se acepta la plantilla** que descarga la propia pantalla (hojas
   "Productos" + "Instrucciones"). Columnas por encabezado, en cualquier orden:
-  SKU, Nombre*, Categoría, Precio venta (*en nuevos), Costo, Cantidad, Stock
-  mínimo, Código proveedor, Garantía (meses), Descripción, Activo. Si falta
-  alguna columna se rechaza el archivo completo.
+  SKU, Nombre*, Categoría, Precio venta (*en nuevos), Costo, Comisión % (*en
+  nuevos), Cantidad, Stock mínimo, Código proveedor, Garantía (meses),
+  Descripción, Activo. Si falta alguna columna se rechaza el archivo completo,
+  salvo "Comisión %" (las plantillas anteriores no la traen; entonces ningún
+  producto nuevo se puede crear desde ese archivo).
 - Producto existente (por SKU → código proveedor → nombre normalizado): las
   celdas llenas actualizan, las vacías no tocan nada; **Cantidad fija el
   stock** (conteo) y la diferencia queda como `ajuste` en el ledger.
@@ -188,6 +191,39 @@ registro.
   `skuForCategoryChange`, `isSkuTaken`), usada por el panel, la importación y
   la sync (`upsertProduct`). `nextAutoSku` salta números ya ocupados por SKUs
   escritos a mano. `generateProductSku` se eliminó.
+
+### Comisión por producto (2026-10-14)
+
+Decisión del usuario: la comisión de los vendedores es **por producto**, un
+porcentaje del precio de venta en `products.commission_bps` (puntos base,
+`1500` = 15%, CHECK 0–10000), **igual para todos los vendedores**. Ya no hay
+comisión por vendedor ni fija por unidad. Migración `0026_product_commission`
+(los productos existentes quedan en 0%).
+
+- `lib/domain/commission.ts` (con tests; el móvil tiene una copia idéntica):
+  `lineCommission` = `round(cantidad × unitPrice × bps / 10000)`, la venta suma
+  sus líneas redondeadas (`calculateCommission(lines)`), siempre sobre el
+  `unitPrice` cobrado. `parseCommissionPercent` acepta "15", "12,5", "15 %",
+  15 y la celda de Excel con formato porcentaje (0,15 → 15%).
+- La calculan con el % actual de cada producto: `createSellerSale` del panel
+  (`lib/db/queries/seller-sales.ts`) y de la sync, y `createDirectSale` de un
+  vendedor de tienda (`lib/sync/operations/shared.ts#soldProductByUuid`). Las
+  ventas ya guardadas no se recalculan si cambia un %.
+- Obligatoria al crear un producto (`productSchema.commissionBps`; en el PUT
+  puede faltar). Formulario de producto, columna "Comisión" en la tabla, y en
+  las dos importaciones de Excel: plantilla de productos ("Comisión %") y
+  pedido de compra (columna **F**; E sigue siendo el total que no se lee). En
+  el pedido la F solo vale para productos nuevos y es obligatoria para ellos:
+  si a uno le falta no se importa nada (`newProductsMissingCommission`).
+- Sync: `upsertProduct` acepta `commissionBps` opcional (ausente = 0 al crear,
+  sin cambio al editar, para las versiones viejas de la app) y el pull lo
+  manda en `products` (también a los vendedores: ven cuánto ganan).
+- `sellers.commission_type`/`commission_value` quedan **sin uso**, con
+  defaults (`'percentage'`, 0) para que un vendedor nuevo no los necesite;
+  `upsertSeller` los ignora y el pull los sigue mandando solo porque los
+  celulares con la versión anterior los exigen. Borrarlos (aquí y en el móvil)
+  cuando todos los celulares actualicen.
+- **Desplegar la web antes de instalar la versión de la app que la usa.**
 
 ### Next.js version note
 

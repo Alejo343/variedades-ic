@@ -3,11 +3,6 @@ import { ChevronRight, MapPin, Phone, Plus, Users } from "lucide-react";
 import { getAllSellers } from "@/lib/db/queries/sellers";
 import { getAllSellersInventory } from "@/lib/db/queries/seller-inventory";
 import { Badge, ButtonLink, EmptyState, Page, PageHeader } from "../_components/ui";
-import { formatCOP } from "../_lib/format";
-
-function formatCommission(type: string, value: number) {
-  return type === "percentage" ? `${(value / 100).toLocaleString("es-CO", { maximumFractionDigits: 2 })}%` : `${formatCOP(value)}/u`;
-}
 
 export default async function SellersPage() {
   const [sellers, inventory] = await Promise.all([getAllSellers(), getAllSellersInventory()]);
@@ -78,8 +73,8 @@ export default async function SellersPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[var(--adm-line)]">
                   <div>
-                    <p className="adm-eyebrow">Comisión</p>
-                    <p className="num text-[15px] font-semibold mt-1">{formatCommission(s.commissionType, s.commissionValue)}</p>
+                    <p className="adm-eyebrow">Tipo</p>
+                    <p className="text-[15px] font-semibold mt-1">{s.inventoryMode === "store" ? "Tienda" : "Consignación"}</p>
                   </div>
                   <div>
                     <p className="adm-eyebrow">En su poder</p>

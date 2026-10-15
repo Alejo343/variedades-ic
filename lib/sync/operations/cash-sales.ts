@@ -4,7 +4,7 @@ import { planCashTransfer } from "@/lib/domain/cash";
 import { calculateCommission } from "@/lib/domain/commission";
 import { validateAdjustmentReason } from "@/lib/domain/inventory-movement";
 import { defineHandler, SyncRejection } from "../push";
-import { changePrincipalStock, fromUtc, idByUuid, rowUuid, utcTimestamp } from "./shared";
+import { changePrincipalStock, fromUtc, idByUuid, rowUuid, soldProductByUuid, utcTimestamp } from "./shared";
 
 // Cash movements, in-store sales and inventory adjustments from the owner's
 // phone (sub-paso 7, parte 3b). Rows mirror what the panel writes (concepts,
@@ -79,8 +79,9 @@ export const createDirectSale = defineHandler({
   sellerUuid: (p) => p.sellerUuid,
   async apply(tx, p, { principal }) {
     const accountId = await idByUuid(tx, "cash_accounts", p.accountUuid, "Cuenta");
-    const productIds = [];
-    for (const item of p.items) productIds.push(await idByUuid(tx, "products", item.productUuid, "Producto"));
+    const products: Awaited<ReturnType<typeof soldProductByUuid>>[] = [];
+    for (const item of p.items) products.push(await soldProductByUuid(tx, item.productUuid));
+    const productIds = products.map((product) => product.id);
     const totalAmount = p.items.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0);
 
     // A seller may only push this as a 'store' seller (the phone's view of its
@@ -90,17 +91,17 @@ export const createDirectSale = defineHandler({
     let commissionAmount = 0;
     if (p.sellerUuid) {
       const result = await tx.execute(sql`
-        SELECT id, commission_type, commission_value, inventory_mode FROM sellers WHERE uuid = ${p.sellerUuid}`);
-      const seller = result.rows[0] as
-        | { id: number; commission_type: "percentage" | "fixed_per_unit"; commission_value: number; inventory_mode: string }
-        | undefined;
+        SELECT id, inventory_mode FROM sellers WHERE uuid = ${p.sellerUuid}`);
+      const seller = result.rows[0] as { id: number; inventory_mode: string } | undefined;
       if (!seller) throw new SyncRejection(`Vendedor no existe en el servidor (${p.sellerUuid})`);
       if (seller.inventory_mode !== "store") {
         throw new SyncRejection("Este vendedor es de consignación: solo puede vender su propio inventario");
       }
       sellerId = seller.id;
-      const totalQuantity = p.items.reduce((sum, i) => sum + i.quantity, 0);
-      commissionAmount = calculateCommission({ type: seller.commission_type, value: seller.commission_value }, totalAmount, totalQuantity);
+      // Each product's current percentage, on the (already discounted) unitPrice.
+      commissionAmount = calculateCommission(
+        p.items.map((item, i) => ({ quantity: item.quantity, unitPrice: item.unitPrice, commissionBps: products[i].commissionBps })),
+      );
     }
 
     const inserted = await tx.execute(sql`

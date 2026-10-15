@@ -8,6 +8,7 @@ import { ImagePlus, X } from "lucide-react";
 import type { Category, Product, ProductImage } from "@/lib/db/schema";
 import { formatCOP } from "../../_lib/format";
 import { getSkuPrefix, normalizeSku, skuAfterCategoryChange } from "@/lib/domain/sku";
+import { formatCommissionPercent, lineCommission, parseCommissionPercent } from "@/lib/domain/commission";
 
 // API errors come as a plain string or as a zod flatten() object.
 function apiError(data: { error?: unknown }, fallback: string): string {
@@ -46,6 +47,11 @@ export function ProductForm({ categories, initial }: Props) {
     whatsappText: initial?.whatsappText ?? "",
     sku: initial?.sku ?? "",
   });
+  // As typed ("15", "12,5"); required — every seller earns this percentage.
+  const [commissionText, setCommissionText] = useState(
+    initial ? formatCommissionPercent(initial.commissionBps).replace("%", "") : "",
+  );
+  const commissionBps = parseCommissionPercent(commissionText);
   const [duplicateProduct, setDuplicateProduct] = useState<{ id: number; name: string } | null>(null);
 
   const [imgs, setImgs] = useState<Img[]>(
@@ -98,6 +104,12 @@ export function ProductForm({ categories, initial }: Props) {
     setError("");
     setDuplicateProduct(null);
 
+    if (commissionBps === null) {
+      setLoading(false);
+      setError("Escribe la comisión del vendedor: un porcentaje entre 0 y 100, ej. 15 o 12,5.");
+      return;
+    }
+
     if (form.distributorCode.trim()) {
       const res = await fetch(
         `/api/admin/products/by-distributor-code?code=${encodeURIComponent(form.distributorCode.trim())}`,
@@ -117,7 +129,7 @@ export function ProductForm({ categories, initial }: Props) {
         const res = await fetch(`/api/admin/products/${initial!.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+          body: JSON.stringify({ ...form, commissionBps }),
         });
         if (!res.ok) {
           const data = await res.json();
@@ -161,7 +173,7 @@ export function ProductForm({ categories, initial }: Props) {
         const res = await fetch("/api/admin/products", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(form),
+          body: JSON.stringify({ ...form, commissionBps }),
         });
         if (!res.ok) {
           const data = await res.json();
@@ -311,6 +323,30 @@ export function ProductForm({ categories, initial }: Props) {
               value={form.purchasePrice}
               onChange={(purchasePrice) => setForm((f) => ({ ...f, purchasePrice }))}
             />
+          </div>
+          <div className="sm:max-w-[calc(50%-8px)]">
+            <label className="adm-label">Comisión del vendedor</label>
+            <div className="relative">
+              <input
+                value={commissionText}
+                onChange={(e) => setCommissionText(e.target.value)}
+                inputMode="decimal"
+                placeholder="Ej. 15"
+                required
+                aria-invalid={commissionText.trim() !== "" && commissionBps === null}
+                className={`adm-input num pr-8 h-11 text-[15px] ${commissionText.trim() !== "" && commissionBps === null ? "!border-[var(--adm-danger)]" : ""}`}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--adm-ink-3)] text-sm">%</span>
+            </div>
+            {commissionText.trim() !== "" && commissionBps === null ? (
+              <p className="adm-hint !text-[var(--adm-danger)]">Un porcentaje entre 0 y 100, ej. 15 o 12,5.</p>
+            ) : (
+              <p className="adm-hint num">
+                {commissionBps !== null && form.price > 0
+                  ? `Todo vendedor gana ${formatCOP(lineCommission({ quantity: 1, unitPrice: form.price, commissionBps }))} por unidad vendida a precio completo.`
+                  : "Porcentaje del precio de venta que gana cualquier vendedor."}
+              </p>
+            )}
           </div>
         </section>
 

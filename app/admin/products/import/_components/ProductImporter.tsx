@@ -13,6 +13,7 @@ import {
   type RowError,
 } from "@/lib/domain/product-import";
 import { formatCOP } from "../../../_lib/format";
+import { formatCommissionPercent } from "@/lib/domain/commission";
 
 const TEMPLATE_NAME = "plantilla-productos-ic-variedades.xlsx";
 const DATA_SHEET = "Productos";
@@ -350,6 +351,7 @@ function Preview({
                   <th>Categoría</th>
                   <th className="t-right">Precio</th>
                   <th className="t-right">Costo</th>
+                  <th className="t-right">Comisión</th>
                   <th className="t-right">Cantidad</th>
                 </tr>
               </thead>
@@ -361,6 +363,7 @@ function Preview({
                     <td>{c.categoryName ?? "—"}</td>
                     <td className="t-right num">{formatCOP(c.fields.price)}</td>
                     <td className="t-right num">{formatCOP(c.fields.purchasePrice)}</td>
+                    <td className="t-right num">{formatCommissionPercent(c.fields.commissionBps)}</td>
                     <td className="t-right num t-strong">{c.initialStock}</td>
                   </tr>
                 ))}

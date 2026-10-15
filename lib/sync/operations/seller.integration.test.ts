@@ -30,8 +30,8 @@ describe.skipIf(!url)("operaciones del vendedor (Postgres real)", async () => {
   const principalStock = async () => (await one(`SELECT stock FROM products WHERE id = $1`, [productId])).stock as number;
 
   beforeAll(async () => {
-    const p = await one(`INSERT INTO products (name, slug, sku, price, purchase_price, stock) VALUES ($1, $1, $1, 5000, 3000, 10) RETURNING id, uuid`, [tag]);
-    const s = await one(`INSERT INTO sellers (name, commission_type, commission_value) VALUES ($1, 'percentage', 1000) RETURNING id, uuid`, [tag]);
+    const p = await one(`INSERT INTO products (name, slug, sku, price, purchase_price, commission_bps, stock) VALUES ($1, $1, $1, 5000, 3000, 1000, 10) RETURNING id, uuid`, [tag]);
+    const s = await one(`INSERT INTO sellers (name) VALUES ($1) RETURNING id, uuid`, [tag]);
     ({ id: productId, uuid: productUuid } = p);
     ({ id: sellerId, uuid: sellerUuid } = s);
     // The seller holds 2 units on consignment.
@@ -73,7 +73,7 @@ describe.skipIf(!url)("operaciones del vendedor (Postgres real)", async () => {
     expect(await sellerBalance()).toBe(-1); // had 2, sold 3 offline
     expect(await principalStock()).toBe(10); // a seller sale never touches the principal stock
     const row = await one(`SELECT total_amount, commission_amount, notes FROM seller_sales WHERE uuid = $1`, [sale.uuid]);
-    expect(row).toEqual({ total_amount: 15000, commission_amount: 1500, notes: "sin señal" }); // 10% commission
+    expect(row).toEqual({ total_amount: 15000, commission_amount: 1500, notes: "sin señal" }); // the product's 10% commission
     expect(await one(`SELECT quantity, unit_price, subtotal FROM seller_sale_items WHERE uuid = $1`, [sale.itemUuid])).toEqual({ quantity: 3, unit_price: 5000, subtotal: 15000 });
     expect(await one(`SELECT type, quantity_delta, source_type FROM inventory_movements WHERE uuid = $1`, [sale.movementUuid])).toEqual({ type: "venta", quantity_delta: -3, source_type: "seller_sale" });
 

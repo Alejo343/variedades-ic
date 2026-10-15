@@ -14,10 +14,6 @@ import { getActiveCashAccounts } from "@/lib/db/queries/cash-accounts";
 import { Badge, ButtonLink, Card, EmptyState, Page, PageHeader, Stat, StatusBadge } from "../../_components/ui";
 import { formatCOP, formatDateTime, formatPlainDate } from "../../_lib/format";
 
-function formatCommission(type: string, value: number) {
-  return type === "percentage" ? `${(value / 100).toLocaleString("es-CO", { maximumFractionDigits: 2 })}%` : `${formatCOP(value)} por unidad`;
-}
-
 export default async function SellerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const sellerId = Number(id);
@@ -75,7 +71,6 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
                 {seller.phone}
               </span>
             )}
-            <span>Comisión {formatCommission(seller.commissionType, seller.commissionValue)}</span>
           </span>
         }
         actions={

@@ -22,8 +22,8 @@ describe.skipIf(!url)("entregas y liquidaciones (Postgres real)", async () => {
   const settlementUuid = u();
 
   beforeAll(async () => {
-    ({ id: productId, uuid: productUuid } = await one(`INSERT INTO products (name, slug, sku, price, purchase_price, stock) VALUES ($1, $1, $1, 5000, 3000, 1) RETURNING id, uuid`, [tag]));
-    ({ id: sellerId, uuid: sellerUuid } = await one(`INSERT INTO sellers (name, commission_type, commission_value) VALUES ($1, 'percentage', 1000) RETURNING id, uuid`, [tag]));
+    ({ id: productId, uuid: productUuid } = await one(`INSERT INTO products (name, slug, sku, price, purchase_price, commission_bps, stock) VALUES ($1, $1, $1, 5000, 3000, 1000, 1) RETURNING id, uuid`, [tag]));
+    ({ id: sellerId, uuid: sellerUuid } = await one(`INSERT INTO sellers (name) VALUES ($1) RETURNING id, uuid`, [tag]));
     ({ id: accountId, uuid: accountUuid } = await one(`INSERT INTO cash_accounts (name) VALUES ($1) RETURNING id, uuid`, [tag]));
     const ou = await one(`INSERT INTO users (username, name, password_hash, role) VALUES ($1, 'ZZ', 'h', 'owner') RETURNING id`, [tag]);
     const od = await one(`INSERT INTO device_sessions (user_id, token_hash) VALUES ($1, $2) RETURNING id`, [ou.id, tag]);
@@ -102,7 +102,7 @@ describe.skipIf(!url)("entregas y liquidaciones (Postgres real)", async () => {
   it("liquidación con saldo 0 no exige movimiento de caja", async () => {
     // A fresh seller with nothing pending, so the balance is guaranteed 0
     // regardless of what earlier tests in this file left behind.
-    const emptySeller = await one(`INSERT INTO sellers (name, commission_type, commission_value) VALUES ($1, 'percentage', 1000) RETURNING id, uuid`, [`${tag}-empty`]);
+    const emptySeller = await one(`INSERT INTO sellers (name) VALUES ($1) RETURNING id, uuid`, [`${tag}-empty`]);
     const zeroUuid = u();
     await push("createSettlement", { uuid: zeroUuid, sellerUuid: emptySeller.uuid, periodDate: "2026-09-23" });
     expect(await one(`SELECT amount_due FROM settlements WHERE uuid = $1`, [zeroUuid])).toEqual({ amount_due: 0 });

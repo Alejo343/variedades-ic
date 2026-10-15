@@ -109,8 +109,27 @@ describe("syncPushSchema", () => {
   });
 });
 
-describe("productSchema.sku", () => {
+describe("productSchema.commissionBps", () => {
   const base = { name: "Producto", slug: "producto", price: 1000 };
+
+  it("es obligatoria al crear un producto", () => {
+    expect(productSchema.safeParse(base).success).toBe(false);
+    expect(productSchema.parse({ ...base, commissionBps: 1500 }).commissionBps).toBe(1500);
+    expect(productSchema.parse({ ...base, commissionBps: 0 }).commissionBps).toBe(0);
+  });
+
+  it("al editar puede faltar (no cambia)", () => {
+    expect(productSchema.partial().parse({ price: 2000 }).commissionBps).toBeUndefined();
+  });
+
+  it("rechaza menos de 0% o más de 100%", () => {
+    expect(productSchema.safeParse({ ...base, commissionBps: -1 }).success).toBe(false);
+    expect(productSchema.safeParse({ ...base, commissionBps: 10001 }).success).toBe(false);
+  });
+});
+
+describe("productSchema.sku", () => {
+  const base = { name: "Producto", slug: "producto", price: 1000, commissionBps: 0 };
 
   it("vacío o ausente significa 'automático / sin cambio'", () => {
     expect(productSchema.parse(base).sku).toBeUndefined();

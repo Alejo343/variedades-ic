@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ImageOff, Package, Search, Star } from "lucide-react";
 import { Badge, EmptyState } from "../../_components/ui";
 import { formatCOP } from "../../_lib/format";
+import { formatCommissionPercent } from "@/lib/domain/commission";
 
 type Row = {
   id: number;
@@ -13,6 +14,7 @@ type Row = {
   sku: string;
   price: number;
   purchasePrice: number | null;
+  commissionBps: number;
   stock: number;
   minStock: number;
   featured: boolean;
@@ -136,6 +138,7 @@ export function ProductsTable({ products }: { products: Row[] }) {
                 <th className="t-right">Costo</th>
                 <th className="t-right">Precio</th>
                 <th className="t-right">Margen</th>
+                <th className="t-right">Comisión</th>
                 <th className="t-right">Stock</th>
                 <th>Estado</th>
               </tr>
@@ -185,6 +188,7 @@ export function ProductsTable({ products }: { products: Row[] }) {
                     <td className="t-right num">
                       {margin === null ? "—" : <span className={margin < 0 ? "text-[var(--adm-danger)]" : ""}>{margin}%</span>}
                     </td>
+                    <td className="t-right num">{formatCommissionPercent(p.commissionBps)}</td>
                     <td className="t-right">
                       <span
                         className={`num font-semibold ${

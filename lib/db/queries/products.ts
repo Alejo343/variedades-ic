@@ -96,6 +96,7 @@ export function getAllProducts() {
       distributorCode: products.distributorCode,
       price: products.price,
       purchasePrice: products.purchasePrice,
+      commissionBps: products.commissionBps,
       stock: products.stock,
       minStock: products.minStock,
       featured: products.featured,

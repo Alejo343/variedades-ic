@@ -1,9 +1,9 @@
 import { db } from "../index";
 import { directSales, sellerSales, sellerSaleItems, inventoryMovements, products, sellers } from "../schema";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, inArray, sql } from "drizzle-orm";
 import type { SellerSaleInput } from "@/lib/validations";
 import { deductStock } from "@/lib/domain/stock";
-import { calculateCommission, type CommissionConfig } from "@/lib/domain/commission";
+import { calculateCommission, type CommissionLine } from "@/lib/domain/commission";
 import { getSellerBalance } from "./seller-inventory";
 
 export type CreateSellerSaleResult =
@@ -130,13 +130,21 @@ export async function createSellerSale(data: SellerSaleInput): Promise<CreateSel
         .values({ sellerId: data.sellerId, totalAmount: 0, commissionAmount: 0, notes: data.notes ?? null })
         .returning();
 
+      // Each product's own commission percentage (lib/domain/commission.ts).
+      const productIds = data.items.map((item) => item.productId);
+      const rates = await tx
+        .select({ id: products.id, commissionBps: products.commissionBps })
+        .from(products)
+        .where(inArray(products.id, productIds));
+      const bpsById = new Map(rates.map((r) => [r.id, r.commissionBps]));
+
       let totalAmount = 0;
-      let totalQuantity = 0;
+      const commissionLines: CommissionLine[] = [];
 
       for (const item of data.items) {
         const subtotal = item.quantity * item.unitPrice;
         totalAmount += subtotal;
-        totalQuantity += item.quantity;
+        commissionLines.push({ quantity: item.quantity, unitPrice: item.unitPrice, commissionBps: bpsById.get(item.productId) ?? 0 });
 
         await tx.insert(inventoryMovements).values({
           productId: item.productId,
@@ -158,11 +166,7 @@ export async function createSellerSale(data: SellerSaleInput): Promise<CreateSel
         });
       }
 
-      const commissionConfig: CommissionConfig =
-        seller.commissionType === "percentage"
-          ? { type: "percentage", value: seller.commissionValue }
-          : { type: "fixed_per_unit", value: seller.commissionValue };
-      const commissionAmount = calculateCommission(commissionConfig, totalAmount, totalQuantity);
+      const commissionAmount = calculateCommission(commissionLines);
 
       const [updated] = await tx
         .update(sellerSales)
