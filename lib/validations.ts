@@ -137,6 +137,11 @@ export const sellerSchema = z.object({
   // No default here: a partial update (PUT) without it must keep the current
   // mode. A new seller gets the column default ('consignment').
   inventoryMode: z.enum(["consignment", "store"]).optional(),
+  // Same: absent in a PUT keeps the current pay configuration. Checked as a
+  // whole, with the mode, by lib/domain/salary.ts#sellerPayConfigError.
+  payType: z.enum(["commission", "salary"]).optional(),
+  salaryAmount: z.number().int("El sueldo debe ser un valor entero").positive("El sueldo debe ser mayor que cero").nullable().optional(),
+  salaryPeriod: z.enum(["weekly", "monthly"]).nullable().optional(),
   active: z.boolean().optional().default(true),
   notes: z.string().optional(),
 });
@@ -144,6 +149,16 @@ export const sellerSchema = z.object({
 // Paying a store seller every commission still unpaid up to periodDate.
 export const commissionPaymentSchema = z.object({
   periodDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha con formato inválido"),
+  accountId: z.number().int(),
+  notes: z.string().max(2000).optional(),
+});
+
+// Paying a salaried store seller one period (a week from its Monday, or a
+// month from the 1st); the amount may differ from the configured salary.
+export const salaryPaymentSchema = z.object({
+  period: z.enum(["weekly", "monthly"]),
+  periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha con formato inválido"),
+  amount: z.number().int("El valor debe ser entero").positive("El valor debe ser mayor que cero"),
   accountId: z.number().int(),
   notes: z.string().max(2000).optional(),
 });
@@ -323,6 +338,7 @@ export type SalesOrderItemInput = z.infer<typeof salesOrderItemSchema>;
 export type InventoryAdjustmentInput = z.infer<typeof inventoryAdjustmentSchema>;
 export type SellerInput = z.infer<typeof sellerSchema>;
 export type CommissionPaymentInput = z.infer<typeof commissionPaymentSchema>;
+export type SalaryPaymentInput = z.infer<typeof salaryPaymentSchema>;
 export type SellerUserCreateInput = z.infer<typeof sellerUserCreateSchema>;
 export type SellerUserUpdateInput = z.infer<typeof sellerUserUpdateSchema>;
 export type SyncLoginInput = z.infer<typeof syncLoginSchema>;

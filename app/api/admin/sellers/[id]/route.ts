@@ -3,7 +3,9 @@ import type { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { getSellerById, updateSeller, deleteSeller } from "@/lib/db/queries/sellers";
 import { CONSIGNED_STOCK_BLOCKS_STORE_MODE, hasConsignedStock } from "@/lib/db/queries/seller-inventory";
+import { resolveSellerPay } from "@/lib/db/queries/seller-pay";
 import { db } from "@/lib/db";
+import { todayInBogota } from "@/app/admin/_lib/format";
 import { sellerSchema } from "@/lib/validations";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -38,7 +40,10 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     }
   }
 
-  const [updated] = await updateSeller(Number(id), parsed.data);
+  const pay = await resolveSellerPay(db, Number(id), parsed.data, todayInBogota());
+  if (!pay.ok) return NextResponse.json({ error: pay.error }, { status: 409 });
+
+  const [updated] = await updateSeller(Number(id), { ...parsed.data, ...pay.values });
   if (!updated) return NextResponse.json({ error: "No encontrado" }, { status: 404 });
   return NextResponse.json(updated);
 }

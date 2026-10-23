@@ -10,9 +10,12 @@ import { getDeviceSessions, getUserBySellerId } from "@/lib/db/queries/users";
 import { SellerAccessCard } from "../_components/SellerAccessCard";
 import { CommissionPaymentCard } from "../_components/CommissionPaymentCard";
 import { getCommissionPaymentsForSeller } from "@/lib/db/queries/commission-payments";
+import { getSalaryPaymentsForSeller } from "@/lib/db/queries/salary-payments";
+import { SalaryPaymentCard } from "../_components/SalaryPaymentCard";
+import { SALARY_PERIOD_LABEL, type SalaryPeriod } from "@/lib/domain/salary";
 import { getActiveCashAccounts } from "@/lib/db/queries/cash-accounts";
 import { Badge, ButtonLink, Card, EmptyState, Page, PageHeader, Stat, StatusBadge } from "../../_components/ui";
-import { formatCOP, formatDateTime, formatPlainDate } from "../../_lib/format";
+import { formatCOP, formatDateTime, formatPlainDate, todayInBogota } from "../../_lib/format";
 
 export default async function SellerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -30,12 +33,19 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
   if (!seller) notFound();
 
   const sessions = user ? await getDeviceSessions(user.id) : [];
-  const [commissionPayments, accounts] =
-    seller.inventoryMode === "store" ? await Promise.all([getCommissionPaymentsForSeller(sellerId), getActiveCashAccounts()]) : [[], []];
+  const [commissionPayments, salaryPayments, accounts] =
+    seller.inventoryMode === "store"
+      ? await Promise.all([getCommissionPaymentsForSeller(sellerId), getSalaryPaymentsForSeller(sellerId), getActiveCashAccounts()])
+      : [[], [], []];
   const summary = summaries.find((s) => s.sellerId === sellerId);
   // A store seller sells the principal inventory as in-store sales (no
   // deliveries, no settlements); a consignment seller, from their own stock.
   const isStore = seller.inventoryMode === "store";
+  // A salaried store seller earns no commission (lib/domain/salary.ts).
+  const salary =
+    isStore && seller.payType === "salary" && seller.salaryAmount && seller.salaryPeriod && seller.salaryStartDate
+      ? { amount: seller.salaryAmount, period: seller.salaryPeriod as SalaryPeriod, startDate: seller.salaryStartDate }
+      : null;
   const recentSales = (isStore ? directSales : sales).filter((s) => s.sellerId === sellerId).slice(0, 6);
   const sellerSettlements = settlements.filter((s) => s.sellerId === sellerId);
   const pendingSettlement = sellerSettlements.filter((s) => s.status === "pendiente").reduce((t, s) => t + s.amountDue, 0);
@@ -54,6 +64,7 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
           <span className="inline-flex items-center gap-3">
             {seller.name}
             {isStore && <Badge>Tienda principal</Badge>}
+            {salary && <Badge>Sueldo fijo</Badge>}
             {!seller.active && <Badge>Inactivo</Badge>}
           </span>
         }
@@ -84,7 +95,9 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
       {isStore ? (
         <p className="adm-alert adm-alert-info">
           <Store size={16} />
-          Vende del inventario principal desde su celular; cada venta entra a caja al momento con su comisión.
+          {salary
+            ? `Vende del inventario principal desde su celular; cada venta entra a caja al momento. Tiene sueldo fijo ${SALARY_PERIOD_LABEL[salary.period]}: sus ventas no generan comisión.`
+            : "Vende del inventario principal desde su celular; cada venta entra a caja al momento con su comisión."}
         </p>
       ) : (
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -113,11 +126,20 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
         <Stat
           label="Ventas históricas"
           value={formatCOP(summary?.totalAmount ?? 0)}
-          hint={`${summary?.count ?? 0} ventas · comisión ${formatCOP(summary?.totalCommission ?? 0)}`}
+          hint={salary ? `${summary?.count ?? 0} ventas` : `${summary?.count ?? 0} ventas · comisión ${formatCOP(summary?.totalCommission ?? 0)}`}
           icon={HandCoins}
           tone="ok"
         />
-        {isStore && <Stat label="Comisión acumulada" value={formatCOP(summary?.totalCommission ?? 0)} icon={HandCoins} tone="violet" />}
+        {isStore && !salary && <Stat label="Comisión acumulada" value={formatCOP(summary?.totalCommission ?? 0)} icon={HandCoins} tone="violet" />}
+        {salary && (
+          <Stat
+            label="Sueldo"
+            value={formatCOP(salary.amount)}
+            hint={`${SALARY_PERIOD_LABEL[salary.period]} · desde ${formatPlainDate(salary.startDate)}`}
+            icon={HandCoins}
+            tone="violet"
+          />
+        )}
         {!isStore && <Stat
           label="Por cobrar en liquidaciones"
           value={formatCOP(pendingSettlement)}
@@ -194,7 +216,7 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
                       <p className="text-[13.5px]">
                         <span className="num text-[var(--adm-ink-3)]">#{s.id}</span> · {formatDateTime(s.saleDate)}
                       </p>
-                      <p className="num text-[12px] text-[var(--adm-ink-3)]">Comisión {formatCOP(s.commissionAmount)}</p>
+                      {!salary && <p className="num text-[12px] text-[var(--adm-ink-3)]">Comisión {formatCOP(s.commissionAmount)}</p>}
                     </div>
                     <span className="num font-semibold text-[14px]">{formatCOP(s.totalAmount)}</span>
                   </li>
@@ -223,7 +245,19 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
         </div>
       </div>
 
-      {isStore && (
+      {salary && (
+        <SalaryPaymentCard
+          sellerId={seller.id}
+          salaryAmount={salary.amount}
+          salaryPeriod={salary.period}
+          salaryStartDate={salary.startDate}
+          today={todayInBogota()}
+          accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}
+          payments={salaryPayments.map((p) => ({ ...p, paidAt: p.paidAt.toISOString() }))}
+        />
+      )}
+
+      {isStore && !salary && (
         <CommissionPaymentCard
           sellerId={seller.id}
           accounts={accounts.map((a) => ({ id: a.id, name: a.name }))}

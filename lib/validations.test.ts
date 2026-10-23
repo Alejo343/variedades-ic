@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { categorySchema, ownPasswordChangeSchema, productSchema, sellerUserCreateSchema, sellerUserUpdateSchema, syncLoginSchema, syncPushSchema, toSlug } from "./validations";
+import { categorySchema, ownPasswordChangeSchema, productSchema, salaryPaymentSchema, sellerSchema, sellerUserCreateSchema, sellerUserUpdateSchema, syncLoginSchema, syncPushSchema, toSlug } from "./validations";
 
 describe("toSlug", () => {
   it("convierte a minúsculas", () => {
@@ -169,5 +169,38 @@ describe("categorySchema.imageUrl", () => {
     expect(categorySchema.safeParse({ ...base, imageUrl: "https://evil.example/x.png" }).success).toBe(false);
     expect(categorySchema.safeParse({ ...base, imageUrl: "javascript:alert(1)" }).success).toBe(false);
     expect(categorySchema.safeParse({ ...base, imageUrl: "/uploads/../.env.local" }).success).toBe(false);
+  });
+});
+
+describe("sellerSchema: forma de pago", () => {
+  it("sin los campos (app vieja o PUT parcial) no inventa una forma de pago", () => {
+    const parsed = sellerSchema.parse({ name: "Ana" });
+    expect(parsed.payType).toBeUndefined();
+    expect(parsed.salaryAmount).toBeUndefined();
+  });
+
+  it("acepta sueldo con monto y período", () => {
+    expect(sellerSchema.parse({ name: "Ana", payType: "salary", salaryAmount: 300000, salaryPeriod: "weekly" })).toMatchObject({
+      payType: "salary", salaryAmount: 300000, salaryPeriod: "weekly",
+    });
+  });
+
+  it("rechaza un sueldo negativo, con decimales o un período desconocido", () => {
+    expect(sellerSchema.safeParse({ name: "Ana", salaryAmount: -1 }).success).toBe(false);
+    expect(sellerSchema.safeParse({ name: "Ana", salaryAmount: 10.5 }).success).toBe(false);
+    expect(sellerSchema.safeParse({ name: "Ana", salaryPeriod: "daily" }).success).toBe(false);
+  });
+});
+
+describe("salaryPaymentSchema", () => {
+  const ok = { period: "weekly", periodStart: "2026-10-19", amount: 300000, accountId: 1 };
+
+  it("acepta un pago de un período", () => {
+    expect(salaryPaymentSchema.safeParse(ok).success).toBe(true);
+  });
+
+  it("rechaza monto cero y fecha mal formada", () => {
+    expect(salaryPaymentSchema.safeParse({ ...ok, amount: 0 }).success).toBe(false);
+    expect(salaryPaymentSchema.safeParse({ ...ok, periodStart: "19/10/2026" }).success).toBe(false);
   });
 });

@@ -52,7 +52,11 @@ export default async function SellersPage() {
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-[15.5px] truncate">
                       {s.name}
-                      {s.inventoryMode === "store" && <span className="ml-2 text-[11.5px] font-medium text-[var(--adm-ink-3)]">· Tienda</span>}
+                      {s.inventoryMode === "store" && (
+                        <span className="ml-2 text-[11.5px] font-medium text-[var(--adm-ink-3)]">
+                          · Tienda{s.payType === "salary" ? " · sueldo" : ""}
+                        </span>
+                      )}
                     </p>
                     <div className="flex flex-wrap gap-x-3 text-[12.5px] text-[var(--adm-ink-3)]">
                       {s.city && (
@@ -74,7 +78,7 @@ export default async function SellersPage() {
                 <div className="grid grid-cols-2 gap-3 pt-4 border-t border-[var(--adm-line)]">
                   <div>
                     <p className="adm-eyebrow">Tipo</p>
-                    <p className="text-[15px] font-semibold mt-1">{s.inventoryMode === "store" ? "Tienda" : "Consignación"}</p>
+                    <p className="text-[15px] font-semibold mt-1">{s.inventoryMode !== "store" ? "Consignación" : s.payType === "salary" ? "Tienda · sueldo" : "Tienda"}</p>
                   </div>
                   <div>
                     <p className="adm-eyebrow">En su poder</p>

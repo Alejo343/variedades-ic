@@ -14,6 +14,7 @@ const SOURCE_LABELS: Record<string, string> = {
   direct_sale: "Venta en local",
   purchase_payment: "Pago a distribuidor",
   commission_payment: "Pago de comisiones",
+  salary_payment: "Pago de sueldo",
   ajuste: "Ajuste de caja",
   transferencia: "Transferencia",
 };

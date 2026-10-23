@@ -69,7 +69,9 @@ const SPECS: TableSpec[] = [
   },
   {
     table: "sellers", alias: "s", from: "sellers s", sellerFilter: "s.id = $3",
-    select: () => `s.uuid, s.name, s.phone, s.city, s.inventory_mode AS "inventoryMode", s.active, s.notes, ${ts("s.created_at")} AS "createdAt"`,
+    select: () => `s.uuid, s.name, s.phone, s.city, s.inventory_mode AS "inventoryMode", s.pay_type AS "payType",
+      s.salary_amount AS "salaryAmount", s.salary_period AS "salaryPeriod", ${day("s.salary_start_date")} AS "salaryStartDate",
+      s.active, s.notes, ${ts("s.created_at")} AS "createdAt"`,
   },
   {
     table: "inventory_movements", alias: "m",
@@ -85,6 +87,7 @@ const SPECS: TableSpec[] = [
       CASE m.source_type
         WHEN 'direct_sale' THEN (SELECT x.uuid FROM direct_sales x WHERE x.id = m.source_id)
         WHEN 'commission_payment' THEN (SELECT x.uuid FROM commission_payments x WHERE x.id = m.source_id)
+        WHEN 'salary_payment' THEN (SELECT x.uuid FROM salary_payments x WHERE x.id = m.source_id)
         WHEN 'settlement' THEN (SELECT x.uuid FROM settlements x WHERE x.id = m.source_id)
         WHEN 'purchase_payment' THEN (SELECT x.uuid FROM purchase_payments x WHERE x.id = m.source_id)
       END AS "sourceUuid",
@@ -98,6 +101,14 @@ const SPECS: TableSpec[] = [
     select: () => `cp.uuid, s.uuid AS "sellerUuid", ${day("cp.period_date")} AS "periodDate", cp.sale_count AS "saleCount",
       cp.total_commission AS "totalCommission", a.uuid AS "accountUuid", ${ts("cp.paid_at")} AS "paidAt", cp.notes,
       ${ts("cp.created_at")} AS "createdAt"`,
+  },
+  {
+    // A salaried store seller sees the payments of their own salary.
+    table: "salary_payments", alias: "sp",
+    from: "salary_payments sp JOIN sellers s ON s.id = sp.seller_id JOIN cash_accounts a ON a.id = sp.account_id",
+    sellerFilter: null, storeSellerFilter: "sp.seller_id = $3",
+    select: () => `sp.uuid, s.uuid AS "sellerUuid", sp.period, ${day("sp.period_start")} AS "periodStart", sp.amount,
+      a.uuid AS "accountUuid", ${ts("sp.paid_at")} AS "paidAt", sp.notes, ${ts("sp.created_at")} AS "createdAt"`,
   },
   {
     table: "direct_sales", alias: "d",

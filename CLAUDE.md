@@ -234,6 +234,39 @@ comisión por vendedor ni fija por unidad. Migración `0026_product_commission`
   `upsertSeller` ignora esos campos si una app vieja los manda (zod los quita).
 - **Desplegar la web antes de instalar la versión de la app que la usa.**
 
+### Vendedor de tienda con sueldo fijo (2026-10-23)
+
+Decisión del usuario: un vendedor de tienda se paga por **comisión** (como
+hasta ahora) o con **sueldo fijo semanal o mensual**; con sueldo, sus ventas
+no generan comisión. Migración `0028_salary_sellers` (`0024` en el móvil).
+
+- `sellers.pay_type` (`commission` | `salary`), `salary_amount`,
+  `salary_period` (`weekly` | `monthly`), `salary_start_date`; CHECK: sueldo
+  solo con `inventory_mode = 'store'` y con los tres campos llenos.
+- `lib/domain/salary.ts` (con tests; el móvil tiene una copia idéntica):
+  semana = lunes a domingo, mes = calendario; el primer período es el que
+  contiene `salary_start_date` (el día en que se configuró; se reinicia si
+  cambia el período, no el monto — `nextSalaryStartDate`);
+  `sellerPayConfigError` valida la configuración completa.
+- `lib/db/queries/seller-pay.ts#resolveSellerPay` (panel y sync): campos
+  ausentes = sin cambio (apps viejas, PUT parcial), comisión = campos de
+  sueldo en `null`, y no se pasa a sueldo con comisiones sin pagar.
+- `salary_payments` (`UNIQUE(seller_id, period, period_start)`, sync +
+  triggers): un pago = un período, monto editable, gasto `source_type =
+  'salary_payment'` (`lib/db/queries/salary-payments.ts#paySalary`). Panel:
+  tarjeta "Pagar sueldo" en la ficha del vendedor (`SalaryPaymentCard`),
+  `POST /api/admin/sellers/[id]/salary-payments`; formulario de vendedor con
+  "Cómo se le paga".
+- Sync: `upsertSeller` acepta los campos (opcionales) y la fecha de inicio
+  del celular; operación nueva `createSalaryPayment` (solo dueño);
+  `createDirectSale` deja la comisión en 0 si el vendedor tiene sueldo; el
+  pull manda los campos en `sellers`, la tabla `salary_payments` (al dueño y
+  al propio vendedor de tienda) y el `sourceUuid` del gasto.
+- Test `lib/sync/operations/salary-seller.integration.test.ts`.
+- **Desplegar la web antes de instalar la versión de la app que la usa**
+  (un servidor viejo rechaza `createSalaryPayment` como "Operación
+  desconocida" y descarta los campos de sueldo de `upsertSeller`).
+
 ### Next.js version note
 
 This project uses Next.js **16** (see `package.json`). APIs and conventions may differ from your training data — consult `node_modules/next/dist/docs/` for the authoritative reference before writing Next.js-specific code.

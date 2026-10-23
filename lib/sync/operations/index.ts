@@ -3,6 +3,7 @@ import { createSellerDelivery, createSettlement, markSettlementSettled } from ".
 import { createCashMovement, createCashTransfer, createDirectSale, createInventoryAdjustment } from "./cash-sales";
 import { createCommissionPayment } from "./commissions";
 import { upsertCashAccount, upsertCategory, upsertDistributor, upsertProduct, upsertSeller } from "./catalog";
+import { createSalaryPayment } from "./salary";
 import { createPurchaseOrder, createPurchasePayment, transitionPurchaseOrder } from "./purchases";
 import { createSellerLoss, createSellerReturn, createSellerSale } from "./seller";
 
@@ -28,4 +29,5 @@ export const syncHandlers: OperationHandlers = {
   transitionPurchaseOrder,
   createPurchasePayment,
   createCommissionPayment,
+  createSalaryPayment,
 };

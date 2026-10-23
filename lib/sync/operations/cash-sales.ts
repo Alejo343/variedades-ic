@@ -91,17 +91,20 @@ export const createDirectSale = defineHandler({
     let commissionAmount = 0;
     if (p.sellerUuid) {
       const result = await tx.execute(sql`
-        SELECT id, inventory_mode FROM sellers WHERE uuid = ${p.sellerUuid}`);
-      const seller = result.rows[0] as { id: number; inventory_mode: string } | undefined;
+        SELECT id, inventory_mode, pay_type FROM sellers WHERE uuid = ${p.sellerUuid}`);
+      const seller = result.rows[0] as { id: number; inventory_mode: string; pay_type: string } | undefined;
       if (!seller) throw new SyncRejection(`Vendedor no existe en el servidor (${p.sellerUuid})`);
       if (seller.inventory_mode !== "store") {
         throw new SyncRejection("Este vendedor es de consignación: solo puede vender su propio inventario");
       }
       sellerId = seller.id;
-      // Each product's current percentage, on the (already discounted) unitPrice.
-      commissionAmount = calculateCommission(
-        p.items.map((item, i) => ({ quantity: item.quantity, unitPrice: item.unitPrice, commissionBps: products[i].commissionBps })),
-      );
+      // Each product's current percentage, on the (already discounted)
+      // unitPrice — none for a salaried seller (lib/domain/salary.ts).
+      if (seller.pay_type !== "salary") {
+        commissionAmount = calculateCommission(
+          p.items.map((item, i) => ({ quantity: item.quantity, unitPrice: item.unitPrice, commissionBps: products[i].commissionBps })),
+        );
+      }
     }
 
     const inserted = await tx.execute(sql`

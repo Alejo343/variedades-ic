@@ -174,10 +174,26 @@ export const sellers = pgTable("sellers", {
   // 'store': works at the main store — sells the principal inventory and the
   // money goes straight to a cash account (a direct_sale tagged with them).
   inventoryMode: varchar("inventory_mode", { length: 15 }).default("consignment").notNull(),
+  // How a 'store' seller is paid (lib/domain/salary.ts): 'commission' on each
+  // sale (per product), or a fixed 'salary' — then their sales carry no
+  // commission and the salary is paid per period (salary_payments).
+  payType: varchar("pay_type", { length: 15 }).default("commission").notNull(),
+  salaryAmount: integer("salary_amount"),
+  salaryPeriod: varchar("salary_period", { length: 10 }),
+  // The first period is the one containing this day (see nextSalaryStartDate).
+  salaryStartDate: date("salary_start_date"),
   active: boolean("active").default(true).notNull(),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => [check("sellers_inventory_mode_valid", sql`${table.inventoryMode} IN ('consignment', 'store')`)]);
+}, (table) => [
+  check("sellers_inventory_mode_valid", sql`${table.inventoryMode} IN ('consignment', 'store')`),
+  check("sellers_pay_type_valid", sql`${table.payType} IN ('commission', 'salary')`),
+  check("sellers_salary_period_valid", sql`${table.salaryPeriod} IS NULL OR ${table.salaryPeriod} IN ('weekly', 'monthly')`),
+  check(
+    "sellers_salary_complete",
+    sql`${table.payType} <> 'salary' OR (${table.inventoryMode} = 'store' AND ${table.salaryAmount} > 0 AND ${table.salaryPeriod} IS NOT NULL AND ${table.salaryStartDate} IS NOT NULL)`,
+  ),
+]);
 
 // Real money accounts (e.g. "Efectivo", "Transferencia") — cash_movements,
 // direct_sales and purchase_payments all reference one, so each account's
@@ -393,6 +409,33 @@ export const commissionPayments = pgTable("commission_payments", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => [check("commission_payments_total_positive", sql`${table.totalCommission} > 0`)]);
 
+// The owner paying a salaried store seller one period of their salary (a week
+// from Monday, or a calendar month — periodStart is its first day). The amount
+// defaults to sellers.salary_amount but may differ (advances, absences,
+// bonuses). Paid on creation — an expense in the chosen account
+// (cash_movements, source_type 'salary_payment'). A period is paid only once.
+export const salaryPayments = pgTable(
+  "salary_payments",
+  {
+    id: serial("id").primaryKey(),
+    uuid: syncUuid(),
+    syncVersion: syncVersion(),
+    sellerId: integer("seller_id").notNull().references(() => sellers.id),
+    period: varchar("period", { length: 10 }).notNull(),
+    periodStart: date("period_start").notNull(),
+    amount: integer("amount").notNull(),
+    accountId: integer("account_id").notNull().references(() => cashAccounts.id),
+    paidAt: timestamp("paid_at").defaultNow().notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    check("salary_payments_amount_positive", sql`${table.amount} > 0`),
+    check("salary_payments_period_valid", sql`${table.period} IN ('weekly', 'monthly')`),
+    unique("salary_payments_seller_period_unique").on(table.sellerId, table.period, table.periodStart),
+  ],
+);
+
 export const purchasePayments = pgTable(
   "purchase_payments",
   {
@@ -480,6 +523,7 @@ export type InventoryMovement = typeof inventoryMovements.$inferSelect;
 export type NewInventoryMovement = typeof inventoryMovements.$inferInsert;
 export type Seller = typeof sellers.$inferSelect;
 export type NewSeller = typeof sellers.$inferInsert;
+export type SalaryPayment = typeof salaryPayments.$inferSelect;
 export type CashAccount = typeof cashAccounts.$inferSelect;
 export type NewCashAccount = typeof cashAccounts.$inferInsert;
 export type CashMovement = typeof cashMovements.$inferSelect;

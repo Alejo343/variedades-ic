@@ -1,7 +1,9 @@
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { CONSIGNED_STOCK_BLOCKS_STORE_MODE, hasConsignedStock } from "@/lib/db/queries/seller-inventory";
+import { resolveSellerPay } from "@/lib/db/queries/seller-pay";
 import { nextAutoSku, skuForCategoryChange } from "@/lib/db/queries/sku";
+import { todayInBogota } from "@/app/admin/_lib/format";
 import { defineHandler, SyncRejection, type Tx } from "../push";
 import { idByUuid, rowUuid } from "./shared";
 
@@ -123,23 +125,43 @@ export const upsertSeller = defineHandler({
     city: z.string().max(100).nullish(),
     // Optional so an app version that predates it never resets a seller's mode.
     inventoryMode: z.enum(["consignment", "store"]).optional(),
+    // Same for the pay configuration (lib/domain/salary.ts).
+    payType: z.enum(["commission", "salary"]).optional(),
+    salaryAmount: z.number().int().nullish(),
+    salaryPeriod: z.enum(["weekly", "monthly"]).nullish(),
+    salaryStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
     active: z.boolean(),
     notes: optionalText,
   }),
   async apply(tx, p) {
-    if (p.inventoryMode === "store") {
-      const current = await tx.execute(sql`SELECT id, inventory_mode FROM sellers WHERE uuid = ${p.uuid}`);
-      const row = current.rows[0] as { id: number; inventory_mode: string } | undefined;
-      if (row && row.inventory_mode !== "store" && (await hasConsignedStock(tx, row.id))) {
-        throw new SyncRejection(CONSIGNED_STOCK_BLOCKS_STORE_MODE);
-      }
+    const current = await tx.execute(sql`SELECT id, inventory_mode FROM sellers WHERE uuid = ${p.uuid}`);
+    const row = current.rows[0] as { id: number; inventory_mode: string } | undefined;
+    if (p.inventoryMode === "store" && row && row.inventory_mode !== "store" && (await hasConsignedStock(tx, row.id))) {
+      throw new SyncRejection(CONSIGNED_STOCK_BLOCKS_STORE_MODE);
     }
+    // Only sent fields count: an older app's payload (no payType) keeps the
+    // seller's current pay configuration.
+    const pay = await resolveSellerPay(
+      tx,
+      row?.id ?? null,
+      {
+        inventoryMode: p.inventoryMode,
+        payType: p.payType,
+        ...(p.payType !== undefined ? { salaryAmount: p.salaryAmount ?? null, salaryPeriod: p.salaryPeriod ?? null } : {}),
+        salaryStartDate: p.salaryStartDate ?? undefined,
+      },
+      todayInBogota(),
+    );
+    if (!pay.ok) throw new SyncRejection(pay.error);
+    const v = pay.values;
     await tx.execute(sql`
-      INSERT INTO sellers (uuid, name, phone, city, inventory_mode, active, notes)
-      VALUES (${p.uuid}, ${p.name}, ${p.phone ?? null}, ${p.city ?? null},
-        ${p.inventoryMode ?? "consignment"}, ${p.active}, ${p.notes ?? null})
+      INSERT INTO sellers (uuid, name, phone, city, inventory_mode, pay_type, salary_amount, salary_period, salary_start_date, active, notes)
+      VALUES (${p.uuid}, ${p.name}, ${p.phone ?? null}, ${p.city ?? null}, ${p.inventoryMode ?? "consignment"},
+        ${v.payType}, ${v.salaryAmount}, ${v.salaryPeriod}, ${v.salaryStartDate}, ${p.active}, ${p.notes ?? null})
       ON CONFLICT (uuid) DO UPDATE SET name = EXCLUDED.name, phone = EXCLUDED.phone, city = EXCLUDED.city,
-        inventory_mode = COALESCE(${p.inventoryMode ?? null}, sellers.inventory_mode), active = EXCLUDED.active, notes = EXCLUDED.notes`);
+        inventory_mode = COALESCE(${p.inventoryMode ?? null}, sellers.inventory_mode), pay_type = EXCLUDED.pay_type,
+        salary_amount = EXCLUDED.salary_amount, salary_period = EXCLUDED.salary_period, salary_start_date = EXCLUDED.salary_start_date,
+        active = EXCLUDED.active, notes = EXCLUDED.notes`);
   },
 });
 
