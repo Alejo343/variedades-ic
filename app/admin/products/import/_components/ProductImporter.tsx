@@ -18,10 +18,11 @@ import { formatCommissionPercent } from "@/lib/domain/commission";
 const TEMPLATE_NAME = "plantilla-productos-ic-variedades.xlsx";
 const DATA_SHEET = "Productos";
 
-function downloadTemplate() {
+/** Template workbook ("Productos" + "Instrucciones"); `rows` starts with the header. */
+function downloadWorkbook(rows: unknown[][], fileName: string) {
   const wb = XLSX.utils.book_new();
 
-  const data = XLSX.utils.aoa_to_sheet([PRODUCT_IMPORT_COLUMNS.map((c) => c.header)]);
+  const data = XLSX.utils.aoa_to_sheet(rows);
   data["!cols"] = PRODUCT_IMPORT_COLUMNS.map((c) => ({ wch: Math.max(c.header.length + 4, c.key === "name" || c.key === "description" ? 34 : 14) }));
   XLSX.utils.book_append_sheet(wb, data, DATA_SHEET);
 
@@ -48,11 +49,15 @@ function downloadTemplate() {
   );
   const a = document.createElement("a");
   a.href = url;
-  a.download = TEMPLATE_NAME;
+  a.download = fileName;
   document.body.appendChild(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+function downloadTemplate() {
+  downloadWorkbook([PRODUCT_IMPORT_COLUMNS.map((c) => c.header)], TEMPLATE_NAME);
 }
 
 type Stage =
@@ -70,6 +75,24 @@ export function ProductImporter() {
   const [dragging, setDragging] = useState(false);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
+
+  async function downloadCatalog() {
+    setExporting(true);
+    setExportError("");
+    try {
+      const res = await fetch("/api/admin/products/export");
+      const data = await res.json();
+      if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "No se pudieron descargar los productos");
+      const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local time
+      downloadWorkbook(data.rows, `productos-ic-variedades-${today}.xlsx`);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "No se pudieron descargar los productos");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   async function readFile(file: File) {
     setError("");
@@ -174,7 +197,7 @@ export function ProductImporter() {
     <div className="flex flex-col gap-4">
       {/* Step 1 */}
       <section className="adm-card overflow-hidden">
-        <div className="adm-card-head">
+        <div className="adm-card-head flex-wrap">
           <div className="flex items-center gap-3">
             <StepNumber n={1} />
             <div>
@@ -182,11 +205,29 @@ export function ProductImporter() {
               <p className="adm-card-desc">Solo se aceptan archivos con esta estructura. No cambies los encabezados.</p>
             </div>
           </div>
-          <button type="button" onClick={downloadTemplate} className="adm-btn adm-btn-brand">
-            <Download />
-            Descargar plantilla
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={downloadTemplate} className="adm-btn">
+              <Download />
+              Plantilla vacía
+            </button>
+            <button type="button" onClick={downloadCatalog} disabled={exporting} className="adm-btn adm-btn-brand">
+              <FileSpreadsheet />
+              {exporting ? "Preparando…" : "Descargar mis productos"}
+            </button>
+          </div>
         </div>
+        {exportError && (
+          <p className="adm-alert adm-alert-danger mx-5 mt-4">
+            <AlertTriangle />
+            <span>{exportError}</span>
+          </p>
+        )}
+        <p className="mx-5 my-4 text-[13px] text-[var(--adm-ink-2)]">
+          <strong className="text-[var(--adm-ink)]">Para actualizar productos:</strong> “Descargar mis productos” trae todo tu
+          catálogo actual en esta misma plantilla. Cambia solo lo que necesites y súbelo en el paso 2. Ojo con la Cantidad: si
+          vendes algo entre la descarga y la subida, el stock vuelve al número del archivo — borra esas celdas si no estás
+          contando.
+        </p>
         <div className="adm-table-wrap">
           <table className="adm-table">
             <thead>

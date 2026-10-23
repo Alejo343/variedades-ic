@@ -132,6 +132,17 @@ Lógica pura en `lib/domain/product-import.ts` (con tests); aplicación
 transaccional en `lib/db/queries/product-import.ts`; API
 `POST /api/admin/products/import`.
 
+**"Descargar mis productos"** (2026-10-23): además de la plantilla vacía, la
+pantalla descarga todo el catálogo (activos e inactivos) en la misma
+plantilla, con SKU lleno, para editarlo y volver a subirlo.
+`productsToSheetRows` (contrato con test: exportar y volver a importar sin
+tocar = cero cambios), `GET /api/admin/products/export` devuelve las filas y
+el cliente arma el `.xlsx`. Stock negativo sale vacío (el importador no acepta
+negativos); comisión entre 0 y 1 % sale como texto ("0,5%") porque el número
+0,5 se leería como 50 %. Cantidad sale con el stock actual: si se vende algo
+entre la descarga y la subida, la subida vuelve a fijar el stock del archivo
+(la pantalla lo advierte y la vista previa lo muestra como cambio de Stock).
+
 ### Ajustes de caja (2026-10-04)
 
 Movimiento de caja que mueve el saldo pero **no cuenta como ingreso ni gasto**

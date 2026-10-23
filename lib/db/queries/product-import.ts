@@ -1,14 +1,19 @@
 import { db } from "../index";
 import { categories, products } from "../schema";
 import { eq } from "drizzle-orm";
-import { planProductImport, type ProductImportPlan, type ProductImportRow } from "@/lib/domain/product-import";
+import {
+  planProductImport,
+  productsToSheetRows,
+  type ProductImportPlan,
+  type ProductImportRow,
+} from "@/lib/domain/product-import";
 import { recordPrincipalMovement } from "./inventory";
 import { nextAutoSku, skuForCategoryChange } from "./sku";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-async function loadPlan(dbOrTx: typeof db | Tx, rows: ProductImportRow[]): Promise<ProductImportPlan> {
-  const [existing, cats] = await Promise.all([
+function loadCatalog(dbOrTx: typeof db | Tx) {
+  return Promise.all([
     dbOrTx
       .select({
         id: products.id,
@@ -29,7 +34,17 @@ async function loadPlan(dbOrTx: typeof db | Tx, rows: ProductImportRow[]): Promi
       .from(products),
     dbOrTx.select({ id: categories.id, name: categories.name }).from(categories),
   ]);
+}
+
+async function loadPlan(dbOrTx: typeof db | Tx, rows: ProductImportRow[]): Promise<ProductImportPlan> {
+  const [existing, cats] = await loadCatalog(dbOrTx);
   return planProductImport(rows, existing, cats);
+}
+
+/** The whole catalog as rows of the import template, to edit and upload back. */
+export async function exportProductSheet(): Promise<unknown[][]> {
+  const [existing, cats] = await loadCatalog(db);
+  return productsToSheetRows(existing, cats);
 }
 
 /** Read-only: what the import would do, for the preview screen. */

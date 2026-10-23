@@ -3,6 +3,7 @@ import {
   PRODUCT_IMPORT_COLUMNS,
   parseProductSheet,
   planProductImport,
+  productsToSheetRows,
   type ExistingProduct,
   type ProductImportRow,
 } from "./product-import";
@@ -281,5 +282,65 @@ describe("planProductImport", () => {
       CATEGORIES,
     );
     expect(plan.updates[0].changes.map((c) => c.field)).toEqual(["Categoría"]);
+  });
+});
+
+describe("productsToSheetRows", () => {
+  const MORE: ExistingProduct[] = [
+    ...EXISTING,
+    {
+      id: 3,
+      name: "Labial mate",
+      sku: "BELL-00003",
+      slug: "labial-mate",
+      distributorCode: "LAB-9",
+      stock: -2,
+      price: 18000,
+      purchasePrice: 9000,
+      commissionBps: 50,
+      categoryId: 2,
+      minStock: 1,
+      warrantyMonths: 3,
+      description: "Larga duración",
+      active: false,
+    },
+  ];
+
+  it("arma la hoja con los encabezados de la plantilla y una fila por producto", () => {
+    const sheet = productsToSheetRows(MORE, CATEGORIES);
+    expect(sheet[0]).toEqual(HEADER);
+    expect(sheet).toHaveLength(4);
+    const labial = sheet.find((r) => r[HEADER.indexOf("SKU")] === "BELL-00003")!;
+    const at = (h: string) => labial[HEADER.indexOf(h)];
+    expect(at("Categoría")).toBe("Belleza");
+    expect(at("Activo")).toBe("no");
+    expect(at("Comisión %")).toBe("0,5%"); // 0.5 as a number would read back as 50%
+    expect(at("Cantidad")).toBe(""); // negative stock can't be imported; empty = untouched
+    const cargador = sheet.find((r) => r[HEADER.indexOf("SKU")] === "TECN-00002")!;
+    expect(cargador[HEADER.indexOf("Comisión %")]).toBe(10);
+    expect(cargador[HEADER.indexOf("Costo")]).toBe("");
+  });
+
+  it("subir la hoja exportada sin tocarla no cambia nada", () => {
+    const parsed = parseProductSheet(productsToSheetRows(MORE, CATEGORIES));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.errors).toEqual([]);
+    const plan = planProductImport(parsed.rows, MORE, CATEGORIES);
+    expect(plan.errors).toEqual([]);
+    expect(plan.creates).toEqual([]);
+    expect(plan.updates).toEqual([]);
+    expect(plan.unchanged.map((u) => u.productId).sort()).toEqual([1, 2, 3]);
+  });
+
+  it("un precio editado en la hoja exportada se ve como actualización", () => {
+    const sheet = productsToSheetRows(EXISTING, CATEGORIES);
+    const r = sheet.find((row) => row[HEADER.indexOf("SKU")] === "TECN-00001")!;
+    r[HEADER.indexOf("Precio venta")] = 55000;
+    const parsed = parseProductSheet(sheet);
+    if (!parsed.ok) throw new Error("estructura");
+    const plan = planProductImport(parsed.rows, EXISTING, CATEGORIES);
+    expect(plan.updates).toHaveLength(1);
+    expect(plan.updates[0].changes).toEqual([{ field: "Precio venta", from: "$50.000", to: "$55.000" }]);
   });
 });

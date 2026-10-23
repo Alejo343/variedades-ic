@@ -406,3 +406,46 @@ export function planProductImport(
 
   return plan;
 }
+
+/**
+ * The current catalog as template rows (header + one row per product), so the
+ * owner can edit it and upload it back. Contract: parsing these rows and
+ * planning them against the same products gives no creates, updates or errors.
+ * - Every product is included (inactive too), sorted by category then name;
+ *   the SKU is filled, so each row matches its product on upload.
+ * - Empty cells for null values (empty = "don't change" on upload).
+ * - Negative stock (sales accepted via sync) is left empty: the importer
+ *   rejects negative counts, and empty keeps the current stock.
+ * - Commission is a number (15 = 15%), except between 0 and 1%, written as
+ *   text ("0,5%") because the number 0.5 reads back as an Excel percent (50%).
+ */
+export function productsToSheetRows(existing: ExistingProduct[], categories: ExistingCategory[]): unknown[][] {
+  const categoryName = new Map(categories.map((c) => [c.id, c.name]));
+  const catOf = (p: ExistingProduct) => (p.categoryId === null ? "" : (categoryName.get(p.categoryId) ?? ""));
+  const sorted = [...existing].sort(
+    (a, b) => catOf(a).localeCompare(catOf(b), "es") || a.name.localeCompare(b.name, "es"),
+  );
+
+  const values = (p: ExistingProduct): Record<ImportColumnKey, unknown> => ({
+    sku: p.sku,
+    name: p.name,
+    category: catOf(p),
+    price: p.price,
+    cost: p.purchasePrice ?? "",
+    commission: p.commissionBps > 0 && p.commissionBps < 100 ? formatCommissionPercent(p.commissionBps) : p.commissionBps / 100,
+    quantity: p.stock >= 0 ? p.stock : "",
+    minStock: p.minStock,
+    distributorCode: p.distributorCode ?? "",
+    warrantyMonths: p.warrantyMonths ?? "",
+    description: p.description ?? "",
+    active: p.active ? "sí" : "no",
+  });
+
+  return [
+    PRODUCT_IMPORT_COLUMNS.map((c) => c.header),
+    ...sorted.map((p) => {
+      const v = values(p);
+      return PRODUCT_IMPORT_COLUMNS.map((c) => v[c.key]);
+    }),
+  ];
+}
