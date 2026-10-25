@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { toSlug } from "@/lib/validations";
-import { ImagePlus, X } from "lucide-react";
+import { Eraser, ImagePlus, LoaderCircle, X } from "lucide-react";
 import type { Category, Product, ProductImage } from "@/lib/db/schema";
 import { formatCOP } from "../../_lib/format";
 import { getSkuPrefix, normalizeSku, skuAfterCategoryChange } from "@/lib/domain/sku";
@@ -64,6 +64,8 @@ export function ProductForm({ categories, initial }: Props) {
   );
 
   const [uploading, setUploading] = useState(false);
+  // Background removal in progress: which image (by url) and what to show on it.
+  const [bgJob, setBgJob] = useState<{ url: string; label: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -92,6 +94,43 @@ export function ProductForm({ categories, initial }: Props) {
 
     const { url } = await res.json();
     setImgs((prev) => [...prev, { kind: "new", url, alt: form.name }]);
+  }
+
+  // Swaps the photo for a transparent-background copy, in place. An existing
+  // image is only deleted when the form is saved, so leaving without saving
+  // keeps the original.
+  async function handleRemoveBg(img: Img) {
+    setError("");
+    setBgJob({ url: img.url, label: "Preparando…" });
+    try {
+      const { removeBackground, frameCutout } = await import("../_lib/remove-background");
+      const cutout = await removeBackground(img.url, (p) => {
+        const label =
+          p.stage === "processing"
+            ? "Quitando fondo…"
+            : `Descargando modelo${p.total ? ` · ${Math.floor((p.loaded / p.total) * 100)}%` : "…"}`;
+        setBgJob({ url: img.url, label });
+      });
+
+      // Same frame for every product: object centered, same margin around it.
+      setBgJob({ url: img.url, label: "Encuadrando…" });
+      const blob = await frameCutout(cutout);
+
+      setBgJob({ url: img.url, label: "Guardando…" });
+      const fd = new FormData();
+      fd.append("file", new File([blob], "sin-fondo.png", { type: "image/png" }));
+      const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Error al subir imagen");
+        return;
+      }
+      setImgs((prev) => prev.map((it) => (it.url === img.url ? { kind: "new", url: data.url, alt: it.alt } : it)));
+    } catch (err) {
+      setError(`No se pudo quitar el fondo: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBgJob(null);
+    }
   }
 
   function removeImg(idx: number) {
@@ -426,17 +465,37 @@ export function ProductForm({ categories, initial }: Props) {
                 <button
                   type="button"
                   onClick={() => removeImg(i)}
-                  className="absolute top-1.5 right-1.5 w-7 h-7 grid place-items-center rounded-lg bg-white/90 text-[var(--adm-ink-2)] hover:text-[var(--adm-danger)] opacity-0 group-hover:opacity-100 focus:opacity-100 transition shadow-sm"
+                  disabled={!!bgJob}
+                  className="absolute top-1.5 right-1.5 w-7 h-7 grid place-items-center rounded-lg bg-white/90 text-[var(--adm-ink-2)] hover:text-[var(--adm-danger)] opacity-0 group-hover:opacity-100 focus:opacity-100 transition shadow-sm disabled:hidden"
                   aria-label="Quitar imagen"
                 >
                   <X size={15} />
                 </button>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveBg(img)}
+                  disabled={!!bgJob}
+                  className="absolute bottom-1.5 left-1.5 h-7 px-2 flex items-center gap-1.5 rounded-lg bg-white/90 text-[12px] font-medium text-[var(--adm-ink-2)] hover:text-[var(--adm-brand)] opacity-0 group-hover:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100 transition shadow-sm disabled:hidden"
+                  aria-label="Quitar fondo"
+                  title="Quitar fondo"
+                >
+                  <Eraser size={14} />
+                  {i === 0 && "Quitar fondo"}
+                </button>
+                {bgJob?.url === img.url && (
+                  <div className="absolute inset-0 grid place-items-center bg-white/80 text-[var(--adm-ink-2)]">
+                    <span className="flex flex-col items-center gap-1.5 px-2 text-center text-[12px] font-medium">
+                      <LoaderCircle size={18} className="animate-spin" />
+                      {bgJob.label}
+                    </span>
+                  </div>
+                )}
               </div>
             ))}
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              disabled={uploading}
+              disabled={uploading || !!bgJob}
               className={`rounded-xl border-2 border-dashed border-[var(--adm-line-strong)] grid place-items-center text-[var(--adm-ink-3)] hover:border-[var(--adm-brand)] hover:text-[var(--adm-brand)] transition disabled:opacity-60 ${
                 imgs.length === 0 ? "col-span-3 aspect-[4/3]" : "aspect-square"
               }`}
@@ -449,6 +508,10 @@ export function ProductForm({ categories, initial }: Props) {
           </div>
           <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" onChange={handleUpload} className="hidden" />
           <p className="adm-hint !mt-0">JPG, PNG o WebP hasta 10 MB. La primera es la principal.</p>
+          <p className="adm-hint !mt-0">
+            “Quitar fondo” corre en este navegador: la primera vez descarga el modelo (~220 MB) y cada foto puede
+            tardar hasta un minuto o dos.
+          </p>
         </section>
 
         <section className="adm-card p-5 flex flex-col gap-1">
@@ -484,7 +547,7 @@ export function ProductForm({ categories, initial }: Props) {
         )}
 
         <div className="flex gap-2">
-          <button type="submit" disabled={loading || uploading} className="adm-btn adm-btn-primary adm-btn-lg flex-1">
+          <button type="submit" disabled={loading || uploading || !!bgJob} className="adm-btn adm-btn-primary adm-btn-lg flex-1">
             {loading ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear producto"}
           </button>
           <button type="button" onClick={() => router.push("/admin/products")} className="adm-btn adm-btn-lg">

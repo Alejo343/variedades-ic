@@ -107,6 +107,35 @@ conectados siguen sincronizando (su token no depende de la contraseña).
 `ADMIN_PASSWORD_HASH` del `.env.local` solo siembra al dueño la primera vez:
 cambiarlo ahí no cambia nada.
 
+### Quitar fondo a fotos de producto (2026-10-24)
+
+Botón "Quitar fondo" en cada foto del formulario de producto. Corre en el
+navegador del admin, no en el VPS: modelo BEN2 (MIT) con Transformers.js, el
+mismo montaje que `runonweb/remove-bg` (github.com/midudev/runonweb.ai).
+
+- Worker en `public/workers/remove-bg.js` (JS plano) que importa el bundle
+  autocontenido de Transformers.js **desde jsDelivr** (versión fijada). A
+  propósito no es dependencia npm: arrastraría ~450 MB de `onnxruntime-node`
+  al `npm ci` del VPS. Cliente: `app/admin/products/_lib/remove-background.ts`
+  (un worker por pestaña; el modelo queda cargado para la siguiente foto).
+- Solo WASM, `dtype: 'fp16'`: BEN2 rompe el shader de WebGPU en
+  onnxruntime-web ≥ 1.30 (onnxruntime#32627). Un hilo, porque el sitio no
+  tiene aislamiento cross-origin. Primera vez: ~219 MB que el navegador
+  guarda en Cache Storage; cada foto tarda del orden de un minuto.
+- Encuadre estándar (decisión del usuario 2026-10-24: todas las fotos con el
+  mismo tamaño y los mismos márgenes, sin importar cuánto fondo se borró):
+  cuadrado transparente de 1200×1200 (las tarjetas y la galería son
+  cuadradas), objeto recortado a su caja y escalado —también hacia arriba—
+  hasta que su lado largo deje 8 % de margen, centrado (`FRAME_SIZE` /
+  `FRAME_MARGIN` en `remove-background.ts#frameCutout`). Lógica pura en
+  `lib/domain/image-frame.ts` (`alphaBounds`, `fitInSquare`, con tests).
+  `alphaBounds` ignora alfa ≤ 64 y filas/columnas con < 3 píxeles: BEN2 deja
+  píxeles sueltos con alfa ~50 en las esquinas de la foto que estiraban la
+  caja a la foto entera (encontrado probando con una foto real).
+- El resultado (PNG con alfa) se sube por `/api/admin/upload` como cualquier
+  foto (sharp lo pasa a WebP conservando la transparencia) y reemplaza la
+  foto en el formulario; la original solo se borra al guardar.
+
 ### Importación de productos desde Excel (2026-10-04)
 
 `/admin/products/import`, distinto del Excel de pedidos de compra (ese lee la
