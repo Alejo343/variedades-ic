@@ -191,8 +191,12 @@ un vendedor) y "corregirla" = anularla y registrarla de nuevo. Migración
 - Sync: `voidDirectSale`/`voidSellerSale {saleUuid, voidedAt, reason?,
   items: [{itemUuid, movementUuid}]}`, solo dueño; el pull manda `voidedAt`
   y `voidReason`. Test `lib/sync/operations/sale-voids.integration.test.ts`.
-- Panel: "Anular" y "Corregir" en Ventas en local y Ventas de vendedores
-  (`_components/VoidSaleControls.tsx`, `POST /api/admin/{direct,seller}-sales/[id]/void`).
+- Panel: en Ventas en local y Ventas de vendedores cada fila se despliega
+  (`_components/ExpandableSaleRow.tsx` + `SaleBreakdown.tsx`; productos por
+  venta con `getDirectSaleLines`/`getSellerSaleLines`) con el desglose y
+  "Anular"/"Corregir" (`_components/VoidSaleControls.tsx`,
+  `POST /api/admin/{direct,seller}-sales/[id]/void`). La columna "Productos"
+  resume la venta (`_lib/sale-lines.ts#linesSummary`).
   Corregir abre el formulario con `?corregir=<id>` precargado; la venta de un
   vendedor de tienda solo se anula (el panel no registra ventas a su nombre).
 - **Desplegar la web antes de instalar la versión de la app que la usa.**

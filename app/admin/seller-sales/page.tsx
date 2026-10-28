@@ -1,13 +1,17 @@
 import Link from "next/link";
 import { HandCoins, Plus } from "lucide-react";
 import { getAllSellerSales, getSellerSalesSummary } from "@/lib/db/queries/seller-sales";
+import { getSellerSaleLines } from "@/lib/db/queries/direct-sales";
 import { saleVoidBlocker } from "@/lib/domain/sale-void";
 import { Badge, ButtonLink, Card, EmptyState, Page, PageHeader } from "../_components/ui";
+import { ExpandableSaleRow } from "../_components/ExpandableSaleRow";
+import { SaleBreakdown } from "../_components/SaleBreakdown";
 import { VoidSaleControls } from "../_components/VoidSaleControls";
+import { linesSummary } from "../_lib/sale-lines";
 import { formatCOP, formatDateTime } from "../_lib/format";
 
 export default async function SellerSalesPage() {
-  const [sales, summary] = await Promise.all([getAllSellerSales(), getSellerSalesSummary()]);
+  const [sales, summary, linesBySale] = await Promise.all([getAllSellerSales(), getSellerSalesSummary(), getSellerSaleLines()]);
   const ranking = [...summary].sort((a, b) => b.totalAmount - a.totalAmount);
   const top = ranking[0]?.totalAmount ?? 0;
 
@@ -36,45 +40,68 @@ export default async function SellerSalesPage() {
                     <th>#</th>
                     <th>Fecha</th>
                     <th>Vendedor</th>
-                    <th>Notas</th>
+                    <th>Productos</th>
                     <th className="t-right">Comisión</th>
                     <th className="t-right">Total</th>
                     <th />
                   </tr>
                 </thead>
                 <tbody>
-                  {sales.map((s) => (
-                    <tr key={s.id} className={s.voidedAt ? "opacity-60" : undefined}>
-                      <td className="num text-[var(--adm-ink-3)]">#{s.id}</td>
-                      <td className="whitespace-nowrap">{formatDateTime(s.saleDate)}</td>
-                      <td className="t-strong">
-                        <Link href={`/admin/sellers/${s.sellerId}`} className="hover:underline underline-offset-4">
-                          {s.sellerName ?? "—"}
-                        </Link>
-                      </td>
-                      <td className="max-w-[240px] truncate">
-                        {s.voidedAt ? (
-                          <span title={s.voidReason ?? undefined}>
-                            <Badge tone="danger">Anulada</Badge> {s.voidReason ?? ""}
-                          </span>
-                        ) : (
-                          (s.notes ?? "—")
-                        )}
-                      </td>
-                      <td className={`t-right num ${s.voidedAt ? "line-through" : ""}`}>{formatCOP(s.commissionAmount)}</td>
-                      <td className={`t-right num t-strong ${s.voidedAt ? "line-through" : ""}`}>{formatCOP(s.totalAmount)}</td>
-                      <td className="t-right">
-                        {!s.voidedAt && (
-                          <VoidSaleControls
-                            kind="seller"
-                            saleId={s.id}
-                            blocker={saleVoidBlocker(s)}
-                            correctHref={`/admin/seller-sales/new?sellerId=${s.sellerId}&corregir=${s.id}`}
+                  {sales.map((s) => {
+                    const lines = linesBySale.get(s.id) ?? [];
+                    return (
+                      <ExpandableSaleRow
+                        key={s.id}
+                        colSpan={7}
+                        dim={!!s.voidedAt}
+                        cells={
+                          <>
+                            <td className="num text-[var(--adm-ink-3)]">#{s.id}</td>
+                            <td className="whitespace-nowrap">{formatDateTime(s.saleDate)}</td>
+                            <td className="t-strong">
+                              <Link href={`/admin/sellers/${s.sellerId}`} className="hover:underline underline-offset-4">
+                                {s.sellerName ?? "—"}
+                              </Link>
+                            </td>
+                            <td className="max-w-[240px] truncate">
+                              {s.voidedAt && (
+                                <>
+                                  <Badge tone="danger">Anulada</Badge>{" "}
+                                </>
+                              )}
+                              {linesSummary(lines)}
+                            </td>
+                            <td className={`t-right num ${s.voidedAt ? "line-through" : ""}`}>{formatCOP(s.commissionAmount)}</td>
+                            <td className={`t-right num t-strong ${s.voidedAt ? "line-through" : ""}`}>{formatCOP(s.totalAmount)}</td>
+                          </>
+                        }
+                        detail={
+                          <SaleBreakdown
+                            lines={lines}
+                            total={s.totalAmount}
+                            commission={s.commissionAmount}
+                            facts={[
+                              `Vendió ${s.sellerName ?? "—"}`,
+                              s.settlementId ? "Ya entró en una liquidación" : "Pendiente de liquidar",
+                              ...(s.notes ? [`Notas: ${s.notes}`] : []),
+                            ]}
+                            voidedAt={s.voidedAt}
+                            voidReason={s.voidReason}
+                            actions={
+                              !s.voidedAt && (
+                                <VoidSaleControls
+                                  kind="seller"
+                                  saleId={s.id}
+                                  blocker={saleVoidBlocker(s)}
+                                  correctHref={`/admin/seller-sales/new?sellerId=${s.sellerId}&corregir=${s.id}`}
+                                />
+                              )
+                            }
                           />
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                        }
+                      />
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

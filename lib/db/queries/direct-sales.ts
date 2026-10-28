@@ -1,5 +1,5 @@
 import { db } from "../index";
-import { directSales, directSaleItems, products, cashAccounts, sellers } from "../schema";
+import { directSales, directSaleItems, products, cashAccounts, sellers, sellerSaleItems } from "../schema";
 import { eq, desc } from "drizzle-orm";
 import type { DirectSaleInput } from "@/lib/validations";
 import { recordPrincipalMovement } from "./inventory";
@@ -8,6 +8,51 @@ import { recordCashMovement } from "./cash";
 export type CreateDirectSaleResult =
   | { ok: true; sale: typeof directSales.$inferSelect }
   | { ok: false; error: string };
+
+/** One product line of a sale, as the sales lists show it expanded. */
+export type SaleLine = { productId: number; productName: string | null; sku: string | null; quantity: number; unitPrice: number; subtotal: number };
+
+function groupBySale(rows: (SaleLine & { saleId: number })[]): Map<number, SaleLine[]> {
+  const bySale = new Map<number, SaleLine[]>();
+  for (const { saleId, ...line } of rows) bySale.set(saleId, [...(bySale.get(saleId) ?? []), line]);
+  return bySale;
+}
+
+/** Every in-store sale's products, by sale id (the list's expandable rows). */
+export async function getDirectSaleLines(): Promise<Map<number, SaleLine[]>> {
+  const rows = await db
+    .select({
+      saleId: directSaleItems.saleId,
+      productId: directSaleItems.productId,
+      productName: products.name,
+      sku: products.sku,
+      quantity: directSaleItems.quantity,
+      unitPrice: directSaleItems.unitPrice,
+      subtotal: directSaleItems.subtotal,
+    })
+    .from(directSaleItems)
+    .leftJoin(products, eq(directSaleItems.productId, products.id))
+    .orderBy(directSaleItems.id);
+  return groupBySale(rows);
+}
+
+/** Same as getDirectSaleLines, for consignment sales. */
+export async function getSellerSaleLines(): Promise<Map<number, SaleLine[]>> {
+  const rows = await db
+    .select({
+      saleId: sellerSaleItems.saleId,
+      productId: sellerSaleItems.productId,
+      productName: products.name,
+      sku: products.sku,
+      quantity: sellerSaleItems.quantity,
+      unitPrice: sellerSaleItems.unitPrice,
+      subtotal: sellerSaleItems.subtotal,
+    })
+    .from(sellerSaleItems)
+    .leftJoin(products, eq(sellerSaleItems.productId, products.id))
+    .orderBy(sellerSaleItems.id);
+  return groupBySale(rows);
+}
 
 export function getAllDirectSales() {
   return db
