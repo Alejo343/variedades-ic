@@ -3,6 +3,7 @@ import { AlertTriangle, Boxes, CircleDollarSign, PackageX, Tag } from "lucide-re
 import { getAllProducts } from "@/lib/db/queries/products";
 import { getLowStock, getNegativeStock, getOutOfStock, getRecentMovements } from "@/lib/db/queries/inventory";
 import { getInventorySummary } from "@/lib/db/queries/reports";
+import { getSellerHeldTotalsByProduct } from "@/lib/db/queries/seller-inventory";
 import { AdjustmentForm } from "./_components/AdjustmentForm";
 import { Badge, Card, FilterTabs, Page, PageHeader, Stat } from "../_components/ui";
 import { MOVEMENT_LABELS, formatCOP, formatDateTime, formatNumber } from "../_lib/format";
@@ -17,14 +18,18 @@ const TYPE_FILTERS = [
 
 export default async function InventoryPage({ searchParams }: { searchParams: Promise<{ type?: string; ajustar?: string }> }) {
   const { type = "", ajustar } = await searchParams;
-  const [lowStock, outOfStock, negativeStock, movements, products, summary] = await Promise.all([
+  const [lowStock, outOfStock, negativeStock, movements, products, summary, held] = await Promise.all([
     getLowStock(),
     getOutOfStock(),
     getNegativeStock(),
     getRecentMovements(100),
     getAllProducts(),
     getInventorySummary(),
+    getSellerHeldTotalsByProduct(),
   ]);
+  // Agotado / bajo el mínimo stay about the shop's stock; what sellers hold is
+  // only noted beside it.
+  const heldUnits = [...held.values()].reduce((s, q) => s + q, 0);
 
   const activeProducts = products.filter((p) => p.active);
   const valueAtPrice = activeProducts.reduce((s, p) => s + Math.max(p.stock, 0) * p.price, 0);
@@ -39,7 +44,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
       />
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <Stat label="Unidades en bodega" value={formatNumber(summary.totalUnits)} hint={`${summary.activeProducts} productos activos`} icon={Boxes} tone="info" />
+        <Stat label="Unidades en bodega" value={formatNumber(summary.totalUnits)} hint={`${summary.activeProducts} productos activos${heldUnits !== 0 ? ` · ${formatNumber(heldUnits)} más con vendedores` : ""}`} icon={Boxes} tone="info" />
         <Stat label="Valor a costo" value={formatCOP(summary.totalValue)} icon={CircleDollarSign} tone="violet" />
         <Stat label="Valor a precio de venta" value={formatCOP(valueAtPrice)} hint={`Margen potencial ${formatCOP(valueAtPrice - summary.totalValue)}`} icon={Tag} tone="ok" />
         <Stat
@@ -86,6 +91,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                       <Link href={`/admin/products/${p.id}/edit`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-[var(--adm-surface-2)]">
                         <AlertTriangle size={15} className="text-[var(--adm-warn)] shrink-0" />
                         <span className="flex-1 text-[13.5px] truncate">{p.name}</span>
+                        <HeldNote units={held.get(p.id)} />
                         <span className="num text-[13px] font-semibold text-[var(--adm-warn)]">{p.stock}</span>
                         <span className="num text-[12px] text-[var(--adm-ink-3)]">/ {p.minStock}</span>
                       </Link>
@@ -104,6 +110,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
                       <Link href={`/admin/products/${p.id}/edit`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-[var(--adm-surface-2)]">
                         <PackageX size={15} className="text-[var(--adm-danger)] shrink-0" />
                         <span className="flex-1 text-[13.5px] truncate">{p.name}</span>
+                        <HeldNote units={held.get(p.id)} />
                         <Badge tone="danger" plain>
                           0
                         </Badge>
@@ -183,5 +190,14 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         </div>
       </div>
     </Page>
+  );
+}
+
+function HeldNote({ units }: { units: number | undefined }) {
+  if (!units) return null;
+  return (
+    <span className={`num text-[12px] whitespace-nowrap ${units < 0 ? "text-[var(--adm-danger)]" : "text-[var(--adm-violet)]"}`}>
+      {units} con vendedores
+    </span>
   );
 }

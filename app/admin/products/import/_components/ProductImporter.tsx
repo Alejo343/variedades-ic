@@ -7,6 +7,7 @@ import * as XLSX from "xlsx";
 import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, RefreshCw, Upload } from "lucide-react";
 import {
   PRODUCT_IMPORT_COLUMNS,
+  SELLER_HELD_HEADER,
   parseProductSheet,
   type ProductImportPlan,
   type ProductImportRow,
@@ -18,12 +19,19 @@ import { formatCommissionPercent } from "@/lib/domain/commission";
 const TEMPLATE_NAME = "plantilla-productos-ic-variedades.xlsx";
 const DATA_SHEET = "Productos";
 
-/** Template workbook ("Productos" + "Instrucciones"); `rows` starts with the header. */
-function downloadWorkbook(rows: unknown[][], fileName: string) {
+/**
+ * Template workbook ("Productos" + "Instrucciones"); `rows` starts with the
+ * header. The downloaded catalog also brings `sellerRows`: its own
+ * "Con vendedores" sheet, which the importer never reads.
+ */
+function downloadWorkbook(rows: unknown[][], fileName: string, sellerRows?: unknown[][]) {
   const wb = XLSX.utils.book_new();
 
   const data = XLSX.utils.aoa_to_sheet(rows);
-  data["!cols"] = PRODUCT_IMPORT_COLUMNS.map((c) => ({ wch: Math.max(c.header.length + 4, c.key === "name" || c.key === "description" ? 34 : 14) }));
+  data["!cols"] = [
+    ...PRODUCT_IMPORT_COLUMNS.map((c) => ({ wch: Math.max(c.header.length + 4, c.key === "name" || c.key === "description" ? 34 : 14) })),
+    { wch: SELLER_HELD_HEADER.length + 2 },
+  ];
   XLSX.utils.book_append_sheet(wb, data, DATA_SHEET);
 
   const help = XLSX.utils.aoa_to_sheet([
@@ -37,9 +45,16 @@ function downloadWorkbook(rows: unknown[][], fileName: string) {
     [],
     ["Llena la hoja “Productos”: una fila por producto, sin cambiar los encabezados."],
     ["Montos en pesos, sin decimales (50000 o $50.000). Celdas vacías en productos existentes = no se cambia ese dato."],
+    [`“${SELLER_HELD_HEADER}” y la hoja “Con vendedores” solo informan: lo que cambies ahí no se aplica. Lo de un vendedor cambia con entregas, devoluciones y pérdidas.`],
   ]);
   help["!cols"] = [{ wch: 18 }, { wch: 24 }, { wch: 90 }, { wch: 34 }];
   XLSX.utils.book_append_sheet(wb, help, "Instrucciones");
+
+  if (sellerRows) {
+    const sellers = XLSX.utils.aoa_to_sheet(sellerRows.length > 1 ? sellerRows : [...sellerRows, ["Ningún vendedor tiene productos ahora."]]);
+    sellers["!cols"] = [{ wch: 34 }, { wch: 14 }, { wch: 24 }, { wch: 10 }];
+    XLSX.utils.book_append_sheet(wb, sellers, "Con vendedores");
+  }
 
   // Own download instead of XLSX.writeFile: that one revokes the blob URL right
   // away, which some browsers treat as a cancelled download.
@@ -86,7 +101,7 @@ export function ProductImporter() {
       const data = await res.json();
       if (!res.ok) throw new Error(typeof data.error === "string" ? data.error : "No se pudieron descargar los productos");
       const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local time
-      downloadWorkbook(data.rows, `productos-ic-variedades-${today}.xlsx`);
+      downloadWorkbook(data.rows, `productos-ic-variedades-${today}.xlsx`, data.sellerRows);
     } catch (err) {
       setExportError(err instanceof Error ? err.message : "No se pudieron descargar los productos");
     } finally {
@@ -226,7 +241,8 @@ export function ProductImporter() {
           <strong className="text-[var(--adm-ink)]">Para actualizar productos:</strong> “Descargar mis productos” trae todo tu
           catálogo actual en esta misma plantilla. Cambia solo lo que necesites y súbelo en el paso 2. Ojo con la Cantidad: si
           vendes algo entre la descarga y la subida, el stock vuelve al número del archivo — borra esas celdas si no estás
-          contando.
+          contando. La Cantidad es solo lo de la tienda: lo que tienen los vendedores viene aparte, en la columna “Con
+          vendedores” y en su propia hoja, solo para consultar (no se importa).
         </p>
         <div className="adm-table-wrap">
           <table className="adm-table">

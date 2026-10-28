@@ -4,6 +4,8 @@ import {
   parseProductSheet,
   planProductImport,
   productsToSheetRows,
+  SELLER_HELD_HEADER,
+  sellerHoldingsSheetRows,
   type ExistingProduct,
   type ProductImportRow,
 } from "./product-import";
@@ -308,7 +310,7 @@ describe("productsToSheetRows", () => {
 
   it("arma la hoja con los encabezados de la plantilla y una fila por producto", () => {
     const sheet = productsToSheetRows(MORE, CATEGORIES);
-    expect(sheet[0]).toEqual(HEADER);
+    expect(sheet[0]).toEqual([...HEADER, SELLER_HELD_HEADER]);
     expect(sheet).toHaveLength(4);
     const labial = sheet.find((r) => r[HEADER.indexOf("SKU")] === "BELL-00003")!;
     const at = (h: string) => labial[HEADER.indexOf(h)];
@@ -342,5 +344,44 @@ describe("productsToSheetRows", () => {
     const plan = planProductImport(parsed.rows, EXISTING, CATEGORIES);
     expect(plan.updates).toHaveLength(1);
     expect(plan.updates[0].changes).toEqual([{ field: "Precio venta", from: "$50.000", to: "$55.000" }]);
+  });
+});
+
+describe("lo que tienen los vendedores en el Excel descargado", () => {
+  it("va en una columna informativa al final, separada de Cantidad (que es solo la tienda)", () => {
+    const sheet = productsToSheetRows(EXISTING, CATEGORIES, new Map([[1, 7]]));
+    const col = sheet[0].indexOf(SELLER_HELD_HEADER);
+    expect(col).toBe(HEADER.length);
+    const audifonos = sheet.find((r) => r[HEADER.indexOf("SKU")] === "TECN-00001")!;
+    expect(audifonos[HEADER.indexOf("Cantidad")]).toBe(10);
+    expect(audifonos[col]).toBe(7);
+    const cargador = sheet.find((r) => r[HEADER.indexOf("SKU")] === "TECN-00002")!;
+    expect(cargador[col]).toBe("");
+  });
+
+  it("subir la hoja sin tocarla sigue sin cambiar nada, aunque se edite la columna informativa", () => {
+    const sheet = productsToSheetRows(EXISTING, CATEGORIES, new Map([[1, 7]]));
+    sheet.find((r) => r[HEADER.indexOf("SKU")] === "TECN-00001")![HEADER.length] = 99;
+    const parsed = parseProductSheet(sheet);
+    if (!parsed.ok) throw new Error("estructura");
+    const plan = planProductImport(parsed.rows, EXISTING, CATEGORIES);
+    expect(plan.errors).toEqual([]);
+    expect(plan.updates).toEqual([]);
+    expect(plan.creates).toEqual([]);
+  });
+
+  it("hoja de detalle: una fila por producto y vendedor, por nombre de producto y mayor cantidad primero", () => {
+    expect(
+      sellerHoldingsSheetRows([
+        { productName: "Cargador USB-C", sku: "TECN-00002", sellerName: "Ana", quantity: 2 },
+        { productName: "Audífonos Bluetooth", sku: "TECN-00001", sellerName: "Beto", quantity: -1 },
+        { productName: "Audífonos Bluetooth", sku: "TECN-00001", sellerName: "Ana", quantity: 5 },
+      ]),
+    ).toEqual([
+      ["Producto", "SKU", "Vendedor", "Unidades"],
+      ["Audífonos Bluetooth", "TECN-00001", "Ana", 5],
+      ["Audífonos Bluetooth", "TECN-00001", "Beto", -1],
+      ["Cargador USB-C", "TECN-00002", "Ana", 2],
+    ]);
   });
 });

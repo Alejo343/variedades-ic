@@ -51,7 +51,7 @@ export const PRODUCT_IMPORT_COLUMNS: ImportColumn[] = [
   { key: "price", header: "Precio venta", required: "new", help: "Precio al público, en pesos. Obligatorio para productos nuevos.", example: "50000" },
   { key: "cost", header: "Costo", required: "no", help: "Precio de compra, en pesos.", example: "30000" },
   { key: "commission", header: "Comisión %", required: "new", help: "Porcentaje del precio de venta que gana cualquier vendedor con este producto (15 = 15%). Obligatorio para productos nuevos.", example: "15", headerOptional: true },
-  { key: "quantity", header: "Cantidad", required: "no", help: "Unidades que tienes. En productos existentes reemplaza el stock actual (queda como ajuste en el historial).", example: "12" },
+  { key: "quantity", header: "Cantidad", required: "no", help: "Unidades que tienes en la tienda, sin contar las que tienen los vendedores. En productos existentes reemplaza el stock actual (queda como ajuste en el historial).", example: "12" },
   { key: "minStock", header: "Stock mínimo", required: "no", help: "Avisa cuando el stock llegue a este número.", example: "3" },
   { key: "distributorCode", header: "Código proveedor", required: "no", help: "Código que usa tu distribuidor para el producto. Debe ser único.", example: "AUD-1H" },
   { key: "warrantyMonths", header: "Garantía (meses)", required: "no", help: "Meses de garantía.", example: "6" },
@@ -418,8 +418,16 @@ export function planProductImport(
  *   rejects negative counts, and empty keeps the current stock.
  * - Commission is a number (15 = 15%), except between 0 and 1%, written as
  *   text ("0,5%") because the number 0.5 reads back as an Excel percent (50%).
+ * - After the template columns, SELLER_HELD_HEADER: the units sellers hold
+ *   (`heldBySellers`, by product id; empty when none). Information only — the
+ *   importer ignores columns outside the template, so editing it changes
+ *   nothing; "Cantidad" stays the shop's own stock.
  */
-export function productsToSheetRows(existing: ExistingProduct[], categories: ExistingCategory[]): unknown[][] {
+export function productsToSheetRows(
+  existing: ExistingProduct[],
+  categories: ExistingCategory[],
+  heldBySellers: Map<number, number> = new Map(),
+): unknown[][] {
   const categoryName = new Map(categories.map((c) => [c.id, c.name]));
   const catOf = (p: ExistingProduct) => (p.categoryId === null ? "" : (categoryName.get(p.categoryId) ?? ""));
   const sorted = [...existing].sort(
@@ -442,10 +450,25 @@ export function productsToSheetRows(existing: ExistingProduct[], categories: Exi
   });
 
   return [
-    PRODUCT_IMPORT_COLUMNS.map((c) => c.header),
+    [...PRODUCT_IMPORT_COLUMNS.map((c) => c.header), SELLER_HELD_HEADER],
     ...sorted.map((p) => {
       const v = values(p);
-      return PRODUCT_IMPORT_COLUMNS.map((c) => v[c.key]);
+      return [...PRODUCT_IMPORT_COLUMNS.map((c) => v[c.key]), heldBySellers.get(p.id) ?? ""];
     }),
   ];
+}
+
+/** Read-only column of the downloaded catalog, outside the import template. */
+export const SELLER_HELD_HEADER = "Con vendedores (solo informativo)";
+
+export type SellerHoldingLine = { productName: string; sku: string; sellerName: string; quantity: number };
+
+/**
+ * The "Con vendedores" sheet of the downloaded catalog: one row per product
+ * and seller holding it (negative balances included, to be checked), by
+ * product name, then largest quantity first. Never read back on upload.
+ */
+export function sellerHoldingsSheetRows(lines: SellerHoldingLine[]): unknown[][] {
+  const sorted = [...lines].sort((a, b) => a.productName.localeCompare(b.productName, "es") || b.quantity - a.quantity);
+  return [["Producto", "SKU", "Vendedor", "Unidades"], ...sorted.map((l) => [l.productName, l.sku, l.sellerName, l.quantity])];
 }

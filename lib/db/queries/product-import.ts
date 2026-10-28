@@ -4,11 +4,13 @@ import { eq } from "drizzle-orm";
 import {
   planProductImport,
   productsToSheetRows,
+  sellerHoldingsSheetRows,
   type ProductImportPlan,
   type ProductImportRow,
 } from "@/lib/domain/product-import";
 import { recordPrincipalMovement } from "./inventory";
 import { nextAutoSku, skuForCategoryChange } from "./sku";
+import { getAllSellerHoldings } from "./seller-inventory";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -41,10 +43,16 @@ async function loadPlan(dbOrTx: typeof db | Tx, rows: ProductImportRow[]): Promi
   return planProductImport(rows, existing, cats);
 }
 
-/** The whole catalog as rows of the import template, to edit and upload back. */
-export async function exportProductSheet(): Promise<unknown[][]> {
-  const [existing, cats] = await loadCatalog(db);
-  return productsToSheetRows(existing, cats);
+/**
+ * The whole catalog as rows of the import template, to edit and upload back,
+ * plus what sellers hold: a read-only column there and its detail by seller.
+ */
+export async function exportProductSheet(): Promise<{ rows: unknown[][]; sellerRows: unknown[][] }> {
+  const [[existing, cats], holdings] = await Promise.all([loadCatalog(db), getAllSellerHoldings()]);
+  const heldBySellers = new Map<number, number>();
+  for (const h of holdings) heldBySellers.set(h.productId, (heldBySellers.get(h.productId) ?? 0) + h.quantity);
+  for (const [id, q] of heldBySellers) if (q === 0) heldBySellers.delete(id);
+  return { rows: productsToSheetRows(existing, cats, heldBySellers), sellerRows: sellerHoldingsSheetRows(holdings) };
 }
 
 /** Read-only: what the import would do, for the preview screen. */

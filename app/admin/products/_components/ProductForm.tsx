@@ -393,7 +393,7 @@ export function ProductForm({ categories, initial }: Props) {
           <h2 className="adm-card-title">Inventario y garantía</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="adm-label">Stock</label>
+              <label className="adm-label">Stock en tienda</label>
               <input
                 type="number"
                 min={0}

@@ -172,6 +172,25 @@ negativos); comisión entre 0 y 1 % sale como texto ("0,5%") porque el número
 entre la descarga y la subida, la subida vuelve a fijar el stock del archivo
 (la pantalla lo advierte y la vista previa lo muestra como cambio de Stock).
 
+### Stock con vendedores (2026-10-27)
+
+Decisión del usuario: lo que tienen los vendedores (su ledger) se muestra
+**al lado** del stock de la tienda, nunca sumado; agotados y stock bajo
+siguen siendo solo del principal. Igual en el móvil.
+
+- Queries en `lib/db/queries/seller-inventory.ts`: `getSellerHoldingsOfProduct`,
+  `getSellerHeldTotalsByProduct`, `getAllSellerHoldings` (conservan saldos
+  negativos y quitan ceros; `getSellerInventory`/`getAllSellersInventory` no).
+- Editar producto: tarjeta "Con vendedores" (por vendedor + total del
+  negocio). Productos: columna "Con vendedores". Inventario: nota en
+  agotados/bajo el mínimo y en "Unidades en bodega".
+- Excel "Descargar mis productos": columna `SELLER_HELD_HEADER` al final de
+  "Productos" y hoja "Con vendedores" (`sellerHoldingsSheetRows`). Solo
+  informativas: el importador ignora columnas fuera de la plantilla y solo lee
+  la hoja "Productos"; "Cantidad" sigue siendo el stock de la tienda. Lo de un
+  vendedor no se edita por Excel (cambia con entregas, devoluciones y
+  pérdidas).
+
 ### Ajustes de caja (2026-10-04)
 
 Movimiento de caja que mueve el saldo pero **no cuenta como ingreso ni gasto**

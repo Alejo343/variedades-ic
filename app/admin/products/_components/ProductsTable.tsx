@@ -17,6 +17,8 @@ type Row = {
   commissionBps: number;
   stock: number;
   minStock: number;
+  /** Units sellers hold (their ledger). Shown beside stock, never added to it. */
+  heldBySellers: number;
   featured: boolean;
   active: boolean;
   categoryName: string | null;
@@ -140,6 +142,7 @@ export function ProductsTable({ products }: { products: Row[] }) {
                 <th className="t-right">Margen</th>
                 <th className="t-right">Comisión</th>
                 <th className="t-right">Stock</th>
+                <th className="t-right">Con vendedores</th>
                 <th>Estado</th>
               </tr>
             </thead>
@@ -202,6 +205,15 @@ export function ProductsTable({ products }: { products: Row[] }) {
                         {p.stock}
                       </span>
                       {p.minStock > 0 && <span className="num text-[11.5px] text-[var(--adm-ink-3)]"> / {p.minStock}</span>}
+                    </td>
+                    <td className="t-right num">
+                      {p.heldBySellers === 0 ? (
+                        <span className="text-[var(--adm-ink-3)]">—</span>
+                      ) : (
+                        <span className={`font-semibold ${p.heldBySellers < 0 ? "text-[var(--adm-danger)]" : "text-[var(--adm-violet)]"}`}>
+                          {p.heldBySellers}
+                        </span>
+                      )}
                     </td>
                     <td>
                       {!p.active ? (
