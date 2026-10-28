@@ -117,7 +117,7 @@ const SPECS: TableSpec[] = [
     sellerFilter: null, storeSellerFilter: "d.seller_id = $3",
     select: () => `d.uuid, ${ts("d.sale_date")} AS "saleDate", d.total_amount AS "totalAmount", a.uuid AS "accountUuid",
       s.uuid AS "sellerUuid", d.commission_amount AS "commissionAmount", cp.uuid AS "commissionPaymentUuid", d.notes,
-      ${ts("d.created_at")} AS "createdAt"`,
+      ${ts("d.voided_at")} AS "voidedAt", d.void_reason AS "voidReason", ${ts("d.created_at")} AS "createdAt"`,
   },
   {
     table: "direct_sale_items", alias: "i",
@@ -191,7 +191,8 @@ const SPECS: TableSpec[] = [
     from: "seller_sales v JOIN sellers s ON s.id = v.seller_id LEFT JOIN settlements t ON t.id = v.settlement_id",
     sellerFilter: "v.seller_id = $3",
     select: () => `v.uuid, s.uuid AS "sellerUuid", ${ts("v.sale_date")} AS "saleDate", v.total_amount AS "totalAmount",
-      v.commission_amount AS "commissionAmount", t.uuid AS "settlementUuid", v.notes, ${ts("v.created_at")} AS "createdAt"`,
+      v.commission_amount AS "commissionAmount", t.uuid AS "settlementUuid", v.notes, ${ts("v.voided_at")} AS "voidedAt",
+      v.void_reason AS "voidReason", ${ts("v.created_at")} AS "createdAt"`,
   },
   {
     table: "seller_sale_items", alias: "i",

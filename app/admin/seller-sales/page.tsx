@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { HandCoins, Plus } from "lucide-react";
 import { getAllSellerSales, getSellerSalesSummary } from "@/lib/db/queries/seller-sales";
-import { ButtonLink, Card, EmptyState, Page, PageHeader } from "../_components/ui";
+import { saleVoidBlocker } from "@/lib/domain/sale-void";
+import { Badge, ButtonLink, Card, EmptyState, Page, PageHeader } from "../_components/ui";
+import { VoidSaleControls } from "../_components/VoidSaleControls";
 import { formatCOP, formatDateTime } from "../_lib/format";
 
 export default async function SellerSalesPage() {
@@ -37,11 +39,12 @@ export default async function SellerSalesPage() {
                     <th>Notas</th>
                     <th className="t-right">Comisión</th>
                     <th className="t-right">Total</th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
                   {sales.map((s) => (
-                    <tr key={s.id}>
+                    <tr key={s.id} className={s.voidedAt ? "opacity-60" : undefined}>
                       <td className="num text-[var(--adm-ink-3)]">#{s.id}</td>
                       <td className="whitespace-nowrap">{formatDateTime(s.saleDate)}</td>
                       <td className="t-strong">
@@ -49,9 +52,27 @@ export default async function SellerSalesPage() {
                           {s.sellerName ?? "—"}
                         </Link>
                       </td>
-                      <td className="max-w-[240px] truncate">{s.notes ?? "—"}</td>
-                      <td className="t-right num">{formatCOP(s.commissionAmount)}</td>
-                      <td className="t-right num t-strong">{formatCOP(s.totalAmount)}</td>
+                      <td className="max-w-[240px] truncate">
+                        {s.voidedAt ? (
+                          <span title={s.voidReason ?? undefined}>
+                            <Badge tone="danger">Anulada</Badge> {s.voidReason ?? ""}
+                          </span>
+                        ) : (
+                          (s.notes ?? "—")
+                        )}
+                      </td>
+                      <td className={`t-right num ${s.voidedAt ? "line-through" : ""}`}>{formatCOP(s.commissionAmount)}</td>
+                      <td className={`t-right num t-strong ${s.voidedAt ? "line-through" : ""}`}>{formatCOP(s.totalAmount)}</td>
+                      <td className="t-right">
+                        {!s.voidedAt && (
+                          <VoidSaleControls
+                            kind="seller"
+                            saleId={s.id}
+                            blocker={saleVoidBlocker(s)}
+                            correctHref={`/admin/seller-sales/new?sellerId=${s.sellerId}&corregir=${s.id}`}
+                          />
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

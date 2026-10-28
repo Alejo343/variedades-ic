@@ -16,7 +16,14 @@ export async function hasPendingCommission(dbOrTx: typeof db | Tx, sellerId: num
   const rows = await dbOrTx
     .select({ id: directSales.id })
     .from(directSales)
-    .where(and(eq(directSales.sellerId, sellerId), isNull(directSales.commissionPaymentId), gt(directSales.commissionAmount, 0)))
+    .where(
+      and(
+        eq(directSales.sellerId, sellerId),
+        isNull(directSales.commissionPaymentId),
+        isNull(directSales.voidedAt),
+        gt(directSales.commissionAmount, 0),
+      ),
+    )
     .limit(1);
   return rows.length > 0;
 }

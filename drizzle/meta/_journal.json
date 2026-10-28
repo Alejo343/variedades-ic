@@ -204,6 +204,13 @@
       "when": 1792780773807,
       "tag": "0028_salary_sellers",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793196470916,
+      "tag": "0029_sale_voids",
+      "breakpoints": true
     }
   ]
 }

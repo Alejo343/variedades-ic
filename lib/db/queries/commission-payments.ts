@@ -10,7 +10,12 @@ export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 // in the next payment and nothing is paid twice (commission_payment_id).
 // Shared by the panel and the sync push (lib/sync/operations).
 const pendingSales = (sellerId: number, periodDate: string) =>
-  and(eq(directSales.sellerId, sellerId), sql`DATE(${directSales.saleDate}) <= ${periodDate}`, isNull(directSales.commissionPaymentId));
+  and(
+    eq(directSales.sellerId, sellerId),
+    sql`DATE(${directSales.saleDate}) <= ${periodDate}`,
+    isNull(directSales.commissionPaymentId),
+    isNull(directSales.voidedAt),
+  );
 
 export async function pendingCommission(dbOrTx: typeof db | Tx, sellerId: number, periodDate: string) {
   const [row] = await dbOrTx

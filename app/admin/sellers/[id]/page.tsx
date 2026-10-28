@@ -218,7 +218,14 @@ export default async function SellerDetailPage({ params }: { params: Promise<{ i
                       </p>
                       {!salary && <p className="num text-[12px] text-[var(--adm-ink-3)]">Comisión {formatCOP(s.commissionAmount)}</p>}
                     </div>
-                    <span className="num font-semibold text-[14px]">{formatCOP(s.totalAmount)}</span>
+                    {s.voidedAt ? (
+                      <span className="flex items-center gap-2">
+                        <Badge tone="danger">Anulada</Badge>
+                        <span className="num text-[14px] line-through text-[var(--adm-ink-3)]">{formatCOP(s.totalAmount)}</span>
+                      </span>
+                    ) : (
+                      <span className="num font-semibold text-[14px]">{formatCOP(s.totalAmount)}</span>
+                    )}
                   </li>
                 ))}
               </ul>

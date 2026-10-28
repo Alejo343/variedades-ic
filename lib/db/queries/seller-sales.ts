@@ -1,6 +1,6 @@
 import { db } from "../index";
 import { directSales, sellerSales, sellerSaleItems, inventoryMovements, products, sellers } from "../schema";
-import { eq, desc, inArray, sql } from "drizzle-orm";
+import { eq, desc, inArray, isNull, sql } from "drizzle-orm";
 import type { SellerSaleInput } from "@/lib/validations";
 import { deductStock } from "@/lib/domain/stock";
 import { calculateCommission, type CommissionLine } from "@/lib/domain/commission";
@@ -19,6 +19,9 @@ export function getAllSellerSales() {
       saleDate: sellerSales.saleDate,
       totalAmount: sellerSales.totalAmount,
       commissionAmount: sellerSales.commissionAmount,
+      settlementId: sellerSales.settlementId,
+      voidedAt: sellerSales.voidedAt,
+      voidReason: sellerSales.voidReason,
       notes: sellerSales.notes,
     })
     .from(sellerSales)
@@ -35,6 +38,9 @@ export async function getSellerSaleById(id: number) {
       saleDate: sellerSales.saleDate,
       totalAmount: sellerSales.totalAmount,
       commissionAmount: sellerSales.commissionAmount,
+      settlementId: sellerSales.settlementId,
+      voidedAt: sellerSales.voidedAt,
+      voidReason: sellerSales.voidReason,
       notes: sellerSales.notes,
     })
     .from(sellerSales)
@@ -72,6 +78,7 @@ export async function getSellerSalesSummary() {
     })
     .from(sellerSales)
     .leftJoin(sellers, eq(sellerSales.sellerId, sellers.id))
+    .where(isNull(sellerSales.voidedAt))
     .groupBy(sellerSales.sellerId, sellers.name);
 
   return rows.map((r) => ({
@@ -98,6 +105,7 @@ export async function getAllSellersSalesSummary() {
       })
       .from(directSales)
       .innerJoin(sellers, eq(directSales.sellerId, sellers.id))
+      .where(isNull(directSales.voidedAt))
       .groupBy(directSales.sellerId, sellers.name),
   ]);
 

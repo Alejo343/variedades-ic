@@ -1,15 +1,19 @@
 import { Plus, Store } from "lucide-react";
 import { getAllDirectSales } from "@/lib/db/queries/direct-sales";
-import { ButtonLink, EmptyState, Page, PageHeader, Stat } from "../_components/ui";
+import { saleVoidBlocker } from "@/lib/domain/sale-void";
+import { Badge, ButtonLink, EmptyState, Page, PageHeader, Stat } from "../_components/ui";
+import { VoidSaleControls } from "../_components/VoidSaleControls";
 import { formatCOP, formatDateTime, todayInBogota } from "../_lib/format";
 
 export default async function DirectSalesPage() {
   const sales = await getAllDirectSales();
+  // Voided sales stay listed (marked) but count in no total.
+  const counted = sales.filter((s) => !s.voidedAt);
 
   const today = todayInBogota();
   const dayOf = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota" }).format(d);
-  const todays = sales.filter((s) => dayOf(new Date(s.saleDate)) === today);
-  const month = sales.filter((s) => dayOf(new Date(s.saleDate)).slice(0, 7) === today.slice(0, 7));
+  const todays = counted.filter((s) => dayOf(new Date(s.saleDate)) === today);
+  const month = counted.filter((s) => dayOf(new Date(s.saleDate)).slice(0, 7) === today.slice(0, 7));
   const sum = (xs: typeof sales) => xs.reduce((t, s) => t + s.totalAmount, 0);
   const avg = month.length ? Math.round(sum(month) / month.length) : 0;
 
@@ -50,17 +54,38 @@ export default async function DirectSalesPage() {
                   <th>Vendió</th>
                   <th>Notas</th>
                   <th className="t-right">Total</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
                 {sales.map((s) => (
-                  <tr key={s.id}>
+                  <tr key={s.id} className={s.voidedAt ? "opacity-60" : undefined}>
                     <td className="num text-[var(--adm-ink-3)]">#{s.id}</td>
                     <td className="whitespace-nowrap">{formatDateTime(s.saleDate)}</td>
                     <td>{s.accountName ?? "—"}</td>
                     <td>{s.sellerName ?? "Dueño"}</td>
-                    <td className="max-w-[320px] truncate">{s.notes ?? "—"}</td>
-                    <td className="t-right num t-strong">{formatCOP(s.totalAmount)}</td>
+                    <td className="max-w-[320px] truncate">
+                      {s.voidedAt ? (
+                        <span title={s.voidReason ?? undefined}>
+                          <Badge tone="danger">Anulada</Badge> {s.voidReason ?? ""}
+                        </span>
+                      ) : (
+                        (s.notes ?? "—")
+                      )}
+                    </td>
+                    <td className={`t-right num t-strong ${s.voidedAt ? "line-through" : ""}`}>{formatCOP(s.totalAmount)}</td>
+                    <td className="t-right">
+                      {!s.voidedAt && (
+                        <VoidSaleControls
+                          kind="direct"
+                          saleId={s.id}
+                          blocker={saleVoidBlocker(s)}
+                          // The panel's form registers the owner's sales only; a store
+                          // seller registers theirs again from the phone.
+                          correctHref={s.sellerId === null ? `/admin/direct-sales/new?corregir=${s.id}` : null}
+                        />
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

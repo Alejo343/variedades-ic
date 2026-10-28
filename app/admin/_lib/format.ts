@@ -56,6 +56,7 @@ export const MOVEMENT_LABELS: Record<string, string> = {
   perdida: "Pérdida",
   dano: "Daño",
   robo: "Robo",
+  anulacion: "Venta anulada",
 };
 
 /** Today's date in Colombia as YYYY-MM-DD (the business runs on Bogotá time). */

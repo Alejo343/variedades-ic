@@ -10,7 +10,7 @@ import {
   sellerSales,
   sellerSaleItems,
 } from "../schema";
-import { and, desc, eq, gte, lte, ne, inArray, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lte, ne, inArray, sql, type SQL } from "drizzle-orm";
 import type { AnyColumn } from "drizzle-orm";
 
 function dateRangeConditions(column: AnyColumn, from?: string, to?: string): SQL[] {
@@ -73,8 +73,9 @@ export async function getSalesReport(from?: string, to?: string) {
     inArray(salesOrders.status, ["confirmado", "entregado"]),
     ...dateRangeConditions(salesOrders.createdAt, from, to),
   ];
-  const localConds = dateRangeConditions(directSales.saleDate, from, to);
-  const sellerConds = dateRangeConditions(sellerSales.saleDate, from, to);
+  // Voided sales (lib/domain/sale-void.ts) count nowhere.
+  const localConds = [isNull(directSales.voidedAt), ...dateRangeConditions(directSales.saleDate, from, to)];
+  const sellerConds = [isNull(sellerSales.voidedAt), ...dateRangeConditions(sellerSales.saleDate, from, to)];
 
   const [[whatsapp], [local], [seller]] = await Promise.all([
     db
@@ -109,8 +110,8 @@ export async function getProfitReport(from?: string, to?: string) {
     inArray(salesOrders.status, ["confirmado", "entregado"]),
     ...dateRangeConditions(salesOrders.createdAt, from, to),
   ];
-  const localCogsConds = dateRangeConditions(directSales.saleDate, from, to);
-  const sellerCogsConds = dateRangeConditions(sellerSales.saleDate, from, to);
+  const localCogsConds = [isNull(directSales.voidedAt), ...dateRangeConditions(directSales.saleDate, from, to)];
+  const sellerCogsConds = [isNull(sellerSales.voidedAt), ...dateRangeConditions(sellerSales.saleDate, from, to)];
 
   const [sales, [whatsappRow], [localRow], [sellerRow]] = await Promise.all([
     getSalesReport(from, to),
@@ -159,12 +160,12 @@ export async function getDailySales(from: string, to: string): Promise<DailySale
     db
       .select({ day: day(directSales.saleDate), total: sql<string>`COALESCE(SUM(${directSales.totalAmount}), 0)` })
       .from(directSales)
-      .where(and(...dateRangeConditions(directSales.saleDate, from, to)))
+      .where(and(isNull(directSales.voidedAt), ...dateRangeConditions(directSales.saleDate, from, to)))
       .groupBy(day(directSales.saleDate)),
     db
       .select({ day: day(sellerSales.saleDate), total: sql<string>`COALESCE(SUM(${sellerSales.totalAmount}), 0)` })
       .from(sellerSales)
-      .where(and(...dateRangeConditions(sellerSales.saleDate, from, to)))
+      .where(and(isNull(sellerSales.voidedAt), ...dateRangeConditions(sellerSales.saleDate, from, to)))
       .groupBy(day(sellerSales.saleDate)),
   ]);
 

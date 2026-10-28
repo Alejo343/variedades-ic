@@ -172,6 +172,31 @@ negativos); comisión entre 0 y 1 % sale como texto ("0,5%") porque el número
 entre la descarga y la subida, la subida vuelve a fijar el stock del archivo
 (la pantalla lo advierte y la vista previa lo muestra como cambio de Stock).
 
+### Anular y corregir ventas (2026-10-28)
+
+Decisión del usuario: el dueño puede anular una venta equivocada (suya o de
+un vendedor) y "corregirla" = anularla y registrarla de nuevo. Migración
+`0029_sale_voids` (`0025` en el móvil).
+
+- `direct_sales` y `seller_sales` ganan `voided_at`/`void_reason`. La venta
+  no se borra y **no cuenta en ningún total**: reportes, Inicio, comisiones
+  pendientes, liquidaciones y resúmenes filtran `isNull(voidedAt)` (en
+  memoria, `lib/domain/sale-void.ts#countedSales`; el móvil tiene una copia
+  idéntica). Toda consulta nueva que sume ventas debe hacer lo mismo.
+- `lib/db/queries/sale-voids.ts` (panel y sync escriben lo mismo): las
+  unidades vuelven con un movimiento `anulacion` (principal o del vendedor),
+  el ingreso de caja de una venta en local se **borra** (lápida a los
+  celulares) y se marca la venta. Bloqueado si ya está en una liquidación o
+  con la comisión pagada (`saleVoidBlocker`).
+- Sync: `voidDirectSale`/`voidSellerSale {saleUuid, voidedAt, reason?,
+  items: [{itemUuid, movementUuid}]}`, solo dueño; el pull manda `voidedAt`
+  y `voidReason`. Test `lib/sync/operations/sale-voids.integration.test.ts`.
+- Panel: "Anular" y "Corregir" en Ventas en local y Ventas de vendedores
+  (`_components/VoidSaleControls.tsx`, `POST /api/admin/{direct,seller}-sales/[id]/void`).
+  Corregir abre el formulario con `?corregir=<id>` precargado; la venta de un
+  vendedor de tienda solo se anula (el panel no registra ventas a su nombre).
+- **Desplegar la web antes de instalar la versión de la app que la usa.**
+
 ### Stock con vendedores (2026-10-27)
 
 Decisión del usuario: lo que tienen los vendedores (su ledger) se muestra

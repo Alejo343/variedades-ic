@@ -7,10 +7,21 @@ import { formatCOP } from "../../_lib/format";
 
 type Account = { id: number; name: string };
 
-export function DirectSaleForm({ products, accounts }: { products: CartProduct[]; accounts: Account[] }) {
+export function DirectSaleForm({
+  products,
+  accounts,
+  initial,
+}: {
+  products: CartProduct[];
+  accounts: Account[];
+  /** Corregir: the voided sale's products and account, to register it again. */
+  initial?: { lines: CartLine[]; accountId: number };
+}) {
   const router = useRouter();
-  const [lines, setLines] = useState<CartLine[]>([]);
-  const [accountId, setAccountId] = useState<number | "">(accounts.length === 1 ? accounts[0].id : "");
+  const [lines, setLines] = useState<CartLine[]>(initial?.lines ?? []);
+  const [accountId, setAccountId] = useState<number | "">(
+    initial && accounts.some((a) => a.id === initial.accountId) ? initial.accountId : accounts.length === 1 ? accounts[0].id : "",
+  );
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");

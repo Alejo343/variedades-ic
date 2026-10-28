@@ -14,7 +14,12 @@ export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 // settlement_id marks (markIncludedInSettlement) keep anything from being
 // charged twice. Shared with the sync push (lib/sync/operations).
 const pendingSales = (sellerId: number, periodDate: string) =>
-  and(eq(sellerSales.sellerId, sellerId), sql`DATE(${sellerSales.saleDate}) <= ${periodDate}`, isNull(sellerSales.settlementId));
+  and(
+    eq(sellerSales.sellerId, sellerId),
+    sql`DATE(${sellerSales.saleDate}) <= ${periodDate}`,
+    isNull(sellerSales.settlementId),
+    isNull(sellerSales.voidedAt),
+  );
 const pendingLosses = (sellerId: number, periodDate: string) =>
   and(eq(sellerLosses.sellerId, sellerId), sql`DATE(${sellerLosses.lossDate}) <= ${periodDate}`, isNull(sellerLosses.settlementId));
 

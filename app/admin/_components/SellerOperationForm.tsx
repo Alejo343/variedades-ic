@@ -62,14 +62,17 @@ export function SellerOperationForm({
   mode,
   sellerId,
   inventory,
+  initialLines = [],
 }: {
   mode: SellerOperationMode;
   sellerId: number;
   inventory: InventoryItem[];
+  /** Preloaded lines (Corregir: the voided sale's products). */
+  initialLines?: CartLine[];
 }) {
   const router = useRouter();
   const cfg = MODE[mode];
-  const [lines, setLines] = useState<CartLine[]>([]);
+  const [lines, setLines] = useState<CartLine[]>(initialLines);
   const [lossType, setLossType] = useState<LossType>("perdida");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);

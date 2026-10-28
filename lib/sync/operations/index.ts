@@ -4,6 +4,7 @@ import { createCashMovement, createCashTransfer, createDirectSale, createInvento
 import { createCommissionPayment } from "./commissions";
 import { upsertCashAccount, upsertCategory, upsertDistributor, upsertProduct, upsertSeller } from "./catalog";
 import { createSalaryPayment } from "./salary";
+import { voidDirectSale, voidSellerSale } from "./sale-voids";
 import { createPurchaseOrder, createPurchasePayment, transitionPurchaseOrder } from "./purchases";
 import { createSellerLoss, createSellerReturn, createSellerSale } from "./seller";
 
@@ -30,4 +31,6 @@ export const syncHandlers: OperationHandlers = {
   createPurchasePayment,
   createCommissionPayment,
   createSalaryPayment,
+  voidDirectSale,
+  voidSellerSale,
 };

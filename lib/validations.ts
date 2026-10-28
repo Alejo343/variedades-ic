@@ -257,6 +257,11 @@ export const directSaleItemSchema = z.object({
   unitPrice: z.number().int().min(0),
 });
 
+// Voiding a sale from the panel (lib/domain/sale-void.ts): optional reason.
+export const saleVoidSchema = z.object({
+  reason: z.string().max(2000).nullish(),
+});
+
 export const directSaleSchema = z.object({
   items: z.array(directSaleItemSchema).min(1, "Debe incluir al menos un producto"),
   accountId: z.number().int(),

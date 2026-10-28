@@ -20,6 +20,9 @@ export function getAllDirectSales() {
       sellerId: directSales.sellerId,
       sellerName: sellers.name,
       commissionAmount: directSales.commissionAmount,
+      commissionPaymentId: directSales.commissionPaymentId,
+      voidedAt: directSales.voidedAt,
+      voidReason: directSales.voidReason,
       notes: directSales.notes,
       createdAt: directSales.createdAt,
     })

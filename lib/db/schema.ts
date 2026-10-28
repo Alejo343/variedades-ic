@@ -241,6 +241,10 @@ export const directSales = pgTable("direct_sales", {
   commissionAmount: integer("commission_amount").default(0).notNull(),
   // The commission payment that paid this sale's commission (null = pending).
   commissionPaymentId: integer("commission_payment_id").references((): AnyPgColumn => commissionPayments.id),
+  // Set when the owner voided it (lib/domain/sale-void.ts): kept for history,
+  // left out of every total.
+  voidedAt: timestamp("voided_at"),
+  voidReason: text("void_reason"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -296,6 +300,9 @@ export const sellerSales = pgTable("seller_sales", {
   totalAmount: integer("total_amount").default(0).notNull(),
   commissionAmount: integer("commission_amount").default(0).notNull(),
   settlementId: integer("settlement_id").references(() => settlements.id),
+  // Same as direct_sales.voided_at / void_reason.
+  voidedAt: timestamp("voided_at"),
+  voidReason: text("void_reason"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
